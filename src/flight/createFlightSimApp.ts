@@ -2869,8 +2869,11 @@ export async function createFlightSimApp(
     runtime.setSimRunning(!inputManager.isPaused());
     // F-35B starts gear-up, so its wheels are hidden before they are ever drawn.
     // Compiling them on the extend frame freezes the sim; do it under this screen.
-    const warmHiddenGear = aircraftModel?.warmHiddenGear;
-    const hiddenGearPrepared = aircraftModel?.hiddenGearPrepared;
+    // mountFlightWorld assigns this, and the checker does not follow that call,
+    // so the binding is still the initial null here.
+    const gearModel = aircraftModel as AircraftModelHandle | null;
+    const warmHiddenGear = gearModel?.warmHiddenGear;
+    const hiddenGearPrepared = gearModel?.hiddenGearPrepared;
     if (warmHiddenGear && hiddenGearPrepared && !hiddenGearPrepared()) {
       gearPipelineWarmup = true;
       physicsLoop.setPaused(true);
@@ -2878,7 +2881,7 @@ export async function createFlightSimApp(
       try {
         while (!hiddenGearPrepared() && performance.now() < deadline) {
           engineVisuals.read();
-          const rig = aircraftModel?.getRig() ?? null;
+          const rig = gearModel?.getRig() ?? null;
           if (rig) engineVisuals.updateRig(rig, true);
           warmHiddenGear();
           await new Promise(resolve => setTimeout(resolve, 20));
