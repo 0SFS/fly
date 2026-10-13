@@ -546,6 +546,25 @@ describe("experimental F-35B installed-SDK contracts, not aircraft calibration",
     expect(sdk.getPropertyValue("gear/gear-pos-norm")).toBe(0);
   });
 
+  it("slews the horizontal tail and rudder at the declared unloaded rate", async () => {
+    const sdk = await createF35();
+    sdk.setPropertyValue("fcs/control-law-mode", 1);
+    for (const property of ["fcs/pitch-trim-cmd-norm", "fcs/yaw-trim-cmd-norm",
+      "fcs/elevator-cmd-norm", "fcs/rudder-cmd-norm"]) sdk.setPropertyValue(property, 0);
+    expect(sdk.runIc()).toBe(true);
+    const rate = sdk.getPropertyValue("fcs/primary-surface-rate-limit-rad_sec");
+    expect(rate).toBeCloseTo(60 * Math.PI / 180, 12);
+    const surfaces = ["fcs/elevator-pos-rad", "fcs/rudder-pos-rad"] as const;
+    for (const property of surfaces) expect(sdk.getPropertyValue(property)).toBeCloseTo(0, 8);
+    sdk.setPropertyValue("fcs/elevator-cmd-norm", 1);
+    sdk.setPropertyValue("fcs/rudder-cmd-norm", 1);
+    const steps = 30;
+    for (let step = 0; step < steps; step++) expect(sdk.run()).toBe(true);
+    const traveled = rate * FIXED_DT * steps;
+    expect(traveled).toBeLessThan(0.4);
+    for (const property of surfaces) expect(sdk.getPropertyValue(property)).toBeCloseTo(traveled, 5);
+  });
+
   it.each(["aileron", "rudder", "elevator"] as const)("honors the pilot's conventional %s sign", async axis => {
     const sdk = await createF35();
     const before = readFlightState(sdk);
