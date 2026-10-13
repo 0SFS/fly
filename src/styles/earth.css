@@ -1,0 +1,39 @@
+/*
+ * FOSS Earth's stylesheets for what the flight uses from it: the game log and
+ * loading screen, the toolbar, the panels and their controls, and the tabs the
+ * flight shows. The old `foss-earth/shell.css` carried all of these in one sheet;
+ * FOSS Earth now ships them per package (its own app gathers them in
+ * `app/src/styles/globe.css`). The globe's page base, panorama, scenes and dev
+ * sheets are left out, as the old flight never had them. Windowing and the input
+ * mode sheet are imported where the flight builds them.
+ */
+@import "@foss-earth/ui/styles.css";
+@import "@foss-earth/ui/status.css";
+@import "@foss-earth/ui/log.css";
+@import "@foss-earth/ui/mesh-inspector.css";
+@import "@foss-earth/ui/dial.css";
+@import "@foss-earth/toolbar/styles.css";
+@import "@foss-earth/renderer/frame-budget.css";
+@import "@foss-earth/engine/map.css";
+@import "@foss-earth/engine/map-cache.css";
+@import "@foss-earth/engine/location.css";
+@import "@foss-earth/sky/styles.css";
+@import "@foss-earth/about/panel.css";
+@import "@foss-earth/ui/theme.css";
+
+/*
+ * The page itself never scrolls past its ends: a sideways swipe that reached
+ * the browser went Back a page in Chrome, and a pull down reloaded it on a
+ * phone. The old shell sheet said this; FOSS Earth's sheets no longer do.
+ */
+html,
+body {
+  overscroll-behavior: none;
+}
+
+/*
+ * Where the windows leave no room for a floating log, FOSS Earth hides it and
+ * offers a Log tab. While the flight loads the window is inert, so the loading
+ * report (progress, failure, Try again, Copy loading report) keeps floating.
+ */
+html[data-log-visible="false"] body > #app-log.game-log[data-loading-details] { display: flex !important; }

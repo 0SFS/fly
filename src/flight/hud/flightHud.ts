@@ -1,0 +1,676 @@
+import { headingDegFromRad, type FlightState } from "@0sfs/ground-contact/flightState";
+import type { FrameProfiler } from "foss-earth/perf";
+import { createThrottleLever, type ThrottleLeverEngine } from "@0sfs/engines/throttleLever";
+import {
+  ATTITUDE_HALF_SHARE,
+  createAttitudeRenderer,
+  type AttitudeRendererPreference,
+  type AttitudeRendererStatus,
+} from "./attitudeRenderer";
+import type { AttitudeView } from "./attitudeIndicator";
+
+export interface FlightHudOptions {
+  onGearChange(down: boolean): void;
+  onThrottleChange(value: number): void;
+  onPitchTrimChange(value: number): void;
+  onRollTrimChange(value: number): void;
+  onPitchAutoTrimChange(enabled: boolean): void;
+  onRollAutoTrimChange(enabled: boolean): void;
+  onAutopilotEngageChange(engaged: boolean): void;
+  onFlapsChange(value: number): void;
+  flapAutomation?: {
+    getEnabled(): boolean;
+    onEnabledChange(enabled: boolean): void;
+    getPositionNorm(): number;
+    /** Some automatic schedules reflex the flaps slightly above neutral. */
+    minPositionNorm?: number;
+  };
+  onRudderChange(value: number): void;
+  onStickChange(aileron: number, elevator: number): void;
+  /** The globe's WebGPU device, so the attitude indicator draws on the GPU; null on WebGL. */
+  gpuDevice?: GPUDevice | null;
+  /** Renderer → Instruments → Attitude indicator: osfs.renderer.attitudeIndicator. */
+  attitudeRenderer?: AttitudeRendererPreference;
+  /** Told what the attitude indicator draws with, whenever that changes. */
+  onAttitudeStatus?(status: AttitudeRendererStatus): void;
+  profiler?: FrameProfiler | null;
+  pitchAutoTrim?: boolean;
+  rollAutoTrim?: boolean;
+  autopilotEngaged?: boolean;
+  /** Observed engine state, independent of throttle command and audio settings. */
+  afterburner?: {
+    getActive(): boolean | null;
+    accentColor: string;
+  };
+  /**
+   * Starting and stopping the engine from the throttle lever. Absent, the
+   * lever is a plain throttle.
+   */
+  engine?: {
+    getReading(): ThrottleLeverEngine | null;
+    onStartHold(held: boolean): void;
+    onShutdown(): void;
+  };
+  /** Present only when the active aircraft has a powered lift conversion lever. */
+  vtolConversion?: {
+    getCommandNorm(): number;
+    getPositionNorm?(): number;
+    onCommandChange(value: number): void;
+  };
+}
+
+export interface FlightHudControls {
+  pitchTrim: number;
+  rollTrim: number;
+  flaps: number;
+  rudder: number;
+  aileron: number;
+  elevator: number;
+}
+
+export interface FlightHudAutoTrim {
+  pitch: boolean;
+  roll: boolean;
+}
+
+export interface FlightHudMasterAp {
+  engaged: boolean;
+  canEngage: boolean;
+  blockedReason: string | null;
+  ownsPitch: boolean;
+  ownsRoll: boolean;
+  ownsGear: boolean;
+  ownsFlaps: boolean;
+}
+
+export const FLIGHT_HUD_MASTER_OFF: FlightHudMasterAp = {
+  engaged: false,
+  canEngage: true,
+  blockedReason: null,
+  ownsPitch: false,
+  ownsRoll: false,
+  ownsGear: false,
+  ownsFlaps: false,
+};
+
+export interface FlightHudHandle {
+  /**
+   * `gearDown`, auto-trim, and master AP are passed separately rather than
+   * added to `FlightHudControls` because they are latching switches, not
+   * smoothed axes. `attitudeView` is the frame the attitude indicator is
+   * drawn from, the 3D camera's (cameraAttitudeView.ts), or null for the
+   * aircraft's.
+   */
+  update(
+    state: FlightState,
+    controls: FlightHudControls,
+    gearDown: boolean,
+    autoTrim: FlightHudAutoTrim,
+    masterAp?: FlightHudMasterAp,
+    attitudeView?: AttitudeView | null,
+  ): void;
+  /** Repaint just the gear button, for when the key moves it between frames. */
+  setGearDown(down: boolean): void;
+  /** Synchronize a registry edit while the simulation is paused or stopped. */
+  refreshVtolConversion(): void;
+  refreshFlaps(): void;
+  setAttitudeRenderer(preference: AttitudeRendererPreference): void;
+  /**
+   * A pointer is down on one of the flight controls. A finger resting on a
+   * lever is still flying, though it sends nothing until it moves, so control
+   * must not go back to a phone underneath it.
+   */
+  isPilotHolding(): boolean;
+  destroy(): void;
+}
+
+function stickResponse(value: number): number {
+  return Math.abs(value) <= 0.035 ? 0 : Math.sign(value) * (Math.abs(value) - 0.035) / 0.965;
+}
+
+function inverseStickResponse(value: number): number {
+  if (value === 0) return 0;
+  return Math.sign(value) * (Math.abs(value) * 0.965 + 0.035);
+}
+
+function clampStickSquare(x: number, y: number): { x: number; y: number } {
+  return {
+    x: Math.max(-1, Math.min(1, x)),
+    y: Math.max(-1, Math.min(1, y)),
+  };
+}
+
+function controlsToStickDisplay(aileron: number, elevator: number): { x: number; y: number } {
+  return clampStickSquare(
+    inverseStickResponse(aileron),
+    inverseStickResponse(-elevator),
+  );
+}
+
+export function createFlightHud(root: HTMLElement, options: FlightHudOptions): FlightHudHandle {
+  root.innerHTML = `
+    <div class="flight-hud" aria-label="Flight instruments">
+      <div class="flight-hud__attitude-cluster" aria-label="Attitude and adjacent levers">
+        <div class="flight-hud__auto-trims" role="group" aria-label="Trim assists">
+          <button class="flight-hud__auto-trim flight-hud__auto-trim--roll" data-control="auto-roll-trim" type="button" aria-pressed="false"><span>TRIM</span><span>AUTO</span></button>
+          <button class="flight-hud__auto-trim flight-hud__auto-trim--pitch" data-control="auto-pitch-trim" type="button" aria-pressed="false"><span>AUTO</span><span>TRIM</span></button>
+        </div>
+        <label class="flight-hud__slider-control flight-hud__slider-control--roll-trim">
+          <span>ROLL</span>
+          <input data-control="roll-trim" type="range" min="-1" max="1" step="0.01" value="0" aria-label="Roll trim" />
+          <output data-output="roll-trim">0%</output>
+        </label>
+        <label class="flight-hud__lever flight-hud__lever--pitch">
+          <span class="flight-hud__lever-meta">
+            <span>PITCH</span>
+            <output data-output="pitch-trim">0%</output>
+          </span>
+          <span class="flight-hud__lever-track">
+            <input data-control="pitch-trim" type="range" min="-1" max="1" step="0.01" value="0" aria-label="Pitch trim" />
+          </span>
+        </label>
+        <div class="flight-hud__attitude" role="button" tabindex="0" data-takes-keys="ArrowLeft ArrowRight ArrowUp ArrowDown" aria-label="Attitude indicator and pitch roll control. Drag to steer."></div>
+        <div class="flight-hud__lever flight-hud__lever--flaps">
+          <span class="flight-hud__lever-meta">
+            <span>FLAPS</span>
+            ${options.flapAutomation ? '<button type="button" class="flight-hud__auto-button" data-control="auto-flaps" aria-label="Automatic flaps" aria-pressed="false">AUTO</button>' : ""}
+            <output data-output="flaps">0%</output>
+          </span>
+          <span class="flight-hud__lever-track">
+            <input data-control="flaps" type="range" min="0" max="1" step="0.01" value="0" aria-label="Flaps" />
+          </span>
+        </div>
+      </div>
+      <div class="flight-hud__tapes">
+        <div class="flight-hud__tape">
+          <div class="flight-hud__tape-header">
+            <span class="flight-hud__label">IAS</span>
+            <span class="flight-hud__unit">kt</span>
+          </div>
+          <span class="flight-hud__value" data-metric="ias">000</span>
+        </div>
+        <div class="flight-hud__tape">
+          <div class="flight-hud__tape-header">
+            <span class="flight-hud__label">HDG</span>
+            <span class="flight-hud__unit">°</span>
+          </div>
+          <span class="flight-hud__value" data-metric="hdg">000</span>
+        </div>
+        <div class="flight-hud__tape">
+          <div class="flight-hud__tape-header">
+            <span class="flight-hud__label">VS</span>
+            <span class="flight-hud__unit">fpm</span>
+          </div>
+          <span class="flight-hud__value" data-metric="vs">+0000</span>
+        </div>
+        <div class="flight-hud__aoa" data-slot="aoa"></div>
+        <div class="flight-hud__g" data-slot="g"></div>
+        <button class="flight-hud__gear" data-control="gear" type="button" aria-pressed="true">G</button>
+        <button class="flight-hud__ap" data-control="autopilot" type="button" aria-pressed="false">AP</button>
+      </div>
+      <div class="flight-hud__yaw-throttle" aria-label="Yaw and throttle">
+        <div class="flight-hud__eval" data-slot="eval"></div>
+        <div class="flight-hud__yaw">
+          <label class="flight-hud__yaw-control">
+            <span class="flight-hud__yaw-heading">
+              <span>YAW</span>
+              <output data-output="rudder">0%</output>
+            </span>
+            <input data-control="rudder" type="range" min="-1" max="1" step="0.01" value="0" aria-label="Yaw rudder. Drag left or right; releases to center." />
+          </label>
+        </div>
+        <div class="flight-hud__engine" data-slot="engine"></div>
+        <div class="flight-hud__throttle">
+          <div class="flight-hud__slider-control flight-hud__slider-control--throttle"></div>
+          ${options.vtolConversion ? `
+          <label class="flight-hud__slider-control flight-hud__slider-control--vtol">
+            <span>VTOL</span>
+            <output data-output="vtol-conversion">0%</output>
+            <input data-control="vtol-conversion" type="range" min="0" max="1" step="0.01" value="0" aria-label="VTOL conversion" aria-orientation="vertical" />
+          </label>` : ""}
+        </div>
+      </div>
+    </div>
+  `;
+
+  // The pad takes the pointer and the keys; the renderer draws into a canvas inside it.
+  const pad = root.querySelector<HTMLElement>(".flight-hud__attitude");
+  const iasEl = root.querySelector<HTMLElement>('[data-metric="ias"]');
+  const hdgEl = root.querySelector<HTMLElement>('[data-metric="hdg"]');
+  const vsEl = root.querySelector<HTMLElement>('[data-metric="vs"]');
+  const throttleControl = root.querySelector<HTMLElement>(".flight-hud__slider-control--throttle");
+  const pitchTrimInput = root.querySelector<HTMLInputElement>('[data-control="pitch-trim"]');
+  const rollTrimInput = root.querySelector<HTMLInputElement>('[data-control="roll-trim"]');
+  const pitchAutoTrimButton = root.querySelector<HTMLButtonElement>('[data-control="auto-pitch-trim"]');
+  const rollAutoTrimButton = root.querySelector<HTMLButtonElement>('[data-control="auto-roll-trim"]');
+  const flapsInput = root.querySelector<HTMLInputElement>('[data-control="flaps"]');
+  const autoFlapsButton = root.querySelector<HTMLButtonElement>('[data-control="auto-flaps"]');
+  const rudderInput = root.querySelector<HTMLInputElement>('[data-control="rudder"]');
+  const vtolInput = root.querySelector<HTMLInputElement>('[data-control="vtol-conversion"]');
+  const vtolOutput = root.querySelector<HTMLOutputElement>('[data-output="vtol-conversion"]');
+  const pitchTrimOutput = root.querySelector<HTMLOutputElement>('[data-output="pitch-trim"]');
+  const rollTrimOutput = root.querySelector<HTMLOutputElement>('[data-output="roll-trim"]');
+  const flapsOutput = root.querySelector<HTMLOutputElement>('[data-output="flaps"]');
+  const rudderOutput = root.querySelector<HTMLOutputElement>('[data-output="rudder"]');
+  const gearButton = root.querySelector<HTMLButtonElement>('[data-control="gear"]');
+  const apButton = root.querySelector<HTMLButtonElement>('[data-control="autopilot"]');
+
+  if (!pad || !gearButton || !apButton || !pitchAutoTrimButton || !rollAutoTrimButton
+    || !iasEl || !hdgEl || !vsEl
+    || !throttleControl || !pitchTrimInput || !rollTrimInput || !flapsInput || !rudderInput
+    || !pitchTrimOutput || !rollTrimOutput || !flapsOutput || !rudderOutput) {
+    throw new Error("Flight HUD markup failed to initialize.");
+  }
+
+  if (options.afterburner) {
+    throttleControl.style.setProperty("--afterburner-accent", options.afterburner.accentColor);
+  }
+  // The phone mounts this same lever; see throttleLever.ts.
+  const throttle = createThrottleLever(throttleControl, {
+    onThrottleChange: options.onThrottleChange,
+    onStartHold: options.engine?.onStartHold,
+    onShutdown: options.engine?.onShutdown,
+  });
+  let masterAp: FlightHudMasterAp = {
+    ...FLIGHT_HUD_MASTER_OFF,
+    engaged: options.autopilotEngaged === true,
+  };
+  let flapsDragging = false;
+  let flapsKeyboardEditing = false;
+  let flapCommand = 0;
+  const refreshFlaps = (): void => {
+    const automation = options.flapAutomation;
+    const enabled = automation?.getEnabled() === true;
+    if (enabled) flapsKeyboardEditing = false;
+    autoFlapsButton?.setAttribute("aria-pressed", String(enabled));
+    autoFlapsButton?.classList.toggle("is-on", enabled && !masterAp.ownsFlaps);
+    if (autoFlapsButton) {
+      autoFlapsButton.title = masterAp.ownsFlaps
+        ? `Flaps are owned by Autopilot. Automatic flap assist is ${enabled ? "requested" : "off"}; move the slider to take over manually.`
+        : enabled ? "Automatic flaps on. Move the slider to take over manually."
+          : "Automatic flaps off. Click to resume automatic control.";
+      autoFlapsButton.setAttribute("aria-label", autoFlapsButton.title);
+    }
+    const actual = automation?.getPositionNorm();
+    const known = actual !== undefined && Number.isFinite(actual);
+    const editingCommand = flapsDragging || (flapsKeyboardEditing && !enabled);
+    const displayed = known && !editingCommand ? actual : flapCommand;
+    flapsInput.min = String(enabled ? automation?.minPositionNorm ?? 0 : 0);
+    if (!flapsDragging) flapsInput.value = String(displayed);
+    flapsOutput.value = known ? `${Math.round(actual * 100)}%` : `${Math.round(flapCommand * 100)}%`;
+    flapsInput.setAttribute("aria-valuetext", `${Math.round(displayed * 100)}% ${known && !editingCommand ? "actual" : "commanded"}${masterAp.ownsFlaps ? ", autopilot owns flaps" : enabled ? ", automatic flaps" : ""}`);
+  };
+  const onAutoFlapsClick = (): void => {
+    flapsKeyboardEditing = false;
+    if (options.flapAutomation) options.flapAutomation.onEnabledChange(!options.flapAutomation.getEnabled());
+    refreshFlaps();
+  };
+  autoFlapsButton?.addEventListener("click", onAutoFlapsClick);
+  const onFlapsPointerDown = (): void => { flapsDragging = true; flapsKeyboardEditing = false; };
+  const onFlapsPointerUp = (): void => { flapsDragging = false; refreshFlaps(); };
+  const onFlapsBlur = (): void => { flapsDragging = false; flapsKeyboardEditing = false; refreshFlaps(); };
+  const onFlapsKeyDown = (event: KeyboardEvent): void => {
+    if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"].includes(event.key)) {
+      flapsKeyboardEditing = true;
+    }
+  };
+  flapsInput.addEventListener("pointerdown", onFlapsPointerDown);
+  flapsInput.addEventListener("pointerup", onFlapsPointerUp);
+  flapsInput.addEventListener("pointercancel", onFlapsPointerUp);
+  flapsInput.addEventListener("lostpointercapture", onFlapsPointerUp);
+  flapsInput.addEventListener("blur", onFlapsBlur);
+  flapsInput.addEventListener("keydown", onFlapsKeyDown);
+  refreshFlaps();
+
+  const attitude = createAttitudeRenderer(pad, {
+    device: options.gpuDevice ?? null,
+    preference: options.attitudeRenderer,
+    onStatusChange: options.onAttitudeStatus,
+    profiler: options.profiler,
+  });
+
+  let gearDown = true;
+  let pitchAutoTrim = options.pitchAutoTrim === true;
+  let rollAutoTrim = options.rollAutoTrim === true;
+  const renderGearButton = (): void => {
+    gearButton.setAttribute("aria-pressed", String(gearDown));
+    gearButton.classList.toggle("is-down", gearDown);
+    gearButton.title = masterAp.ownsGear
+      ? "Landing gear is held by Autopilot. Click or press G to take it back."
+      : gearDown ? "Landing gear down (G) — click to raise" : "Landing gear up (G) — click to lower";
+    gearButton.setAttribute("aria-label", gearButton.title);
+  };
+  const renderMasterApButton = (): void => {
+    apButton.setAttribute("aria-pressed", String(masterAp.engaged));
+    apButton.classList.toggle("is-on", masterAp.engaged);
+    apButton.classList.toggle("is-blocked", !masterAp.canEngage);
+    apButton.title = masterAp.engaged
+      ? "Autopilot on — flying the axes selected on the Autopilot tab. Click to disengage."
+      : masterAp.canEngage
+        ? "Autopilot off — click to engage the package from the Autopilot tab."
+        : (masterAp.blockedReason ?? "Autopilot cannot engage.");
+    apButton.setAttribute("aria-label", apButton.title);
+  };
+  const renderAxisAutoTrim = (
+    button: HTMLButtonElement,
+    input: HTMLInputElement,
+    enabled: boolean,
+    axis: "pitch" | "roll",
+    apOwns: boolean,
+  ): void => {
+    button.setAttribute("aria-pressed", String(enabled));
+    button.classList.toggle("is-on", enabled && !apOwns);
+    button.title = apOwns
+      ? `${axis} is owned by Autopilot. TRIM is a wheel assist; disengage AP to use it.`
+      : enabled
+        ? `Trim assist on — the ${axis} wheel cancels leftover moment in real time, including while you fly. Click to turn off.`
+        : `Trim assist off — click to cancel leftover ${axis} moment on the trim wheel.`;
+    button.setAttribute("aria-label", button.title);
+    input.disabled = enabled || apOwns;
+  };
+  const renderAutoTrimButtons = (): void => {
+    renderAxisAutoTrim(pitchAutoTrimButton, pitchTrimInput, pitchAutoTrim, "pitch", masterAp.ownsPitch);
+    renderAxisAutoTrim(rollAutoTrimButton, rollTrimInput, rollAutoTrim, "roll", masterAp.ownsRoll);
+  };
+  const onGearClick = (): void => options.onGearChange(!gearDown);
+  const onPitchAutoTrimClick = (): void => options.onPitchAutoTrimChange(!pitchAutoTrim);
+  const onRollAutoTrimClick = (): void => options.onRollAutoTrimChange(!rollAutoTrim);
+  const onAutopilotClick = (): void => options.onAutopilotEngageChange(!masterAp.engaged);
+  gearButton.addEventListener("click", onGearClick);
+  pitchAutoTrimButton.addEventListener("click", onPitchAutoTrimClick);
+  rollAutoTrimButton.addEventListener("click", onRollAutoTrimClick);
+  apButton.addEventListener("click", onAutopilotClick);
+  renderGearButton();
+  renderMasterApButton();
+  renderAutoTrimButtons();
+
+  const refreshVtolConversion = (): void => {
+    const lever = options.vtolConversion;
+    if (!lever || !vtolInput || !vtolOutput) return;
+    const value = lever.getCommandNorm();
+    const command = Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
+    const percent = Math.round(command * 100);
+    const physical = lever.getPositionNorm?.();
+    const actual = physical !== undefined && Number.isFinite(physical)
+      ? `; ${Math.round(Math.min(1, Math.max(0, physical)) * 100)}% actual conversion` : "";
+    vtolInput.value = String(command);
+    vtolOutput.value = `${percent}%`;
+    vtolInput.setAttribute("aria-valuetext", `${percent}% commanded${actual}`);
+    vtolInput.title = `0% conventional flight; 100% vertical lift. ${percent}% commanded${actual}.`;
+  };
+  const onVtolInput = (): void => {
+    if (!options.vtolConversion || !vtolInput) return;
+    options.vtolConversion.onCommandChange(Number(vtolInput.value));
+    refreshVtolConversion();
+  };
+  vtolInput?.addEventListener("input", onVtolInput);
+  refreshVtolConversion();
+
+  let rudderDragging = false;
+  const onPitchTrimInput = (): void => options.onPitchTrimChange(Number(pitchTrimInput.value));
+  const onRollTrimInput = (): void => options.onRollTrimChange(Number(rollTrimInput.value));
+  const onFlapsInput = (): void => {
+    const command = Math.min(1, Math.max(0, Number(flapsInput.value)));
+    flapCommand = command;
+    if (!flapsDragging && document.activeElement === flapsInput) flapsKeyboardEditing = true;
+    options.flapAutomation?.onEnabledChange(false);
+    options.onFlapsChange(command);
+    flapCommand = command; // Synchronous setting observers may refresh the HUD during takeover.
+    refreshFlaps();
+  };
+  const onRudderInput = (): void => options.onRudderChange(Number(rudderInput.value));
+  const releaseRudder = (): void => {
+    if (!rudderDragging) return;
+    rudderDragging = false;
+    rudderInput.value = "0";
+    rudderOutput.value = "0%";
+    options.onRudderChange(0);
+  };
+  const onRudderPointerDown = (): void => { rudderDragging = true; };
+  const onRudderPointerUp = (): void => releaseRudder();
+  const onRudderBlur = (): void => releaseRudder();
+  pitchTrimInput.addEventListener("input", onPitchTrimInput);
+  rollTrimInput.addEventListener("input", onRollTrimInput);
+  flapsInput.addEventListener("input", onFlapsInput);
+  rudderInput.addEventListener("input", onRudderInput);
+  rudderInput.addEventListener("pointerdown", onRudderPointerDown);
+  rudderInput.addEventListener("pointerup", onRudderPointerUp);
+  rudderInput.addEventListener("pointercancel", onRudderPointerUp);
+  rudderInput.addEventListener("lostpointercapture", onRudderPointerUp);
+  rudderInput.addEventListener("blur", onRudderBlur);
+
+  let stickX = 0;
+  let stickY = 0;
+  let stickActive = false;
+  let capturedPointer: number | null = null;
+  const stickKeys = new Set<string>();
+
+  const applyStick = (x: number, y: number): void => {
+    stickX = x;
+    stickY = y;
+    options.onStickChange(stickResponse(x), -stickResponse(y));
+  };
+
+  const releaseStick = (): void => {
+    if (capturedPointer !== null && pad.hasPointerCapture(capturedPointer)) {
+      pad.releasePointerCapture(capturedPointer);
+    }
+    const held = capturedPointer !== null || stickKeys.size > 0 || stickX !== 0 || stickY !== 0;
+    capturedPointer = null;
+    stickKeys.clear();
+    stickActive = false;
+    pad.removeAttribute("data-active");
+    // Letting go of a stick nobody holds is not pilot input. The window losing
+    // focus or resizing lands here, and any stick input takes the controls
+    // from a phone: clicking another application handed the aircraft back to
+    // this computer mid-flight.
+    if (held) applyStick(0, 0);
+  };
+
+  const moveStick = (clientX: number, clientY: number): void => {
+    const rect = pad.getBoundingClientRect();
+    const half = Math.max(1, Math.min(rect.width, rect.height) * ATTITUDE_HALF_SHARE);
+    const { x, y } = clampStickSquare(
+      (clientX - rect.left - rect.width / 2) / half,
+      (clientY - rect.top - rect.height / 2) / half,
+    );
+    applyStick(x, y);
+  };
+
+  const onPointerDown = (event: PointerEvent): void => {
+    if (capturedPointer !== null || event.button !== 0) return;
+    event.preventDefault();
+    capturedPointer = event.pointerId;
+    pad.setPointerCapture(event.pointerId);
+    pad.setAttribute("data-active", "");
+    stickActive = true;
+    moveStick(event.clientX, event.clientY);
+  };
+
+  const onPointerMove = (event: PointerEvent): void => {
+    if (capturedPointer !== event.pointerId) return;
+    event.preventDefault();
+    moveStick(event.clientX, event.clientY);
+  };
+
+  const onPointerEnd = (event: PointerEvent): void => {
+    if (capturedPointer !== event.pointerId) return;
+    releaseStick();
+  };
+
+  const applyKeyboardStick = (): void => {
+    const { x, y } = clampStickSquare(
+      Number(stickKeys.has("ArrowRight")) - Number(stickKeys.has("ArrowLeft")),
+      Number(stickKeys.has("ArrowDown")) - Number(stickKeys.has("ArrowUp")),
+    );
+    stickActive = x !== 0 || y !== 0;
+    applyStick(x, y);
+  };
+
+  const onKeyDown = (event: KeyboardEvent): void => {
+    if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key) || capturedPointer !== null) return;
+    event.preventDefault();
+    stickKeys.add(event.key);
+    applyKeyboardStick();
+  };
+
+  const onKeyUp = (event: KeyboardEvent): void => {
+    if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key) || capturedPointer !== null) return;
+    event.preventDefault();
+    stickKeys.delete(event.key);
+    if (stickKeys.size === 0) releaseStick();
+    else applyKeyboardStick();
+  };
+
+  const onBlur = (): void => releaseStick();
+  const onVisibilityChange = (): void => {
+    if (document.hidden) releaseStick();
+  };
+
+  pad.addEventListener("pointerdown", onPointerDown);
+  pad.addEventListener("pointermove", onPointerMove);
+  pad.addEventListener("pointerup", onPointerEnd);
+  pad.addEventListener("pointercancel", onPointerEnd);
+  pad.addEventListener("lostpointercapture", onPointerEnd);
+  pad.addEventListener("keydown", onKeyDown);
+  pad.addEventListener("keyup", onKeyUp);
+  pad.addEventListener("blur", onBlur);
+  const onContextMenu = (event: Event): void => event.preventDefault();
+  pad.addEventListener("contextmenu", onContextMenu);
+  window.addEventListener("blur", onBlur);
+  window.addEventListener("resize", onBlur);
+  document.addEventListener("visibilitychange", onVisibilityChange);
+
+  // Pointers down on a flight control, wherever they are lifted.
+  const heldPointers = new Set<number>();
+  const controlGroups = [...root.querySelectorAll<HTMLElement>(".flight-hud__attitude-cluster, .flight-hud__yaw-throttle")];
+  const onHoldStart = (event: PointerEvent): void => { heldPointers.add(event.pointerId); };
+  const onHoldEnd = (event: PointerEvent): void => { heldPointers.delete(event.pointerId); };
+  const clearHeld = (): void => heldPointers.clear();
+  for (const group of controlGroups) group.addEventListener("pointerdown", onHoldStart, { capture: true });
+  window.addEventListener("pointerup", onHoldEnd, { capture: true });
+  window.addEventListener("pointercancel", onHoldEnd, { capture: true });
+  window.addEventListener("blur", clearHeld);
+
+  const setGearDown = (next: boolean): void => {
+    if (next === gearDown) return;
+    gearDown = next;
+    renderGearButton();
+  };
+  const setAutoTrim = (next: FlightHudAutoTrim): void => {
+    if (next.pitch === pitchAutoTrim && next.roll === rollAutoTrim) return;
+    pitchAutoTrim = next.pitch;
+    rollAutoTrim = next.roll;
+    renderAutoTrimButtons();
+  };
+  const setMasterAp = (next: FlightHudMasterAp): void => {
+    const same = next.engaged === masterAp.engaged
+      && next.canEngage === masterAp.canEngage
+      && next.blockedReason === masterAp.blockedReason
+      && next.ownsPitch === masterAp.ownsPitch
+      && next.ownsRoll === masterAp.ownsRoll
+      && next.ownsGear === masterAp.ownsGear
+      && next.ownsFlaps === masterAp.ownsFlaps;
+    if (same) return;
+    masterAp = { ...next };
+    renderMasterApButton();
+    renderGearButton();
+    renderAutoTrimButtons();
+    refreshFlaps();
+  };
+
+  return {
+    setGearDown,
+    refreshVtolConversion,
+    refreshFlaps,
+    setAttitudeRenderer: preference => attitude.setPreference(preference),
+    update(
+      state: FlightState,
+      controls: FlightHudControls,
+      nextGearDown: boolean,
+      nextAutoTrim: FlightHudAutoTrim,
+      nextMasterAp = FLIGHT_HUD_MASTER_OFF,
+      attitudeView: AttitudeView | null = null,
+    ): void {
+      setGearDown(nextGearDown);
+      setAutoTrim(nextAutoTrim);
+      setMasterAp(nextMasterAp);
+      refreshVtolConversion();
+      const localStick = capturedPointer !== null || stickKeys.size > 0;
+      const { x: displayX, y: displayY } = localStick
+        ? clampStickSquare(stickX, stickY)
+        : controlsToStickDisplay(controls.aileron, controls.elevator);
+      const displayActive = localStick || stickActive
+        || Math.hypot(controls.aileron, controls.elevator) > 0.001;
+      attitude.draw(state, { x: displayX, y: displayY, active: displayActive }, attitudeView);
+
+      iasEl.textContent = Math.round(state.airspeedKts).toString().padStart(3, "0");
+      hdgEl.textContent = Math.round(headingDegFromRad(state.headingRad)).toString().padStart(3, "0");
+
+      // Sign then magnitude, each fixed width: signing the padded number gave
+      // "+ 738" against "-738", so the chip changed width across zero. The
+      // instrument row is left-anchored now, and that shunts everything after
+      // it sideways.
+      const vsFpm = Math.round(state.verticalSpeedFps * 60);
+      vsEl.textContent = `${vsFpm < 0 ? "-" : "+"}${Math.abs(vsFpm).toString().padStart(4, " ")}`;
+      pitchTrimInput.value = String(controls.pitchTrim);
+      rollTrimInput.value = String(controls.rollTrim);
+      if (!flapsKeyboardEditing) flapCommand = controls.flaps;
+      refreshFlaps();
+      if (!rudderDragging) rudderInput.value = String(controls.rudder);
+      throttle.update({
+        throttle: state.throttleNorm,
+        engine: options.engine?.getReading() ?? null,
+        afterburner: options.afterburner?.getActive() ?? null,
+      });
+      pitchTrimOutput.value = `${Math.round(controls.pitchTrim * 100)}%`;
+      rollTrimOutput.value = `${Math.round(controls.rollTrim * 100)}%`;
+      rudderOutput.value = `${Math.round((rudderDragging ? Number(rudderInput.value) : controls.rudder) * 100)}%`;
+    },
+    destroy(): void {
+      attitude.destroy();
+      releaseStick();
+      releaseRudder();
+      gearButton.removeEventListener("click", onGearClick);
+      pitchAutoTrimButton.removeEventListener("click", onPitchAutoTrimClick);
+      rollAutoTrimButton.removeEventListener("click", onRollAutoTrimClick);
+      apButton.removeEventListener("click", onAutopilotClick);
+      throttle.destroy();
+      vtolInput?.removeEventListener("input", onVtolInput);
+      pitchTrimInput.removeEventListener("input", onPitchTrimInput);
+      rollTrimInput.removeEventListener("input", onRollTrimInput);
+      flapsInput.removeEventListener("input", onFlapsInput);
+      autoFlapsButton?.removeEventListener("click", onAutoFlapsClick);
+      flapsInput.removeEventListener("pointerdown", onFlapsPointerDown);
+      flapsInput.removeEventListener("pointerup", onFlapsPointerUp);
+      flapsInput.removeEventListener("pointercancel", onFlapsPointerUp);
+      flapsInput.removeEventListener("lostpointercapture", onFlapsPointerUp);
+      flapsInput.removeEventListener("blur", onFlapsBlur);
+      flapsInput.removeEventListener("keydown", onFlapsKeyDown);
+      rudderInput.removeEventListener("input", onRudderInput);
+      rudderInput.removeEventListener("pointerdown", onRudderPointerDown);
+      rudderInput.removeEventListener("pointerup", onRudderPointerUp);
+      rudderInput.removeEventListener("pointercancel", onRudderPointerUp);
+      rudderInput.removeEventListener("lostpointercapture", onRudderPointerUp);
+      rudderInput.removeEventListener("blur", onRudderBlur);
+      pad.removeEventListener("pointerdown", onPointerDown);
+      pad.removeEventListener("pointermove", onPointerMove);
+      pad.removeEventListener("pointerup", onPointerEnd);
+      pad.removeEventListener("pointercancel", onPointerEnd);
+      pad.removeEventListener("lostpointercapture", onPointerEnd);
+      pad.removeEventListener("keydown", onKeyDown);
+      pad.removeEventListener("keyup", onKeyUp);
+      pad.removeEventListener("blur", onBlur);
+      pad.removeEventListener("contextmenu", onContextMenu);
+      window.removeEventListener("blur", onBlur);
+      window.removeEventListener("resize", onBlur);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      for (const group of controlGroups) group.removeEventListener("pointerdown", onHoldStart, { capture: true });
+      window.removeEventListener("pointerup", onHoldEnd, { capture: true });
+      window.removeEventListener("pointercancel", onHoldEnd, { capture: true });
+      window.removeEventListener("blur", clearHeld);
+      root.innerHTML = "";
+    },
+    isPilotHolding: () => heldPointers.size > 0,
+  };
+}

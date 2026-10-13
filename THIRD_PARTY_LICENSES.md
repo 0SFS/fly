@@ -1,0 +1,75 @@
+# Third-party software and service review
+
+This is a release-audit record, not a replacement for the license texts
+distributed in dependencies. The JSBSim row reflects the accepted in-tree
+package on 2026-09-13 and the gamepad-tools row the lockfile on 2026-09-14;
+other versions below are the installed versions resolved
+by `package-lock.json` on 2026-09-09. “Generally compatible” means the stated
+license is normally combinable with AGPLv3 when its notice and source terms are
+met; it is not a legal opinion.
+
+## Direct dependencies
+
+| Component | Version | License | Usage | AGPLv3 assessment and notes |
+| --- | ---: | --- | --- | --- |
+| [@felipegalind0/jsbsim](https://github.com/Felipegalind0/jsbsim) | 1.2.4-fork.7, local tarball | MIT SDK; bundled JSBSim WASM is LGPL-2.1, with native third-party notices | Flight dynamics engine and virtual filesystem SDK, built from one JSBSim repository revision | Conditional. The SDK retains 0x62’s attribution and MIT notice; preserve native LGPL/third-party notices and corresponding source. The accepted distribution records its source identity and includes 14 hashed files, including notices. See [JSBSim WASM integration](docs/jsbsim.md). Package metadata alone is incomplete; aircraft/assets retain separate rights questions. |
+| [@felipegalind0/gamepad-tools](https://github.com/Felipegalind0/gamepad-tools) | 0.1.0, local link | MIT | Controller and keyboard input, binding profiles and evaluation, the binding editor, and the optional 3D controller view | Project-owned code; retain its MIT notice. Like `foss-earth`, the sibling link is not an immutable release pin. Its peer dependency `@babylonjs/core` is listed below. |
+| [@babylonjs/core](https://www.babylonjs.com/) | 8.56.2 | Apache-2.0 | WebGL/WebGPU renderer | Generally compatible; retain Apache notice. |
+| [@babylonjs/loaders](https://www.babylonjs.com/) | 8.56.2 | Apache-2.0 | glTF and asset loading | Generally compatible; retain Apache notice. |
+| [3d-tiles-renderer](https://github.com/NASA-AMMOS/3DTilesRendererJS) | 0.4.24 | Apache-2.0 | 3D Tiles renderer and Google auth plugin | Generally compatible; retain Apache notice and Caltech/JPL non-endorsement notice. Provider data has separate terms. |
+| `foss-earth` | 0.0.0 local link | AGPL-3.0-only | Globe, maps, shared UI/input/runtime | Project-owned code under the same core-code license. The current sibling link still needs an immutable release pin. |
+| [jsqr](https://github.com/cozmo/jsQR) | 1.4.0 | Apache-2.0 | Phone-controller QR reading, so a Home Screen controller can pair | Generally compatible; retain Apache notice. No dependencies of its own; loaded only when the scanner opens. |
+| [lucide-react](https://lucide.dev) | 1.41.0 | ISC; Feather-derived icon notice is MIT | UI icons | Generally compatible; preserve both applicable notices. |
+| [peerjs](https://peerjs.com) | 1.5.5 | MIT | WebRTC pairing/signalling client | Generally compatible; PeerJS Cloud is an external service with its own operational terms. |
+| [qrcode](https://github.com/soldair/node-qrcode) | 1.5.4 | MIT | Phone-controller QR generation | Generally compatible. |
+| [react](https://react.dev) | 19.2.6 | MIT | UI runtime | Generally compatible. |
+| [react-dom](https://react.dev) | 19.2.6 | MIT | DOM renderer | Generally compatible. |
+
+## Direct development dependencies
+
+| Component | Version | License | Usage | AGPLv3 assessment |
+| --- | ---: | --- | --- | --- |
+| [@eslint/js](https://eslint.org) | 9.39.4 | MIT | Lint rules | Generally compatible; build-time only. |
+| [@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node) | 24.12.4 | MIT | Node typings | Generally compatible; build-time only. |
+| [@types/qrcode](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/qrcode) | 1.5.5 | MIT | QR typings | Generally compatible; build-time only. |
+| [@types/react](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/react) | 19.2.14 | MIT | React typings | Generally compatible; build-time only. |
+| [@types/react-dom](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/react-dom) | 19.2.3 | MIT | React DOM typings | Generally compatible; build-time only. |
+| [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react) | 6.0.2 | MIT | Vite React transform | Generally compatible; build-time only. |
+| [eslint](https://eslint.org) | 9.39.4 | MIT | Linter | Generally compatible; build-time only. |
+| [eslint-plugin-react-hooks](https://react.dev) | 7.1.1 | MIT | Hooks lint rules | Generally compatible; build-time only. |
+| eslint-plugin-react-refresh | 0.5.2 | MIT | Vite refresh lint rules | Generally compatible; build-time only. |
+| globals | 17.6.0 | MIT | ESLint globals | Generally compatible; build-time only. |
+| [jsdom](https://github.com/jsdom/jsdom) | 29.1.1 | MIT | Browser-like test runtime | Generally compatible; build-time only. |
+| [TypeScript](https://www.typescriptlang.org/) | 5.9.3 | Apache-2.0 | Type checker/compiler | Generally compatible; build-time only. |
+| [typescript-eslint](https://typescript-eslint.io/packages/typescript-eslint) | 8.59.3 | MIT | TypeScript linting | Generally compatible; build-time only. |
+| [Vite](https://vite.dev) | 8.0.13 | MIT | Dev server and production bundle | Generally compatible; build-time only. |
+| [Vitest](https://vitest.dev) | 4.1.6 | MIT | Test runner | Generally compatible; build-time only. |
+
+## Transitive dependency boundary
+
+The 0SFS lockfile contains 347 registry packages and one local link;
+FOSS Earth contains 314 registry packages. `npm ls --all` succeeded for both.
+The installed package metadata declared licenses for the registry packages
+reviewed. In addition to permissive MIT/ISC/Apache/BSD families, the resolved
+tree includes MPL-2.0 Lightning CSS, CC-BY-4.0 `caniuse-lite`, Python-2.0
+`argparse`, and BlueOak-1.0.0 `minimatch`/`lru-cache`; each needs its required
+notice retained where applicable. Optional platform packages were not installed
+on this machine.
+
+This audit deliberately does not claim a hand-verified license for every
+transitive package from a summary field. Before release, add CI that emits a
+versioned SPDX or CycloneDX SBOM and a full dependency-license report from the
+committed lockfiles; review all `UNKNOWN`, custom, copyleft, and bundled-binary
+results. The lockfiles remain the authoritative exact package lists for this
+audit snapshot.
+
+## Non-package components requiring separate review
+
+* JSBSim aircraft, engine, and propeller XML are simulation data, not simply
+  code under the SDK's MIT label. The bundled C172 definition is restricted;
+  see the release audit.
+* GLB/Blender models, images, PDFs, textures, icons, and reference material
+  require per-asset provenance. The asset audit found unresolved items.
+* Google Tiles, OSM, USGS, CARTO, OpenTopoMap, MapTilerhorn, AWS Terrarium,
+  Nominatim, Overpass, FreeAirportDB, PeerJS Cloud, and Google STUN are live
+  external services/data sources, not dependencies relicensed by AGPL.

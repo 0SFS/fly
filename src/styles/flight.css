@@ -1,0 +1,1106 @@
+/* Control appearance is shared with the phone controller. */
+@import "@0sfs/rc/styles/flightControls.css";
+
+.flight-app {
+  --flight-panel-bg: rgba(13, 17, 20, 0.94);
+  --flight-panel-line: rgba(208, 220, 224, 0.15);
+  --flight-panel-muted: #91a0a6;
+  --flight-panel-text: #edf2f3;
+  --flight-panel-accent: #e8b647;
+  /* The shared control rules read `--ctl-*`; the HUD's accent drives theirs. */
+  --ctl-accent: var(--flight-panel-accent);
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  /* The visible height, with or without mobile browser bars: no page scroll. */
+  height: 100dvh;
+  min-height: 100%;
+  overflow: hidden;
+  background: #04060a;
+}
+
+.flight-app__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.flight-hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: #e8edf5;
+  font-family: "SF Mono", "Menlo", "Consolas", monospace;
+  /*
+   * Clears the bottom button bar so attitude / levers stay readable. The bar
+   * publishes its height, which grows when it wraps on a narrow screen.
+   */
+  --flight-controls-bottom: calc(var(--foss-hud-bottom, 16px) + var(--foss-hud-bar-height, 32px) + 8px);
+  --flight-hud-left: env(safe-area-inset-left, 0px);
+  --flight-attitude-size: 220px;
+  --flight-auto-trim-size: 35px;
+  --flight-roll-trim-height: 16px;
+  --flight-lever-thickness: var(--flight-roll-trim-height);
+  --ctl-lever-thickness: var(--flight-lever-thickness);
+  --flight-attitude-cluster-height: calc(var(--flight-auto-trim-size) + 2px + var(--flight-attitude-size));
+}
+
+.flight-hud__attitude-cluster {
+  position: absolute;
+  left: var(--flight-hud-left);
+  bottom: var(--flight-controls-bottom);
+  display: grid;
+  grid-template-columns: max-content var(--flight-attitude-size) max-content;
+  grid-template-rows: var(--flight-auto-trim-size) var(--flight-attitude-size);
+  column-gap: 0;
+  row-gap: 2px;
+  pointer-events: auto;
+}
+
+.flight-hud__attitude {
+  grid-column: 2;
+  grid-row: 2;
+  flex: 0 0 auto;
+  width: var(--flight-attitude-size);
+  height: var(--flight-attitude-size);
+}
+
+/*
+ * Sits directly on top of the attitude cluster, so the numbers are read in
+ * the same glance as the horizon rather than at the other end of the screen.
+ * Anchored on `bottom` so a wrapped row grows upward and the gap to the
+ * cluster stays fixed. The attitude square plus the roll-trim row above it
+ * set the cluster height; the pitch/flaps levers sit in the same grid.
+ */
+.flight-hud__tapes {
+  position: absolute;
+  left: var(--flight-hud-left);
+  bottom: calc(var(--flight-controls-bottom) + var(--flight-attitude-cluster-height) + 8px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  /* Wide enough that the speed/heading/VS/AoA chips, gear, and AP hold
+     one row; below that the row wraps, and `bottom` anchoring grows it upward. */
+  max-width: min(520px, calc(100vw - 48px));
+}
+
+.flight-hud__aoa,
+.flight-hud__g {
+  display: contents;
+}
+
+.flight-hud__yaw-throttle {
+  position: absolute;
+  right: calc(env(safe-area-inset-right, 0px) + 24px);
+  bottom: var(--flight-controls-bottom);
+  display: grid;
+  grid-template-columns: max-content max-content;
+  grid-template-areas:
+    "eval ."
+    "yaw throttle"
+    "engine throttle";
+  align-items: end;
+  justify-items: end;
+  column-gap: 6px;
+  row-gap: 6px;
+  pointer-events: auto;
+}
+
+.flight-hud__eval {
+  grid-area: eval;
+  justify-self: stretch;
+}
+
+.flight-hud__engine {
+  grid-area: engine;
+}
+
+.flight-hud__throttle {
+  grid-area: throttle;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 6px;
+  align-self: end;
+  padding: 8px 6px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.flight-hud__yaw {
+  grid-area: yaw;
+  width: 148px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.flight-hud__throttle .flight-hud__slider-control {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.flight-hud__slider-control--throttle[data-afterburner="active"] {
+  --flight-panel-accent: var(--afterburner-accent);
+  --ctl-accent: var(--afterburner-accent);
+}
+
+.flight-hud__auto-trims {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: end;
+  align-self: end;
+  width: var(--flight-auto-trim-size);
+  height: var(--flight-auto-trim-size);
+}
+
+.flight-hud__auto-button {
+  width: max-content;
+  padding: 2px 3px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.flight-hud__auto-button.is-on {
+  color: var(--flight-panel-accent);
+}
+
+.flight-hud__slider-control--roll-trim {
+  grid-column: 2;
+  grid-row: 1;
+  height: var(--flight-roll-trim-height);
+}
+
+.flight-hud__lever--pitch {
+  grid-column: 1;
+  grid-row: 2;
+  min-width: var(--flight-auto-trim-size);
+}
+
+.flight-hud__lever--flaps {
+  grid-column: 3;
+  grid-row: 2;
+  min-width: var(--flight-auto-trim-size);
+}
+
+.flight-hud__throttle .flight-hud__slider-control input[type="range"],
+.flight-hud__throttle .flight-throttle {
+  height: 140px;
+}
+
+.flight-panel-root {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  color: var(--flight-panel-text);
+  font-family: "Avenir Next Condensed", "Helvetica Neue", sans-serif;
+  letter-spacing: 0;
+}
+
+.flight-window-overlay-host {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+#flightFps {
+  font-variant-numeric: tabular-nums;
+}
+
+.flight-shell-root {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.flight-shell-root .hud-bar {
+  position: absolute;
+}
+
+/* Fullscreen is hidden where the browser has none (iPhone Safari). */
+.flight-shell-root .hud-bar button[hidden] {
+  display: none;
+}
+
+.flight-shell-root .flight-shell-pause-button.is-active {
+  color: #11161a;
+  background: var(--flight-panel-accent);
+  border-color: var(--flight-panel-accent);
+}
+
+.flight-panel__title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 15px 18px 12px;
+  color: var(--flight-panel-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.flight-panel__title svg {
+  color: var(--flight-panel-accent);
+}
+
+.flight-panel__content {
+  display: grid;
+  gap: 18px;
+  padding: 4px 18px 22px;
+}
+
+.flight-panel__metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--flight-panel-line);
+  border-left: 1px solid var(--flight-panel-line);
+}
+
+.flight-panel__metric {
+  min-width: 0;
+  padding: 12px;
+  border-right: 1px solid var(--flight-panel-line);
+  border-bottom: 1px solid var(--flight-panel-line);
+}
+
+.flight-panel__metric span,
+.flight-panel__coordinates span,
+.flight-panel__section-heading span {
+  display: block;
+  color: var(--flight-panel-muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.flight-panel__metric strong {
+  display: block;
+  margin-top: 3px;
+  overflow: hidden;
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 16px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flight-panel__fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.flight-panel__fieldset legend {
+  margin-bottom: 8px;
+  color: var(--flight-panel-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.flight-panel__segmented {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  padding: 3px;
+  border: 1px solid var(--flight-panel-line);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.flight-panel__segmented button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--flight-panel-muted);
+  font: 600 12px/1 "Avenir Next Condensed", "Helvetica Neue", sans-serif;
+  cursor: pointer;
+}
+
+.flight-panel__segmented button.is-active {
+  background: #d7e0e2;
+  color: #101518;
+}
+
+.flight-panel__command {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid rgba(232, 182, 71, 0.4);
+  border-radius: 4px;
+  background: rgba(232, 182, 71, 0.1);
+  color: #f5d991;
+  font: 700 12px/1 "Avenir Next Condensed", "Helvetica Neue", sans-serif;
+  cursor: pointer;
+}
+
+.flight-panel__command:hover {
+  background: rgba(232, 182, 71, 0.18);
+}
+
+.flight-panel__keymap {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  color: var(--flight-panel-muted);
+  font-size: 11px;
+}
+
+.flight-panel__keymap kbd {
+  display: inline-block;
+  min-width: 35px;
+  margin-right: 5px;
+  color: #dfe6e8;
+  font-family: "SF Mono", Menlo, monospace;
+}
+
+.flight-panel__section-heading,
+.flight-panel__coordinates,
+.flight-panel__debug-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.flight-panel__section-heading strong,
+.flight-panel__coordinates strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 16px;
+}
+
+.flight-panel__section-heading svg,
+.flight-panel__coordinates svg {
+  flex: 0 0 auto;
+  color: var(--flight-panel-accent);
+}
+
+.flight-panel__coordinates {
+  justify-content: flex-start;
+  padding: 12px;
+  border: 1px solid var(--flight-panel-line);
+}
+
+.flight-panel__field {
+  display: grid;
+  gap: 9px;
+  color: #cad3d5;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.flight-panel__field span {
+  display: flex;
+  justify-content: space-between;
+}
+
+.flight-panel__field output {
+  color: var(--flight-panel-accent);
+  font-family: "SF Mono", Menlo, monospace;
+}
+
+/* A checkbox reads as label-then-control on one line, not as a stacked pair. */
+.flight-panel__field--inline {
+  grid-auto-flow: column;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.flight-panel__field--inline span {
+  justify-content: flex-start;
+}
+
+.flight-panel__hint a {
+  color: var(--flight-panel-accent);
+}
+
+.flight-panel__field input[type="range"] {
+  width: 100%;
+  accent-color: var(--flight-panel-accent);
+}
+
+/* A dropdown is as wide as its own text - its longest option - and never
+   stretched to its row or column; it may shrink to fit a narrow panel. See
+   ../foss-earth/docs/ui-layout.md. */
+.flight-panel__field select {
+  justify-self: start;
+  width: auto;
+  max-width: 100%;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--flight-panel-line);
+  background: rgba(0, 0, 0, 0.35);
+  color: #e8edf5;
+  font: inherit;
+}
+
+.flight-panel__radio-list {
+  display: grid;
+  gap: 5px;
+}
+
+.flight-panel__radio-list label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: #aeb9bc;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.flight-panel__radio-list label.is-active {
+  border-color: rgba(232, 182, 71, 0.32);
+  background: rgba(232, 182, 71, 0.08);
+  color: #fff;
+}
+
+.flight-panel__radio-list input {
+  accent-color: var(--flight-panel-accent);
+}
+
+.flight-panel__aircraft-picker,
+.flight-panel__aircraft-controls {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+
+/* Only the image grid scrolls here; the selected controls are its sibling. */
+.flight-panel__aircraft-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 108px), 1fr));
+  align-content: start;
+  gap: 6px;
+  max-height: clamp(124px, 24dvh, 206px);
+  margin-top: 4px;
+  padding: 2px;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+  border: 1px solid var(--flight-panel-line);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.flight-panel__aircraft-card {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  border: 1px solid var(--flight-panel-line);
+  border-radius: 3px;
+  background: rgba(13, 17, 20, 0.8);
+  color: var(--flight-panel-text);
+  cursor: pointer;
+}
+
+.flight-panel__aircraft-card:hover {
+  border-color: var(--flight-panel-muted);
+}
+
+.flight-panel__aircraft-card.is-selected {
+  border-color: var(--flight-panel-accent);
+  background: rgba(232, 182, 71, 0.1);
+}
+
+.flight-panel__aircraft-card:focus-within {
+  outline: 2px solid var(--flight-panel-accent);
+  outline-offset: 2px;
+}
+
+.flight-panel__aircraft-card > input {
+  position: absolute;
+  z-index: 1;
+  top: 8px;
+  left: 8px;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--flight-panel-accent);
+  cursor: pointer;
+}
+
+.flight-panel__aircraft-image {
+  display: grid;
+  width: 100%;
+  aspect-ratio: 8 / 5;
+  overflow: hidden;
+  border-radius: 2px 2px 0 0;
+  background: #172128;
+}
+
+.flight-panel__aircraft-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.flight-panel__aircraft-image-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 4px 4px;
+  color: var(--flight-panel-muted);
+  font-size: 10px;
+}
+
+.flight-panel__aircraft-card-caption {
+  display: grid;
+  gap: 4px;
+  padding: 7px;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.flight-panel__aircraft-card-caption > span {
+  color: var(--flight-panel-muted);
+  font-size: 9px;
+}
+
+.flight-panel__aircraft-card.is-selected .flight-panel__aircraft-card-caption > span {
+  color: var(--flight-panel-accent);
+}
+
+.flight-panel__generation-field {
+  grid-template-columns: auto auto;
+  justify-content: start;
+  align-items: center;
+}
+
+.flight-panel__aircraft-controls input[type="checkbox"] {
+  accent-color: var(--flight-panel-accent);
+}
+
+.flight-panel__aircraft-controls .flight-panel__field--inline,
+.flight-panel__aircraft-controls select,
+.flight-panel__aircraft-controls .flight-panel__command {
+  min-height: 36px;
+}
+
+.flight-panel__aircraft-controls .flight-panel__command {
+  padding: 8px 10px;
+  line-height: 1.35;
+}
+
+.flight-panel__aircraft-controls .flight-panel__hint {
+  margin: 0;
+  font-size: 10px;
+}
+
+.flight-panel__aircraft-controls .flight-panel__command:focus-visible,
+.flight-panel__aircraft-controls input:focus-visible,
+.flight-panel__aircraft-controls a:focus-visible {
+  outline: 2px solid var(--flight-panel-accent);
+  outline-offset: 3px;
+}
+
+.flight-panel__aircraft-controls .flight-panel__command:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.flight-panel__aircraft-controls .flight-panel__command--secondary {
+  border-color: var(--flight-panel-line);
+  background: transparent;
+  color: var(--flight-panel-muted);
+}
+
+.flight-panel__info-details {
+  position: relative;
+}
+
+.flight-panel__info-summary {
+  list-style: none;
+  cursor: pointer;
+  width: 22px;
+  height: 22px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--flight-panel-line);
+  border-radius: 999px;
+  background: rgba(232, 182, 71, 0.12);
+  color: var(--flight-panel-text);
+  font: 700 13px/1 "Avenir Next Condensed", "Helvetica Neue", sans-serif;
+  display: inline-grid;
+  place-items: center;
+  user-select: none;
+}
+
+.flight-panel__info-summary::-webkit-details-marker {
+  display: none;
+}
+
+.flight-panel__info-summary::marker {
+  content: "";
+}
+
+.flight-panel__info-summary:focus-visible {
+  outline: 2px solid var(--flight-panel-accent);
+  outline-offset: 3px;
+}
+
+.flight-panel__info-content {
+  width: min(300px, 90vw);
+  margin-top: 4px;
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--flight-panel-line);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.flight-panel__model-controls {
+  gap: 8px;
+}
+
+.flight-panel__model-controls,
+.flight-panel__model-status {
+  display: grid;
+  gap: 10px;
+}
+
+.flight-panel__aircraft-controls .flight-panel__metric strong {
+  overflow: visible;
+  font-size: 13px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.flight-panel__debug-status {
+  justify-content: flex-start;
+  align-items: flex-start;
+  padding: 11px;
+  border-left: 2px solid var(--flight-panel-accent);
+  background: rgba(255, 255, 255, 0.035);
+  color: #bbc5c8;
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.flight-panel__debug-status svg {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 720px) {
+  .flight-hud {
+    --flight-attitude-size: 130px;
+    --flight-auto-trim-size: 25px;
+    --flight-roll-trim-height: 14px;
+  }
+
+  .flight-hud__attitude {
+    width: var(--flight-attitude-size);
+    height: var(--flight-attitude-size);
+  }
+
+  .flight-hud__yaw-throttle {
+    right: calc(env(safe-area-inset-right, 0px) + 10px);
+    gap: 4px;
+  }
+
+  .flight-hud__yaw {
+    width: 110px;
+    padding: 4px 6px;
+  }
+
+  .flight-hud__throttle {
+    padding: 6px 4px;
+  }
+
+  .flight-hud__slider-control {
+    width: 24px;
+    padding: 2px 1px;
+  }
+
+  .flight-hud__slider-control--roll-trim {
+    width: auto;
+    height: var(--flight-roll-trim-height);
+    padding: 0 6px;
+  }
+
+  .flight-hud__slider-control input[type="range"] {
+    width: 12px;
+  }
+
+  .flight-hud__slider-control--roll-trim input[type="range"] {
+    width: 100%;
+    height: 10px;
+  }
+
+  .flight-hud__auto-trim {
+    font-size: 7px;
+  }
+
+  .flight-hud__throttle .flight-hud__slider-control input[type="range"],
+  .flight-hud__throttle .flight-throttle {
+    height: 100px;
+  }
+
+  .flight-hud__tapes {
+    /* Tracks the attitude cluster this breakpoint shrinks. */
+    bottom: calc(var(--flight-controls-bottom) + var(--flight-attitude-cluster-height) + 8px);
+    gap: 4px;
+    max-width: calc(100vw - 20px);
+  }
+
+  .flight-hud__tape {
+    padding: 3px 5px;
+  }
+
+  .flight-hud__gear {
+    width: 26px;
+    padding: 0;
+  }
+
+  .flight-hud__ap {
+    width: 26px;
+    padding: 0;
+  }
+
+  .flight-hud__value {
+    font-size: 12px;
+  }
+}
+
+.flight-controls-bar {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  pointer-events: auto;
+}
+
+.flight-map-control {
+  position: relative;
+}
+
+.flight-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e8edf5;
+  font-family: "SF Mono", "Menlo", "Consolas", monospace;
+  font-size: 12px;
+}
+
+.flight-chip-button {
+  cursor: pointer;
+}
+
+.flight-chip-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.flight-chip--google {
+  border-color: rgba(96, 165, 250, 0.45);
+}
+
+.flight-chip--raster {
+  border-color: rgba(74, 222, 128, 0.35);
+}
+
+.flight-chip--fallback {
+  border-color: rgba(251, 191, 36, 0.35);
+}
+
+.flight-map-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  min-width: 220px;
+  padding: 8px;
+  border-radius: 12px;
+  background: rgba(8, 10, 16, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+}
+
+.flight-chip--active {
+  border-color: rgba(147, 197, 253, 0.55);
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.flight-map-menu[hidden] {
+  display: none;
+}
+
+.flight-map-option {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #e8edf5;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.flight-map-option:hover,
+.flight-map-option.is-active {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.flight-help {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  max-width: 280px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 12px;
+  line-height: 1.45;
+  pointer-events: none;
+}
+
+.flight-help strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.flight-boot {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: 24px;
+  color: #e8edf5;
+  background: #04060a;
+  text-align: center;
+}
+
+.flight-boot__error {
+  color: #ff8f8f;
+}
+
+.flight-panel__select {
+  justify-self: start;
+  width: auto;
+  max-width: 100%;
+  min-height: 34px;
+  padding: 0 9px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 3px;
+  background: rgba(12, 16, 18, 0.72);
+  color: #e6edef;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.flight-panel__select:focus-visible {
+  outline: 2px solid var(--flight-panel-accent);
+  outline-offset: 1px;
+}
+
+.flight-panel__select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.flight-panel__option {
+  display: grid;
+  gap: 1px;
+  line-height: 1.35;
+}
+
+.flight-panel__option strong {
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.flight-panel__option em {
+  color: #8d999c;
+  font-size: 11px;
+  font-style: normal;
+}
+
+.flight-panel__radio-list label.is-active .flight-panel__option em {
+  color: #b6c2c5;
+}
+
+.flight-panel__hint {
+  margin: 0;
+  color: #8d999c;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.flight-panel__hint.is-error {
+  color: #e8a0a0;
+}
+
+.flight-panel__log {
+  display: grid;
+  gap: 6px;
+  max-height: 260px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.flight-panel__log li {
+  padding: 6px 8px;
+  border-left: 2px solid rgba(255, 255, 255, 0.16);
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.flight-panel__log li[data-level="warn"] { border-left-color: var(--flight-panel-accent); }
+.flight-panel__log li[data-level="error"] { border-left-color: #e8776f; }
+
+.flight-panel__log-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: baseline;
+  color: #cad3d5;
+  font-size: 11px;
+}
+
+.flight-panel__log-head span:first-child {
+  color: #7d888b;
+  font-family: "SF Mono", Menlo, monospace;
+}
+
+.flight-panel__log-head strong {
+  color: var(--flight-panel-accent);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.flight-panel__log pre {
+  margin: 5px 0 0;
+  color: #97a3a6;
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.flight-status-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.flight-status-overlay__card {
+  display: flex;
+  gap: 12px;
+  max-width: 460px;
+  padding: 15px 17px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 5px;
+  background: rgba(11, 15, 17, 0.9);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
+  color: #e6edef;
+  pointer-events: auto;
+  backdrop-filter: blur(3px);
+}
+
+.flight-status-overlay[data-kind="fault"] .flight-status-overlay__card {
+  border-color: rgba(232, 119, 111, 0.5);
+}
+
+.flight-status-overlay[data-kind="fault"] svg { color: #e8776f; }
+.flight-status-overlay[data-kind="waiting"] svg { color: var(--flight-panel-accent); }
+
+.flight-status-overlay__card svg { flex: none; margin-top: 1px; }
+
+.flight-status-overlay__card strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.flight-status-overlay__card p {
+  margin: 0;
+  color: #a8b3b6;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.flight-status-overlay__reasons {
+  margin: 8px 0 0;
+  padding-left: 16px;
+  color: #cad3d5;
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.flight-status-overlay__card .flight-panel__command {
+  margin-top: 11px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .flight-status-overlay[data-kind="waiting"] svg {
+    animation: flight-status-spin 1.4s linear infinite;
+  }
+}
+
+@keyframes flight-status-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Ground interaction settings: choice plus Auto lock on one row. */
+.flight-panel__ground-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 4px 10px;
+}
+
+.flight-panel__ground-row > .flight-panel__hint {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.flight-panel__ground-lock {
+  padding-bottom: 6px;
+}

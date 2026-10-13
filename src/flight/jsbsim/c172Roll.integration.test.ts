@@ -1,0 +1,39 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { JSBSimSdk } from "@felipegalind0/jsbsim";
+import { wasmBinaryUrl, wasmModuleUrl } from "@felipegalind0/jsbsim/wasm";
+import { Vector3 } from "@babylonjs/core";
+import { afterEach, describe, expect, it } from "vitest";
+import { bootstrapC172p } from "./bootstrapC172";
+import { resolveAircraftDataFiles } from "./hydrateJsbsimData";
+import { flightAttitudeToQuaternion, readFlightState } from "@0sfs/ground-contact/ecefBridge";
+
+const instances: JSBSimSdk[] = [];
+afterEach(() => { for (const sdk of instances.splice(0)) sdk.destroy(); });
+
+describe("C172 roll direction", () => {
+  it.each([-1, 1])("banks in the commanded direction for aileron %s", async (aileron) => {
+    const sdk = await JSBSimSdk.create({
+      moduleUrl: wasmModuleUrl,
+      wasmUrl: wasmBinaryUrl,
+      persistence: { enabled: false },
+      log: { console: false, stripAnsi: true },
+    });
+    instances.push(sdk);
+    const dataRoot = resolve(process.cwd(), "public/jsbsim-data");
+    const manifest = JSON.parse(readFileSync(resolve(dataRoot, "manifest.json"), "utf8")) as { files: string[] };
+    for (const relativePath of resolveAircraftDataFiles(manifest, "cessna-172")) {
+      sdk.writeDataFile(relativePath, readFileSync(resolve(dataRoot, relativePath), "utf8"));
+    }
+    await bootstrapC172p(sdk);
+    sdk.setPropertyValue("fcs/aileron-cmd-norm", aileron);
+    for (let step = 0; step < 60; step += 1) expect(sdk.run()).toBe(true);
+    const state = readFlightState(sdk);
+    expect(state.rollRad * aileron).toBeGreaterThan(0.01);
+    const rightWing = Vector3.Zero();
+    new Vector3(-1, 0, 0).rotateByQuaternionToRef(
+      flightAttitudeToQuaternion(state.rollRad, state.pitchRad, state.headingRad), rightWing,
+    );
+    expect(rightWing.y * aileron).toBeLessThan(-0.01);
+  });
+});

@@ -1,0 +1,6 @@
+/* Debug → Frame budget: FOSS Earth's panel in the flight panel's colours. */
+
+.flight-frame-budget {
+  --foss-earth-frame-budget-line: var(--flight-panel-line);
+  --foss-earth-frame-budget-muted: var(--flight-panel-muted);
+}

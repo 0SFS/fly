@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
+    <link rel="manifest" href="%BASE_URL%manifest.webmanifest" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#080e14" />
+    <!-- Home Screen launches have no browser bars; iPhone Safari has no page fullscreen. -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="0SFS" />
+    <title>0SFS — Open Source Flight Simulator</title>
+    <!-- Search and link previews. The build rewrites these for /fly/ and /rc/ (vite.config.ts); the home page is the website's (0sfs.github.io), see its docs/search-visibility.md. -->
+    <meta name="description" content="0SFS is a free, open-source flight simulator that runs in a browser tab, with JSBSim flight physics over real-world scenery. Nothing to install, no account." />
+    <link rel="canonical" href="https://0sfs.github.io/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="0SFS" />
+    <meta property="og:title" content="0SFS — Open Source Flight Simulator" />
+    <meta property="og:description" content="A free, open-source flight simulator in the browser, with JSBSim flight physics over real-world scenery. Nothing to install, no account." />
+    <meta property="og:url" content="https://0sfs.github.io/" />
+    <meta property="og:image" content="https://0sfs.github.io/preview.jpg" />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="720" />
+    <meta property="og:image:alt" content="A Cessna 172 in the chase view over Minneapolis, with the flight instruments" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "0SFS",
+        "alternateName": ["OSFS", "Open Source Flight Simulator"],
+        "url": "https://0sfs.github.io/"
+      }
+    </script>
+    <script>
+      (function () {
+        var base = "%BASE_URL%";
+        var prefix = base.charAt(base.length - 1) === "/" ? base.slice(0, -1) : base;
+        var path = location.pathname;
+        var rest;
+        if (prefix && path !== prefix && path.indexOf(prefix + "/") !== 0) rest = "/";
+        else if (!prefix) rest = path;
+        else if (path === prefix) rest = "/";
+        else rest = path.slice(prefix.length) || "/";
+        if (rest.length > 1 && rest.charAt(rest.length - 1) === "/") rest = rest.slice(0, -1);
+        if (!rest) rest = "/";
+        var mode = new URLSearchParams(location.search).get("mode");
+        var route = "info";
+        if (mode === "remote" || rest === "/rc") route = "remote";
+        else if (mode === "globe") {
+          location.replace("https://foss-earth.github.io/");
+          return;
+        }
+        else if (mode === "flight" || rest === "/fly") route = "flight";
+        document.documentElement.setAttribute("data-route", route);
+        // Safari tints its bars with theme-color, so each page names its own
+        // background: the controller's true black, the flight page's canvas.
+        var themeColor = { remote: "#000", flight: "#04060a" }[route];
+        if (themeColor) document.querySelector('meta[name="theme-color"]').setAttribute("content", themeColor);
+        // Add to Home Screen must install the page it was done from. The
+        // controller has its own manifest and name, so an icon made on /rc/
+        // opens /rc/ and can sit beside the simulator's on one Home Screen.
+        if (route === "remote") {
+          document.querySelector('link[rel="manifest"]').setAttribute("href", base + "rc.webmanifest");
+          document.querySelector('meta[name="apple-mobile-web-app-title"]').setAttribute("content", "0SFS RC");
+        }
+        function canonical(segment) {
+          var next = new URL(base + segment + "/", location.origin);
+          var params = new URLSearchParams(location.search);
+          params.delete("mode");
+          next.search = params.toString();
+          return next.pathname + next.search + location.hash;
+        }
+        if (route === "remote" && rest !== "/rc") location.replace(canonical("rc"));
+        else if (route === "flight" && rest !== "/fly") location.replace(canonical("fly"));
+        // The home page is the website's (0sfs.github.io); this app's own root is the flight.
+        else if (route === "info") location.replace(canonical("fly"));
+      })();
+    </script>
+    <script>
+      // Keep the first-paint log useful if the module bundle itself cannot load.
+      addEventListener("error", function (event) {
+        if (event.target !== window && !(event.target instanceof HTMLScriptElement)) return;
+        document.getElementById("app-log-error")?.removeAttribute("hidden");
+      }, true);
+    </script>
+    <style>
+      /* Paint immediately, before the application or its styles download. Mirrors foss-earth's src/log/gameLog.css, reached here through foss-earth/shell.css. */
+      html { color-scheme: dark; }
+      html, body { margin: 0; background: #080e14; }
+      .game-log { position: fixed; z-index: 25; top: calc(12px + env(safe-area-inset-top, 0px)); left: calc(12px + env(safe-area-inset-left, 0px)); box-sizing: border-box; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; width: max-content; max-width: min(380px, calc(100vw - 88px)); color: #ecf1f4; font: 12px/1.4 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+      .game-log [hidden] { display: none !important; }
+      .game-log__line { box-sizing: border-box; width: fit-content; max-width: 100%; padding: 4px 8px; border-radius: 6px; background: rgba(4, 7, 11, 0.66); }
+      .game-log__line[data-tone="error"] { color: #ffd1c9; background: rgba(58, 18, 16, 0.84); }
+      .game-log a { color: #e8b647; }
+      html[data-route="remote"] #app-log .game-log__line:not([data-tone="error"]) { display: none; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <div id="app-log" class="game-log" role="log" aria-label="Game log" aria-relevant="additions">
+      <div id="app-log-error" class="game-log__line" data-tone="error" hidden>The application could not download. Check your connection, then <a href="">reload and try again</a>.</div>
+      <div class="game-log__line">Downloading the application…</div>
+      <div class="game-log__line">0SFS · Open Source Flight Simulator</div>
+      <noscript><div class="game-log__line">0SFS needs JavaScript enabled to load the simulator.</div></noscript>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
