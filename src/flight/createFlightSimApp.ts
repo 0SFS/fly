@@ -574,6 +574,8 @@ export async function createFlightSimApp(
   // The renderer has said what it is: a very slow device lights imagery as at the aircraft, and takes the ground's light as one colour.
   applySlowDeviceSkyDefaults(settings);
   let worldLoading = true;
+  // Holds physics while hidden gear pipelines compile under the loading screen.
+  let gearPipelineWarmup = false;
   let placementAbort = startupAbort;
 
   // Map → Detail: the Flight minimum is a red marker on the Google track, and
@@ -2438,7 +2440,7 @@ export async function createFlightSimApp(
     frameProfiler.add("flight/terrain", sectionStarted);
 
     sectionStarted = frameProfiler.clock();
-    physicsLoop.setPaused(inputManager.isPaused());
+    physicsLoop.setPaused(gearPipelineWarmup || inputManager.isPaused());
     if (flightGamepadPolling.claimFlightFrame()) flightGamepadSource.tick();
     const controls = inputManager.poll(deltaSeconds);
     // A manual key/controller move also takes over while physics is paused.
@@ -2865,6 +2867,27 @@ export async function createFlightSimApp(
     flightAudio.setHeld(inputManager.isPaused(), "pause");
     flightAudio.setHeld(false, "loading");
     runtime.setSimRunning(!inputManager.isPaused());
+    // F-35B starts gear-up, so its wheels are hidden before they are ever drawn.
+    // Compiling them on the extend frame freezes the sim; do it under this screen.
+    const warmHiddenGear = aircraftModel?.warmHiddenGear;
+    const hiddenGearPrepared = aircraftModel?.hiddenGearPrepared;
+    if (warmHiddenGear && hiddenGearPrepared && !hiddenGearPrepared()) {
+      gearPipelineWarmup = true;
+      physicsLoop.setPaused(true);
+      const deadline = performance.now() + 2000;
+      try {
+        while (!hiddenGearPrepared() && performance.now() < deadline) {
+          engineVisuals.read();
+          const rig = aircraftModel?.getRig() ?? null;
+          if (rig) engineVisuals.updateRig(rig, true);
+          warmHiddenGear();
+          await new Promise(resolve => setTimeout(resolve, 20));
+        }
+      } finally {
+        gearPipelineWarmup = false;
+        physicsLoop.setPaused(inputManager.isPaused());
+      }
+    }
     loading.hide();
     if (engineTest) controlPanel?.openOrSelectTab("engine");
     runtime.requestRender();

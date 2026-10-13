@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { AssetContainer, LoadAssetContainerAsync, Matrix, Mesh, MeshBuilder, NullEngine, Quaternion, Scene, TransformNode, type AbstractMesh, type ISceneLoaderProgressEvent } from "@babylonjs/core";
+import { AssetContainer, LoadAssetContainerAsync, Matrix, Mesh, MeshBuilder, NullEngine, PointLight, Quaternion, Scene, TransformNode, Vector3, type AbstractMesh, type ISceneLoaderProgressEvent } from "@babylonjs/core";
 import { describe, expect, it, vi } from "vitest";
 import { createAircraftModel, type AircraftModelState } from "@0sfs/aircraft/createAircraftModel";
 import { getFdmProfile } from "../jsbsim/fdmProfiles";
@@ -314,6 +314,41 @@ describe("aircraft model loader", () => {
     expect(requestRender).toHaveBeenCalledTimes(2);
     model.dispose();
     t.teardown();
+  });
+
+  it("prepares hidden stowed gear without showing it or asking for a frame", async () => {
+    const t = setup();
+    const container = f35bVisibilityContainer(t.scene);
+    const gear = gearMeshes(container);
+    const requestRender = vi.fn();
+    const ready = vi.spyOn(Mesh.prototype, "isReady").mockReturnValue(true);
+    const model = createAircraftModel(t.scene, t.parent, {
+      aircraftId: "f-35b", lodId: "hd", loadContainer: (url, scene) => url.includes("/engine/") ? loadEngineFixture(url, scene) : Promise.resolve(container), requestRender,
+    });
+    try {
+      await vi.waitFor(() => expect(model.getState().status).toBe("ready"));
+      model.updateGearVisibility(0);
+      expect(model.hiddenGearPrepared()).toBe(false);
+      requestRender.mockClear();
+      model.warmHiddenGear();
+      expect(gear.every(mesh => !mesh.isVisible)).toBe(true);
+      expect(ready).toHaveBeenCalled();
+      expect(model.hiddenGearPrepared()).toBe(true);
+      expect(requestRender).not.toHaveBeenCalled();
+
+      const light = new PointLight("exhaust", Vector3.Zero(), t.scene);
+      // Babylon notifies new lights on a later turn, once meshes can see them.
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(model.hiddenGearPrepared()).toBe(false);
+      model.warmHiddenGear();
+      expect(gear.every(mesh => !mesh.isVisible)).toBe(true);
+      expect(model.hiddenGearPrepared()).toBe(true);
+      light.dispose();
+    } finally {
+      ready.mockRestore();
+      model.dispose();
+      t.teardown();
+    }
   });
 
   it("applies the live stowed-gear override without redundant frames and retains original hidden parts", async () => {
