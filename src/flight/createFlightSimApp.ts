@@ -57,6 +57,8 @@ import { mountBindingEditor } from "@felipegalind0/gamepad-tools/ui";
 import {
   applyRendererChoice,
   createBabylonRuntime,
+  createCanvasTextureDevicePorts,
+  createSceneDeviceLocationMarker,
   createTerrainPerformanceCapture,
   RASTER_BASE_MAP_SOURCES,
   TERRAIN_SOURCES,
@@ -65,6 +67,8 @@ import {
   setTerrainSourcePreference,
   type BabylonRuntime,
   type BabylonRuntimeOptions,
+  type DeviceLocationFix,
+  type DeviceLocationMarker,
   type GlobeMapDebugSnapshot,
   type RasterBaseMapSource,
 } from "foss-earth/runtime";
@@ -221,6 +225,7 @@ import {
 import { createFlightDetailRequirements, importLegacyWorldDetail, navigatorDeviceHints } from "./worldDetail";
 import { appHref } from "@0sfs/rc/appRoute";
 import { engineTestStandBootstrapOptions, engineTestStandInitialState, isEngineTestStandRequested, makeEngineTestStandUrl } from "@0sfs/engines/engineTestStand";
+import { createBrowserDataPanel } from "@foss-earth/ui/browser";
 
 export interface FlightSimAppOptions {
   loadingScreen?: FlightLoadingScreen;
@@ -2189,6 +2194,7 @@ export async function createFlightSimApp(
   ];
   // Which version runs, and everything it is built from, read from the page itself.
   const about = createAboutPanel({ site: __REPOSITORY_SLUG__ || undefined });
+  const browserData = createBrowserDataPanel(document);
   const interfaceSections: PanelSection[] = [
     { id: "toolbar", title: settings.getSectionTitle("interface", "toolbar"), element: toolbarParameters.element },
     ...interfaceParameterSections.map(({ section, handle }) => ({
@@ -2203,6 +2209,22 @@ export async function createFlightSimApp(
     createAbortController: () => new AbortController(),
     timers: { setTimeout: (callback, delay) => window.setTimeout(callback, delay), clearTimeout: handle => window.clearTimeout(handle as number) },
   }, options.locationSearchProvider);
+  let deviceLocationMarker: DeviceLocationMarker | null = null;
+  const showDeviceLocation = (fix: DeviceLocationFix | null): void => {
+    if (disposed) return;
+    if (!fix) { deviceLocationMarker?.show(null); return; }
+    deviceLocationMarker ??= createSceneDeviceLocationMarker(runtime, createCanvasTextureDevicePorts({
+      scene: runtime.scene,
+      createCanvas(width, height) {
+        const surface = document.createElement("canvas");
+        surface.width = width;
+        surface.height = height;
+        return surface;
+      },
+      transfer: (_bytes, _label, submit) => submit(),
+    }));
+    deviceLocationMarker.show(fix);
+  };
   controlPanel = createFlightControlPanel(panelRoot, createPanelSnapshot(), {
     createSection: ui.section,
     settings,
@@ -2214,12 +2236,14 @@ export async function createFlightSimApp(
     timeTab: timePanel.element,
     settingsSections,
     aboutTab: about.element,
+    browserDataTab: browserData.element,
     bugReportTab: bugReportPanel.element,
     onBugReportShow: () => bugReportPanel.show(),
     interfaceSections,
     initialWeather: weather,
     gamepadBindings,
     onLocationApply: teleportToLocation,
+    onDeviceLocation: showDeviceLocation,
     location: flightLocation,
     locationSearchSection: { id: "search", title: settings.getSectionTitle("location", "search"), element: locationSearchParameters.element, defaultOpen: false },
     onWeatherChange: applyWeather,
@@ -2781,6 +2805,7 @@ export async function createFlightSimApp(
       hudBar?.destroy();
       statusOverlay?.destroy();
       controlPanel?.destroy();
+      deviceLocationMarker?.destroy();
       flightLocation.dispose();
       locationSearchParameters.destroy();
       presetsSection.destroy();
@@ -2790,6 +2815,7 @@ export async function createFlightSimApp(
       bugReportPanel.destroy();
       diagnostics.destroy();
       about.dispose();
+      browserData.destroy();
       for (const { handle } of interfaceParameterSections) handle.destroy();
       toolbarParameters.destroy();
       mapPanel.destroy();

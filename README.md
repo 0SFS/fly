@@ -17,6 +17,8 @@ Open the URL Vite prints and add `/fly/` for the simulator or `/rc/` for the pho
 
 To use Google Photorealistic 3D Tiles, add `?key=YOUR_GOOGLE_MAPS_API_KEY` once. The key is saved in the browser and removed from the URL. JSBSim comes from the tarball in `deps/`.
 
+Open **+ → Browser data** to review clearing this site's saved settings, window layout and caches. **Keep API keys** starts checked. The phone controller has the same review. After two failed or stalled starts, the page offers that review before the app loads. Nothing is deleted until you confirm.
+
 ## Checks
 
 ```sh

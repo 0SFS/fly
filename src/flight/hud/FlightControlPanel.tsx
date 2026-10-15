@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { BabylonRuntimeStatus, RendererMode } from "foss-earth/runtime";
+import type { BabylonRuntimeStatus, DeviceLocationFix, RendererMode } from "foss-earth/runtime";
 import type { FlightViewMode } from "@0sfs/aircraft/createPlaceholderAircraft";
 import {
   AIRCRAFT_FAMILIES,
@@ -148,7 +148,7 @@ export interface FlightControlPanelSnapshot {
 }
 
 /** Every tab the panel can show: the flight's own, and the shared globe tabs. */
-export type FlightOverlayTab = "location" | "map" | "renderer" | "sky" | "time" | "bug-report" | FlightPanelTab;
+export type FlightOverlayTab = "location" | "map" | "renderer" | "sky" | "time" | "bug-report" | "browser-data" | FlightPanelTab;
 
 export interface FlightControlPanelOptions {
   /** The app's settings registry, whose sections the tabs draw. */
@@ -171,6 +171,8 @@ export interface FlightControlPanelOptions {
   settingsSections: readonly PanelSection[];
   /** The shared About tab, from `createAboutPanel`: which version runs, and what it is built from. */
   aboutTab?: HTMLElement;
+  /** Clears this website's saved browser state, preserving API keys by default. */
+  browserDataTab?: HTMLElement;
   /** The shared Bug report tab, separate from the activity-trail settings. */
   bugReportTab?: HTMLElement;
   onBugReportShow?(): void;
@@ -179,6 +181,8 @@ export interface FlightControlPanelOptions {
   initialWeather: FlightWeatherState;
   gamepadBindings?: GamepadBindingsMount;
   onLocationApply(location: GeodeticLocation): void;
+  /** A device fix while GPS is on, or null when it stops. Draws the blue dot and accuracy disc. */
+  onDeviceLocation?(fix: DeviceLocationFix | null): void;
   /** The flight's Location lookup, airport choice and saved form. */
   location?: FlightLocationPanel;
   /** The lookup's `search.*` limits, under the Location form. */
@@ -941,10 +945,12 @@ export function FlightControlPanel(props: FlightControlPanelProps) {
         settingsSections={props.settingsSections}
         interfaceSections={props.interfaceSections}
         aboutTab={props.aboutTab}
+        browserDataTab={props.browserDataTab}
         bugReportTab={props.bugReportTab}
         onBugReportShow={props.onBugReportShow}
         getViewState={() => props.snapshot.flightState}
         setViewState={props.onLocationApply}
+        onDeviceLocation={props.onDeviceLocation}
         locationSearchProvider={props.location?.searchProvider}
         locationContribution={props.location?.contribution}
         locationHostDataCodec={props.location?.hostDataCodec}

@@ -9,6 +9,9 @@ const appMocks = vi.hoisted(() => ({
   createFlightSimApp: vi.fn(async () => ({ destroy: vi.fn() })),
   createPhoneControllerApp: vi.fn(async () => ({ destroy: vi.fn() })),
   showReportOnly: vi.fn(),
+  markReady: vi.fn(),
+  reportFailure: vi.fn(),
+  isRecoveryPage: vi.fn(() => false),
   diagnosticsDestroy: vi.fn(),
   diagnosticLog: [] as string[],
   startDiagnostics: vi.fn((options: { log: import("foss-earth/shell").GameLog }) => ({
@@ -18,6 +21,13 @@ const appMocks = vi.hoisted(() => ({
     } },
     destroy: appMocks.diagnosticsDestroy,
   })),
+}));
+
+vi.mock("@foss-earth/ui/browser", async importOriginal => ({
+  ...await importOriginal<typeof import("@foss-earth/ui/browser")>(),
+  markBrowserAppReady: appMocks.markReady,
+  reportBrowserAppFailure: appMocks.reportFailure,
+  isBrowserRecoveryPage: appMocks.isRecoveryPage,
 }));
 
 vi.mock("foss-earth/diagnostics", async importOriginal => ({
@@ -38,6 +48,7 @@ beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
   appMocks.diagnosticLog.length = 0;
+  appMocks.isRecoveryPage.mockReturnValue(false);
   document.body.innerHTML = '<div id="root"></div>';
 });
 
@@ -57,6 +68,7 @@ describe("application route", () => {
     expect(appMocks.createFlightSimApp).not.toHaveBeenCalled();
     expect(appMocks.createPhoneControllerApp).not.toHaveBeenCalled();
     expect(document.getElementById("app-log")).toBeNull();
+    expect(appMocks.markReady).toHaveBeenCalledWith(document);
   });
 
   it("loads only 0SFS when mode=flight", async () => {
@@ -72,6 +84,8 @@ describe("application route", () => {
       diagnostics: expect.objectContaining({ log: expect.objectContaining({ print: expect.any(Function) }), destroy: appMocks.diagnosticsDestroy }),
     });
     expect(appMocks.startDiagnostics).toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(appMocks.markReady).toHaveBeenCalledWith(document));
+    expect(appMocks.reportFailure).not.toHaveBeenCalled();
     expect(appMocks.diagnosticLog).toContain("Application: Downloading application code");
     expect(document.getElementById("app-log")!.textContent).toContain("Application ready");
     // The route keeps the query; FOSS Earth's registry saves the key and takes it off the address bar.
@@ -183,6 +197,8 @@ describe("application route", () => {
     expect(document.querySelector('#app-log [data-tone="error"] .game-log__actions button')!.textContent).toBe("Reload and try again");
     expect(document.querySelector('#app-log .game-log__line[data-tone="error"]')!.textContent).toContain("could not initialize. Check your connection and reload to try again.\nError: Offline");
     expect(appMocks.diagnosticsDestroy).toHaveBeenCalledOnce();
+    expect(appMocks.reportFailure).toHaveBeenCalledExactlyOnceWith(document, "The application could not initialize.");
+    expect(appMocks.markReady).not.toHaveBeenCalled();
   });
 
   it("says once what stopped a flight that reported its own failure", async () => {
@@ -202,6 +218,7 @@ describe("application route", () => {
     expect(errors).toHaveLength(1);
     expect(errors[0]).toContain("Flight paused. Flight could not start safely. Check your connection and map access, then retry.\nAbortError: Terrain preparation");
     expect(window.osfsLoadingDiagnostics?.()).toMatchObject({ outcome: "failed", failure: expect.stringContaining("could not start safely"), cause: { message: expect.stringContaining("AbortError") } });
+    expect(appMocks.reportFailure).toHaveBeenCalledOnce();
   });
 
   it("keeps the original generic error behavior when a non-flight route fails", async () => {
@@ -214,5 +231,19 @@ describe("application route", () => {
 
     await vi.waitFor(() => expect(document.querySelector(".boot-error")?.textContent).toBe("Failed to initialize the application."));
     expect(document.getElementById("app-log")).toBeNull();
+    expect(appMocks.reportFailure).toHaveBeenCalledOnce();
+  });
+
+  it("leaves the standalone browser data review free of flight or phone startup", async () => {
+    window.history.replaceState(null, "", "/rc/?resetBrowserData=1");
+    appMocks.isRecoveryPage.mockReturnValue(true);
+
+    await import("./main");
+
+    expect(appMocks.createFlightSimApp).not.toHaveBeenCalled();
+    expect(appMocks.createPhoneControllerApp).not.toHaveBeenCalled();
+    expect(appMocks.startDiagnostics).not.toHaveBeenCalled();
+    expect(appMocks.markReady).not.toHaveBeenCalled();
+    expect(appMocks.reportFailure).not.toHaveBeenCalled();
   });
 });

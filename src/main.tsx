@@ -2,6 +2,7 @@ import "./styles/earth.css";
 import { createGameLog, trackViewportInsets, type GameLog, type GameLogLine } from "foss-earth/shell";
 import { getAppIdentity, showReportOnly, startAppDiagnostics, wantsReportOnly, type AppDiagnostics } from "foss-earth/diagnostics";
 import { getAppSettings } from "foss-earth/settings";
+import { isBrowserRecoveryPage, markBrowserAppReady, reportBrowserAppFailure } from "@foss-earth/ui/browser";
 import { appRouteFrom, canonicalAppLocation, flightHref, FOSS_EARTH_URL, type AppRoute } from "@0sfs/rc/appRoute";
 import { offerFullscreen } from "./fullscreen/fullscreen";
 import { createFlightLoadingScreen, type FlightLoadingScreen } from "./loading/createFlightLoadingScreen";
@@ -35,6 +36,7 @@ async function bootApp(rootElement: HTMLElement, loading: FlightLoadingScreen | 
     const { createPhoneControllerApp } = await import("@0sfs/rc/createPhoneControllerApp");
     await createPhoneControllerApp(rootElement);
     clearBootShell();
+    markBrowserAppReady(document);
     return;
   }
 
@@ -42,6 +44,7 @@ async function bootApp(rootElement: HTMLElement, loading: FlightLoadingScreen | 
     const { createFlightSimApp } = await import("./flight/createFlightSimApp");
     loading?.setPhase("app", { state: "ready" });
     await createFlightSimApp(rootElement, { loadingScreen: loading ?? undefined, log: log ?? undefined, diagnostics: diagnostics ?? undefined });
+    markBrowserAppReady(document);
     return;
   }
 
@@ -59,12 +62,6 @@ const rootElement = document.getElementById("root");
 if (!rootElement) {
   throw new Error('Expected to find a root element with id "root".');
 }
-
-canonicalizeLocation();
-
-// Lift the fixed HUD clear of any browser toolbar overlaying the page bottom
-// (Firefox Android's URL bar, Chrome's dynamic toolbar).
-trackViewportInsets();
 
 /**
  * The visit's log, each line recorded in the diagnostics trail until `end`.
@@ -99,6 +96,7 @@ function startPage(rootElement: HTMLElement): void {
   if (isFlightMode() && wantsReportOnly(window.location.search)) {
     clearBootShell();
     showReportOnly(rootElement, { settings: getAppSettings(), identity: getAppIdentity() });
+    markBrowserAppReady(document);
     return;
   }
   const recorded = isFlightMode() ? startRecordedLog() : null;
@@ -109,6 +107,7 @@ function startPage(rootElement: HTMLElement): void {
   if (log) offerFullscreen(log);
 
   void bootApp(rootElement, loading, log, diagnostics).catch((error: unknown) => {
+    reportBrowserAppFailure(document, "The application could not initialize.");
     console.error("Failed to bootstrap application.", error);
     if (loading) {
       loading.fail("The application could not initialize. Check your connection and reload to try again.", { cause: error });
@@ -120,4 +119,10 @@ function startPage(rootElement: HTMLElement): void {
   });
 }
 
-startPage(rootElement);
+if (!isBrowserRecoveryPage(document)) {
+  canonicalizeLocation();
+  // Lift the fixed HUD clear of any browser toolbar overlaying the page bottom
+  // (Firefox Android's URL bar, Chrome's dynamic toolbar).
+  trackViewportInsets();
+  startPage(rootElement);
+}
