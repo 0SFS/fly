@@ -27,3 +27,4 @@ __pycache__/
 # on the machine that recorded them; index.json and each case's manifest keep
 # their hashes.
 /validation/evidence/aircraft/f35b/powered-lift-stability-2026-10-08/physics/*/*.f64-delta.br
+.env.local
