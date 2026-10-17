@@ -10,6 +10,8 @@ import { getAppSettings, TOOLBAR_EDIT_PRIORITIES_ID } from "foss-earth/settings"
 import {
   getAppIdentity,
   issueReporterFromBuild,
+  markBoot,
+  markBootOnFrame,
   reportSecrets,
   startAppDiagnostics,
   type AppDiagnostics,
@@ -308,6 +310,7 @@ export async function createFlightSimApp(
   rootElement: HTMLElement,
   options: FlightSimAppOptions = {},
 ): Promise<FlightSimAppHandle> {
+  markBoot("boot:modules");
   // One registry for the page: FOSS Earth's parameters and the flight's.
   const settings = getAppSettings();
   const parameters = registerFlightSettings(settings);
@@ -2917,6 +2920,11 @@ export async function createFlightSimApp(
         physicsLoop.setPaused(inputManager.isPaused());
       }
     }
+    // The page's content: the aircraft in its world, from the first frame without the loading screen.
+    markBootOnFrame("boot:content", { onFrame(listener) {
+      const observer = runtime.scene.onAfterRenderObservable.add(listener);
+      return () => { runtime.scene.onAfterRenderObservable.remove(observer); };
+    } }, () => true);
     loading.hide();
     if (engineTest) controlPanel?.openOrSelectTab("engine");
     runtime.requestRender();
