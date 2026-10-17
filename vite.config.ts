@@ -4,7 +4,7 @@ import { execSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { defaultClientConditions, defaultServerConditions, type Plugin } from 'vite'
-import { babylonShaderChunks, builtFrom, localSource } from 'foss-earth/vite'
+import { babylonBarrels, babylonShaderChunks, builtFrom, localSource } from 'foss-earth/vite'
 import { bootTerminal, browserRecovery } from '@foss-earth/ui/vite'
 import { findLanAddress } from './scripts/dev-lan.mjs'
 import { linkPackPublicFiles } from './scripts/link-packs.mjs'
@@ -217,7 +217,7 @@ export default defineConfig({
     localSource({ root: import.meta.dirname }),
     { name: 'osfs-link-packs', config: () => { linkPackPublicFiles(import.meta.dirname) } },
     dropLinkList(),
-    react(), copyIndexToPagesPaths(), lanOriginPlugin(), builtFrom({ describe: jsbsimBuild }), babylonShaderChunks(),
+    react(), copyIndexToPagesPaths(), lanOriginPlugin(), builtFrom({ describe: jsbsimBuild }), babylonBarrels(), babylonShaderChunks(),
   ],
   test: {
     maxWorkers: '50%',
