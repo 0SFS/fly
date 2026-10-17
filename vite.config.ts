@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import path from 'node:path'
 import { defaultClientConditions, defaultServerConditions, type Plugin } from 'vite'
 import { babylonShaderChunks, builtFrom, localSource } from 'foss-earth/vite'
-import { browserRecovery } from '@foss-earth/ui/vite'
+import { bootTerminal, browserRecovery } from '@foss-earth/ui/vite'
 import { findLanAddress } from './scripts/dev-lan.mjs'
 import { linkPackPublicFiles } from './scripts/link-packs.mjs'
 import { pageHtmlFor } from './scripts/pages-html.mjs'
@@ -207,7 +207,9 @@ export default defineConfig({
   },
   // Each page says what it is built from, for the About tab, which /fly/ and /rc/ copy with it.
   // The flight loads the globe lazily, so Babylon's shaders would otherwise be hundreds of chunks.
+  // The boot terminal follows the flight's own chunk too, which the page imports lazily and needs before its first frame.
   plugins: [
+    bootTerminal({ title: '0SFS · Open Source Flight Simulator', theme: 'dark', waitFor: ['src/flight/createFlightSimApp.ts'] }),
     browserRecovery({ appId: '0sfs' }),
     oneUrlPerSourceFile(),
     localSource(),

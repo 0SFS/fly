@@ -2,7 +2,7 @@ import "./styles/earth.css";
 import { createGameLog, trackViewportInsets, type GameLog, type GameLogLine } from "foss-earth/shell";
 import { getAppIdentity, showReportOnly, startAppDiagnostics, wantsReportOnly, type AppDiagnostics } from "foss-earth/diagnostics";
 import { getAppSettings } from "foss-earth/settings";
-import { isBrowserRecoveryPage, markBrowserAppReady, reportBrowserAppFailure } from "@foss-earth/ui/browser";
+import { attachBootLog, isBrowserRecoveryPage, markBrowserAppReady, reportBrowserAppFailure } from "@foss-earth/ui/browser";
 import { appRouteFrom, canonicalAppLocation, flightHref, FOSS_EARTH_URL, type AppRoute } from "@0sfs/rc/appRoute";
 import { offerFullscreen } from "./fullscreen/fullscreen";
 import { createFlightLoadingScreen, type FlightLoadingScreen } from "./loading/createFlightLoadingScreen";
@@ -102,6 +102,8 @@ function startPage(rootElement: HTMLElement): void {
   const recorded = isFlightMode() ? startRecordedLog() : null;
   const diagnostics = recorded?.diagnostics ?? null;
   const log = recorded?.log ?? null;
+  // The log's history starts with the boot terminal's lines, and the log takes over from it at the first frame.
+  if (log) attachBootLog(log);
   const loading = log ? createFlightLoadingScreen(log) : null;
   loading?.setPhase("app", { state: "loading", detail: "Downloading application code" });
   if (log) offerFullscreen(log);

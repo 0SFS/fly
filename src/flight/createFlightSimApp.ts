@@ -5,7 +5,7 @@ import { Vector3, type WebGPUEngine } from "@babylonjs/core";
 import { bindFrameProfileSettings, FRAME_PROFILING_IDS } from "foss-earth/perf";
 import { setActiveFrameProfile } from "./diagnostics/frameProfile";
 import { createFlightUiHost } from "./earthUiHost";
-import { browserReportDownloads } from "@foss-earth/ui/browser";
+import { bootStep, browserReportDownloads } from "@foss-earth/ui/browser";
 import { getAppSettings, TOOLBAR_EDIT_PRIORITIES_ID } from "foss-earth/settings";
 import {
   getAppIdentity,
@@ -311,6 +311,7 @@ export async function createFlightSimApp(
   options: FlightSimAppOptions = {},
 ): Promise<FlightSimAppHandle> {
   markBoot("boot:modules");
+  bootStep("modules", "Starting the flight", 0);
   // One registry for the page: FOSS Earth's parameters and the flight's.
   const settings = getAppSettings();
   const parameters = registerFlightSettings(settings);
