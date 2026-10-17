@@ -208,8 +208,9 @@ export default defineConfig({
   // Each page says what it is built from, for the About tab, which /fly/ and /rc/ copy with it.
   // The flight loads the globe lazily, so Babylon's shaders would otherwise be hundreds of chunks.
   // The boot terminal follows the flight's own chunk too, which the page imports lazily and needs before its first frame.
+  // It shows on the flight's page only; the test pages under src/ have no boot to show.
   plugins: [
-    bootTerminal({ title: '0SFS · Open Source Flight Simulator', theme: 'dark', waitFor: ['src/flight/createFlightSimApp.ts'] }),
+    bootTerminal({ title: '0SFS · Open Source Flight Simulator', theme: 'dark', waitFor: ['src/flight/createFlightSimApp.ts'], pages: page => page === '/index.html' }),
     browserRecovery({ appId: '0sfs' }),
     oneUrlPerSourceFile(),
     localSource(),
