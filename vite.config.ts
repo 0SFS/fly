@@ -4,8 +4,8 @@ import { execSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { defaultClientConditions, defaultServerConditions, type Plugin } from 'vite'
-import { babylonBarrels, babylonShaderChunks, builtFrom, localSource } from 'foss-earth/vite'
-import { bootTerminal, browserRecovery } from '@foss-earth/ui/vite'
+import { babylonBarrels, babylonShaderChunks, builtFrom, crossOriginIsolation, deployedIsolation, localSource } from 'foss-earth/vite'
+import { appFiles, bootTerminal, browserRecovery } from '@foss-earth/ui/vite'
 import { findLanAddress } from './scripts/dev-lan.mjs'
 import { linkPackPublicFiles } from './scripts/link-packs.mjs'
 import { pageHtmlFor } from './scripts/pages-html.mjs'
@@ -210,6 +210,13 @@ export default defineConfig({
   // The boot terminal follows the flight's own chunk too, which the page imports lazily and needs before its first frame.
   // It shows on the flight's page only; the test pages under src/ have no boot to show.
   plugins: [
+    // Off unless FOSS_EARTH_ISOLATION asks: a threaded WebAssembly core needs an isolated page.
+    crossOriginIsolation(),
+    // GitHub Pages sends no such headers, so in a build a service worker adds them, and each page, /fly/ and /rc/
+    // copied with it, starts with the script that asks for it (FOSS Earth's docs/docs/proposals/webassembly.md,
+    // step 3). The worker keeps none of the flight's files. FOSS_EARTH_ISOLATION=report-only or off at build time
+    // changes what it may do.
+    appFiles({ keepFiles: false, isolation: deployedIsolation(), cacheNamespace: '0sfs-app-files' }),
     bootTerminal({ title: '0SFS · Open Source Flight Simulator', theme: 'dark', waitFor: ['src/flight/createFlightSimApp.ts'], pages: page => page === '/index.html' }),
     browserRecovery({ appId: '0sfs' }),
     oneUrlPerSourceFile(),

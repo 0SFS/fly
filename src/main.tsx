@@ -2,7 +2,7 @@ import "./styles/earth.css";
 import { createGameLog, trackViewportInsets, type GameLog, type GameLogLine } from "foss-earth/shell";
 import { getAppIdentity, showReportOnly, startAppDiagnostics, wantsReportOnly, type AppDiagnostics } from "foss-earth/diagnostics";
 import { getAppSettings } from "foss-earth/settings";
-import { attachBootLog, isBrowserRecoveryPage, markBrowserAppReady, reportBrowserAppFailure } from "@foss-earth/ui/browser";
+import { attachBootLog, isBrowserRecoveryPage, markBrowserAppReady, reportBrowserAppFailure, whenIsolationSettled } from "@foss-earth/ui/browser";
 import { appRouteFrom, canonicalAppLocation, flightHref, FOSS_EARTH_URL, type AppRoute } from "@0sfs/rc/appRoute";
 import { offerFullscreen } from "./fullscreen/fullscreen";
 import { createFlightLoadingScreen, type FlightLoadingScreen } from "./loading/createFlightLoadingScreen";
@@ -126,5 +126,6 @@ if (!isBrowserRecoveryPage(document)) {
   // Lift the fixed HUD clear of any browser toolbar overlaying the page bottom
   // (Firefox Android's URL bar, Chrome's dynamic toolbar).
   trackViewportInsets();
-  startPage(rootElement);
+  // A first visit may reload once to be isolated (index.html's first script); until it knows, nothing starts.
+  void whenIsolationSettled(window).then(() => startPage(rootElement));
 }
