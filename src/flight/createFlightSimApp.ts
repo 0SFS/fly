@@ -214,6 +214,7 @@ import {
   createMapSourcePanel,
   createPresetsSection,
   createRendererPanel,
+  reportRendererStart,
   createSavedSettingsSection,
   createDateTimePanel,
   createSkyPanel,
@@ -2118,15 +2119,19 @@ export async function createFlightSimApp(
 
   // The renderer and basemap choices each have a tab; their HUD chips toggle it.
   // The choice is renderer.backend, which the runtime reads when it starts.
+  const rendererStorage = {
+    getItem: (key: string) => window.localStorage.getItem(key),
+    setItem: (key: string, value: string) => window.localStorage.setItem(key, value),
+    removeItem: (key: string) => window.localStorage.removeItem(key),
+  };
+  // A start on WebGL says why in the log, with how to get WebGPU where it can be had.
+  const rendererAdvice = reportRendererStart(log, runtime.renderer, runtime.engine, window, rendererStorage);
   const rendererPanel = createRendererPanel({
     ui: ui.renderer,
     renderer: runtime.renderer,
-    onChange: force => applyRendererChoice(force, settings, window.location, {
-      getItem: key => window.localStorage.getItem(key),
-      setItem: (key, value) => window.localStorage.setItem(key, value),
-      removeItem: key => window.localStorage.removeItem(key),
-    }),
+    onChange: force => applyRendererChoice(force, settings, window.location, rendererStorage),
     settings,
+    advice: rendererAdvice,
   });
   // The sky is seen from the flight's camera; before the first frame, the Sun and its times of day are the aircraft's place's.
   const skyPlace = () => runtime.sky.getEnvironment()?.illumination.observer ?? physicsLoop.getLatestState() ?? initialState;
