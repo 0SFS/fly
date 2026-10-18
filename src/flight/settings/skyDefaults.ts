@@ -6,6 +6,14 @@ import { FOSS_EARTH_PARAMETERS, VIEWPOINT_SURFACE_LIGHTING_CHOICE, type DeviceCo
  * aircraft, where one factor for all imagery is right and cheaper, so the
  * flight offers that as a choice of its own, and makes it the default only
  * where the device is too slow for the other.
+ *
+ * The time is FOSS Earth's default, a set time: 16:20 solar time on
+ * 2026-04-20 over Minneapolis, where the flight starts and is tested, when
+ * the Sun lines up with the shadows in Google's 3D Tiles. Once the flight
+ * shows live data, such as weather or ADS-B traffic, a set time would put
+ * that data under the wrong Sun: the flight should then make Now its default
+ * (`settings.setHostDefault("sky.time.mode", "now", …)`), which is how it
+ * behaved before.
  */
 
 /** Adds "As at the viewpoint" to Sky → Ground → Map imagery, after FOSS Earth's own choices. */
