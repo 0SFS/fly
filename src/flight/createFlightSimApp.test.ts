@@ -406,7 +406,7 @@ it("flies under the sky's dome by default, offers the Sky and Date and time tabs
     expect(root.querySelector('[data-parameter="renderer.ambientFillMultiplier"]')).toBeNull();
     // The Sky tab says where the Sun is and links to the dials that set the time.
     expect(root.textContent).toContain("the Sun is");
-    const dateTime = [...root.querySelectorAll("button")].find(button => button.textContent === "Date and time")!;
+    const dateTime = root.querySelector<HTMLButtonElement>('button[aria-label="Open Date and time"]')!;
     await act(async () => dateTime.click());
     expect(root.querySelector('[data-settings-section="time/instant"]')).not.toBeNull();
     expect(root.querySelectorAll(".foss-earth-dial")).toHaveLength(2);
@@ -439,11 +439,14 @@ it("runs wheel feedback only when selected, exposes A/B while paused, and mutes 
     await act(async () => root.querySelector<HTMLButtonElement>('[aria-label="Open right panel"]')!.click());
     const debug = Array.from(root.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')).find(button => button.textContent === "Debug")!;
     await act(async () => debug.click());
-    const select = root.querySelector<HTMLSelectElement>('[aria-label="Wheel spin experiment"]')!;
+    // "[Off / A / B] ?  Tire sound [switch]"
+    const wheel = (mode: string) => root.querySelector<HTMLInputElement>(`[role="radiogroup"][aria-label="Wheel spin experiment"] input[value="${mode}"]`)!;
     const sound = root.querySelector<HTMLInputElement>('[aria-label="Enable tire sound"]')!;
-    expect(select.value).toBe("off");
+    expect(wheel("off").checked).toBe(true);
+    expect(wheel("inertia").getAttribute("aria-label")).toBe("B · Gradual spin-up");
+    expect(sound.closest("label")!.firstElementChild!.textContent).toBe("Tire sound");
     expect(sound.disabled).toBe(true);
-    await act(async () => { select.value = "inertia"; select.dispatchEvent(new Event("change", { bubbles: true })); });
+    await act(async () => wheel("inertia").click());
     expect(mocks.wheelSpin.reset).toHaveBeenCalled();
     expect(sound.disabled).toBe(false);
     await act(async () => sound.click());
@@ -452,10 +455,10 @@ it("runs wheel feedback only when selected, exposes A/B while paused, and mutes 
     expect(mocks.wheelSpin.step).toHaveBeenLastCalledWith(1 / 120, "inertia");
     await act(async () => root.querySelector<HTMLInputElement>('[aria-label="Show aircraft collision geometry"]')!.click());
     expect(mocks.wheelOverlay.setEnabled).toHaveBeenLastCalledWith(true);
-    await act(async () => { select.value = "instant"; select.dispatchEvent(new Event("change", { bubbles: true })); });
+    await act(async () => wheel("instant").click());
     onStep(mocks.state as never);
     expect(mocks.wheelSpin.step).toHaveBeenLastCalledWith(1 / 120, "instant");
-    await act(async () => { select.value = "off"; select.dispatchEvent(new Event("change", { bubbles: true })); });
+    await act(async () => wheel("off").click());
     expect(sound.checked).toBe(false);
     expect(mocks.tireAudio.setEnabled).toHaveBeenLastCalledWith(false);
     expect(mocks.wheelOverlay.setEnabled).toHaveBeenLastCalledWith(false);
@@ -750,7 +753,7 @@ async function mountAircraftSelection(initial: [string, string][] = []) {
 
 const generationSelector = ".flight-panel__generation-field select";
 const lodSelector = ".flight-panel__model-controls select";
-const applySelector = ".flight-panel__aircraft-controls > button";
+const applySelector = ".flight-panel__aircraft-apply > button";
 
 it("connects external tank fuel controls to separation, respawn and simulation time", async () => {
   const readTanks = vi.spyOn(fuelTanks, "readFuelTanks").mockImplementation(() => [0, 1, 2, 3].map(index => ({
@@ -1541,7 +1544,7 @@ it("toggles the Map, Renderer and Location tabs from their HUD chips", async () 
   try {
     await act(async () => mocks.hudBarOptions!.onMapClick());
     expect(tabs()).toEqual(["Map"]);
-    expect(root.querySelector('[aria-label="2D basemaps"]')).not.toBeNull();
+    expect(root.querySelector('[role="radiogroup"][aria-label="Basemap"]')).not.toBeNull();
     await act(async () => mocks.hudBarOptions!.onRendererClick());
     expect(tabs()).toEqual(["Map", "Renderer"]);
     expect(root.querySelector('input[name="foss-earth-renderer"]')).not.toBeNull();
@@ -1633,7 +1636,7 @@ it("keeps flightPerf=1, the DevTools aliases and Debug → Frame budget, on the 
     await act(async () => debug.click());
     const measure = root.querySelector<HTMLInputElement>('[data-parameter="renderer.profiling.enabled"] input')!;
     expect(measure.checked).toBe(true);
-    expect(root.textContent).toContain("Copy frame budget");
+    expect(root.querySelector('[aria-label="Copy frame budget"]')).not.toBeNull();
     await act(async () => window.osfsFrameProfile!.setEnabled(false));
     expect(getAppSettings().get("renderer.profiling.enabled")).toBe(false);
     expect(session.enabled).toBe(false);
@@ -1865,7 +1868,7 @@ describe("pause while loading and resumed flights", () => {
       expect(saved()).toMatchObject({ paused: true });
 
       const newFlight = Array.from(t.root.querySelectorAll<HTMLButtonElement>("button"))
-        .find(button => button.textContent === "Start a new flight")!;
+        .find(button => button.textContent === "New flight")!;
       await act(async () => newFlight.click());
       expect(t.reload).toHaveBeenCalledOnce();
       expect(saved()).toBeNull();

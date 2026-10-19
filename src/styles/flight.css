@@ -243,7 +243,7 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 15px 18px 12px;
+  padding: 6px 6px 0;
   color: var(--flight-panel-muted);
   font-size: 11px;
   font-weight: 700;
@@ -256,22 +256,50 @@
 
 .flight-panel__content {
   display: grid;
-  gap: 18px;
-  padding: 4px 18px 22px;
+  gap: 6px;
+  padding: 6px;
 }
 
+/* A phrase of controls on one line that wraps: "[Ⅱ] W/S Pitch …", "Show [switch] ?". */
+.flight-panel__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 6px;
+  min-width: 0;
+}
+
+.flight-panel__row > .flight-panel__hint {
+  flex: 0 1 auto;
+}
+
+/* "Label [switch]": the shared switch, label first. */
+.flight-panel__switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #cad3d5;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.flight-panel__registry-controls {
+  min-width: 0;
+}
+
+/* Readouts as chips that wrap as a paragraph, each as wide as its text. */
 .flight-panel__metrics {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  border-top: 1px solid var(--flight-panel-line);
-  border-left: 1px solid var(--flight-panel-line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
 }
 
 .flight-panel__metric {
   min-width: 0;
-  padding: 12px;
-  border-right: 1px solid var(--flight-panel-line);
-  border-bottom: 1px solid var(--flight-panel-line);
+  padding: 3px 6px;
+  border: 1px solid var(--flight-panel-line);
+  border-radius: 4px;
 }
 
 .flight-panel__metric span,
@@ -286,10 +314,10 @@
 
 .flight-panel__metric strong {
   display: block;
-  margin-top: 3px;
+  margin-top: 1px;
   overflow: hidden;
   font-family: "SF Mono", Menlo, monospace;
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -303,7 +331,7 @@
 }
 
 .flight-panel__fieldset legend {
-  margin-bottom: 8px;
+  margin-bottom: 3px;
   color: var(--flight-panel-muted);
   font-size: 11px;
   font-weight: 700;
@@ -338,9 +366,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 38px;
-  padding: 0 14px;
+  justify-self: start;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 8px;
   border: 1px solid rgba(232, 182, 71, 0.4);
   border-radius: 4px;
   background: rgba(232, 182, 71, 0.1);
@@ -354,28 +383,33 @@
 }
 
 .flight-panel__keymap {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 10px;
   color: var(--flight-panel-muted);
   font-size: 11px;
 }
 
 .flight-panel__keymap kbd {
   display: inline-block;
-  min-width: 35px;
-  margin-right: 5px;
+  margin-right: 4px;
   color: #dfe6e8;
   font-family: "SF Mono", Menlo, monospace;
 }
 
-.flight-panel__section-heading,
 .flight-panel__coordinates,
 .flight-panel__debug-status {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.flight-panel__section-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
 }
 
 .flight-panel__section-heading strong,
@@ -397,17 +431,21 @@
   border: 1px solid var(--flight-panel-line);
 }
 
+/* "Label value [control]" on one line that wraps, never a label stacked over its control. */
 .flight-panel__field {
-  display: grid;
-  gap: 9px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 6px;
+  min-width: 0;
   color: #cad3d5;
   font-size: 12px;
   font-weight: 600;
 }
 
 .flight-panel__field span {
-  display: flex;
-  justify-content: space-between;
+  display: inline-flex;
+  gap: 6px;
 }
 
 .flight-panel__field output {
@@ -415,17 +453,8 @@
   font-family: "SF Mono", Menlo, monospace;
 }
 
-/* A checkbox reads as label-then-control on one line, not as a stacked pair. */
 .flight-panel__field--inline {
-  grid-auto-flow: column;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 8px;
   font-weight: 500;
-}
-
-.flight-panel__field--inline span {
-  justify-content: flex-start;
 }
 
 .flight-panel__hint a {
@@ -433,7 +462,8 @@
 }
 
 .flight-panel__field input[type="range"] {
-  width: 100%;
+  flex: 1 1 8em;
+  min-width: 6em;
   accent-color: var(--flight-panel-accent);
 }
 
@@ -444,40 +474,12 @@
   justify-self: start;
   width: auto;
   max-width: 100%;
-  padding: 8px 10px;
+  padding: 3px 6px;
   border-radius: 6px;
   border: 1px solid var(--flight-panel-line);
   background: rgba(0, 0, 0, 0.35);
   color: #e8edf5;
   font: inherit;
-}
-
-.flight-panel__radio-list {
-  display: grid;
-  gap: 5px;
-}
-
-.flight-panel__radio-list label {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  min-height: 36px;
-  padding: 7px 10px;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  color: #aeb9bc;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.flight-panel__radio-list label.is-active {
-  border-color: rgba(232, 182, 71, 0.32);
-  background: rgba(232, 182, 71, 0.08);
-  color: #fff;
-}
-
-.flight-panel__radio-list input {
-  accent-color: var(--flight-panel-accent);
 }
 
 .flight-panel__aircraft-picker,
@@ -630,50 +632,9 @@
   color: var(--flight-panel-muted);
 }
 
-.flight-panel__info-details {
-  position: relative;
-}
-
-.flight-panel__info-summary {
-  list-style: none;
-  cursor: pointer;
-  width: 22px;
-  height: 22px;
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 1px solid var(--flight-panel-line);
-  border-radius: 999px;
-  background: rgba(232, 182, 71, 0.12);
-  color: var(--flight-panel-text);
-  font: 700 13px/1 "Avenir Next Condensed", "Helvetica Neue", sans-serif;
-  display: inline-grid;
-  place-items: center;
-  user-select: none;
-}
-
-.flight-panel__info-summary::-webkit-details-marker {
-  display: none;
-}
-
-.flight-panel__info-summary::marker {
-  content: "";
-}
-
-.flight-panel__info-summary:focus-visible {
-  outline: 2px solid var(--flight-panel-accent);
-  outline-offset: 3px;
-}
-
 .flight-panel__info-content {
-  width: min(300px, 90vw);
-  margin-top: 4px;
   display: grid;
   gap: 4px;
-  padding: 6px;
-  border: 1px solid var(--flight-panel-line);
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.28);
 }
 
 .flight-panel__model-controls {
@@ -935,28 +896,6 @@
   cursor: not-allowed;
 }
 
-.flight-panel__option {
-  display: grid;
-  gap: 1px;
-  line-height: 1.35;
-}
-
-.flight-panel__option strong {
-  color: inherit;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.flight-panel__option em {
-  color: #8d999c;
-  font-size: 11px;
-  font-style: normal;
-}
-
-.flight-panel__radio-list label.is-active .flight-panel__option em {
-  color: #b6c2c5;
-}
-
 .flight-panel__hint {
   margin: 0;
   color: #8d999c;
@@ -1088,19 +1027,15 @@
   to { transform: rotate(360deg); }
 }
 
-/* Ground interaction settings: choice plus Auto lock on one row. */
+/* Ground interaction settings: "Name [track] ?  Lock [switch]" wraps as a phrase. */
 .flight-panel__ground-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 4px 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 8px;
 }
 
 .flight-panel__ground-row > .flight-panel__hint {
-  grid-column: 1 / -1;
+  flex: 1 1 100%;
   margin: 0;
-}
-
-.flight-panel__ground-lock {
-  padding-bottom: 6px;
 }

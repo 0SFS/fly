@@ -401,19 +401,20 @@
   border-radius: 6px;
 }
 
+/* "Extra panels [switch] [switch]": the title first in one wrapping row. */
 .settings-metric-menu {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px 10px;
-  padding: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 6px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.04);
 }
 
 .settings-section-title {
-  grid-column: 1 / -1;
-  margin: 0 0 2px;
+  margin: 0;
   color: rgba(147, 197, 253, 0.88);
   font-size: 12px;
   font-weight: 700;
@@ -497,54 +498,31 @@
   pointer-events: none;
 }
 
-/* ─── POI Sprite Size Tuner panel ────────────────────────────────── */
+/* ─── POI sprite size and compass scale tuners ─────────────────── */
+/* The engine draws "Sprite size [fields…] [✓] [Save as default]" on the shared
+   classes; only the floating card is styled here. */
 .poi-sprite-tuner {
   pointer-events: auto;
-  width: 210px;
-  padding: 10px 12px;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 8px 10px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 8px;
   background: rgba(10, 14, 22, 0.82);
   backdrop-filter: blur(8px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-  font-family: "SF Mono", "Menlo", "Monaco", monospace;
+  font-size: 12px;
 }
 
 .poi-sprite-tuner[hidden] {
   display: none;
 }
 
-.poi-sprite-tuner-title {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: rgba(147, 197, 253, 0.88);
-  margin-bottom: 8px;
-}
-
-.poi-sprite-tuner-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px 8px;
-  margin-bottom: 8px;
-}
-
-.poi-sprite-tuner-field {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  cursor: default;
-}
-
 .poi-sprite-tuner-field span {
-  font-size: 9px;
-  color: rgba(148, 163, 184, 0.8);
+  color: rgba(148, 163, 184, 0.9);
   white-space: nowrap;
 }
 
 .poi-sprite-tuner-field input {
-  width: 100%;
   height: 22px;
   padding: 0 5px;
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -552,49 +530,11 @@
   background: rgba(255, 255, 255, 0.06);
   color: rgba(239, 246, 255, 0.92);
   font: inherit;
-  font-size: 11px;
 }
 
 .poi-sprite-tuner-field input:focus {
   outline: none;
   border-color: rgba(96, 165, 250, 0.7);
-}
-
-.poi-sprite-tuner-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.poi-sprite-tuner-apply,
-.poi-sprite-tuner-save-defaults {
-  width: 100%;
-  height: 24px;
-  appearance: none;
-  border: 1px solid rgba(96, 165, 250, 0.5);
-  border-radius: 5px;
-  background: rgba(59, 130, 246, 0.18);
-  color: rgba(147, 197, 253, 0.95);
-  font: inherit;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.poi-sprite-tuner-save-defaults {
-  border-color: rgba(52, 211, 153, 0.5);
-  background: rgba(16, 185, 129, 0.16);
-  color: rgba(167, 243, 208, 0.95);
-}
-
-.poi-sprite-tuner-apply:hover {
-  background: rgba(59, 130, 246, 0.32);
-  border-color: rgba(96, 165, 250, 0.75);
-}
-
-.poi-sprite-tuner-save-defaults:hover {
-  background: rgba(16, 185, 129, 0.28);
-  border-color: rgba(52, 211, 153, 0.75);
 }
 
 .poi-sprite-tuner-apply[hidden],

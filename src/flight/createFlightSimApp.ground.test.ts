@@ -122,7 +122,7 @@ it("queues wheel-model changes until pause, applies audio immediately, and resto
     const preset = view.root.querySelector<HTMLElement>('[data-preset="osfs-ground-landing-feedback"]')!;
     const button = (text: string) => [...preset.querySelectorAll<HTMLButtonElement>("button")].find(item => item.textContent === text)!;
     await act(async () => button("Apply…").click());
-    await act(async () => button("Apply these changes").click());
+    await act(async () => button("Apply").click());
     await view.openTab("Aircraft");
     expect([...view.root.querySelectorAll(".foss-earth-preset-status")].map(status => status.textContent))
       .toContain("Matches Ground: Landing feedback");
@@ -157,14 +157,15 @@ it("keeps Debug experiment choices only through the explicit Ground handling act
   const view = await mount();
   try {
     await view.openTab("Debug");
-    await view.choose("Wheel spin experiment", "instant");
+    await act(async () => view.root.querySelector<HTMLInputElement>('[role="radiogroup"][aria-label="Wheel spin experiment"] input[value="instant"]')!.click());
     view.onStep();
     expect(mocks.wheelSpin.step).toHaveBeenLastCalledWith(1 / 120, "instant");
     expect(saved(storage)).not.toHaveProperty("osfs.ground.rotation");
     await view.openTab("Aircraft");
     const override = view.root.querySelector('[aria-label="Wheel experiment override"]')!;
     expect(override.textContent).toMatch(/Instant rolling/);
-    const keep = Array.from(override.querySelectorAll("button")).find(button => button.textContent === "Keep experiment choices")!;
+    const keep = override.querySelector<HTMLButtonElement>('button[aria-label="Keep experiment choices"]')!;
+    expect(keep.textContent).toBe("Keep");
     await act(async () => keep.click());
     expect(saved(storage)).toMatchObject({ "osfs.ground.rotation": "instant" });
     expect(view.root.querySelector('[aria-label="Wheel experiment override"]')).toBeNull();

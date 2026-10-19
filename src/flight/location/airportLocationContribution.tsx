@@ -63,12 +63,12 @@ export function createAirportLocationContribution(): LocationPanelContribution {
         </select></label>
         <p>{airportMode === "departure" ? "On runway, paused. Resume when ready for takeoff." : "5 NM final · 3° approach."}</p>
         {runway && runway.elevationMeters === undefined && <p>Runway elevation unavailable.</p>}
-        <button type="button" onClick={() => {
+        <button type="button" aria-label="Enter coordinates instead" onClick={() => {
           context.cancelResolution();
           lastMode = airportMode;
           context.setHostData(airportMode === "arrival" ? { airportMode } : undefined);
           context.setMessage("");
-        }}>Enter coordinates instead</button>
+        }}>Coordinates</button>
         <p>Airport data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap contributors</a> · <a href="https://freeairportdb.com" target="_blank" rel="noreferrer">FreeAirportDB</a></p>
       </div>;
     },

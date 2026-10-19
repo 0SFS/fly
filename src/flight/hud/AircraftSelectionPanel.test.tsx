@@ -71,7 +71,7 @@ describe("aircraft selection panel", () => {
     const t = await mount(activeSnapshot({ modelStatus, modelError: modelStatus === "error" ? "Active package error" : null }));
     const status = t.host.querySelector('[aria-label="Current model for Cirrus Vision Jet G2"]')!;
     expect(status.textContent).toContain(label);
-    expect(t.host.querySelector<HTMLButtonElement>(".flight-panel__aircraft-controls > button")!.disabled).toBe(true);
+    expect(t.host.querySelector<HTMLButtonElement>(".flight-panel__aircraft-apply > button")!.disabled).toBe(true);
     expect(t.host.textContent).toContain("Cirrus Vision Jet G2 is active. No pending changes.");
     if (modelStatus === "error") expect(status.textContent).toContain("Active package error");
   });
@@ -144,8 +144,10 @@ describe("aircraft selection panel", () => {
     expect(Array.from(levels.options).map(option => option.value)).toEqual(["auto", "hd"]);
     expect(t.host.textContent).not.toContain("No mesh exists for this airframe");
     expect(t.onApply).not.toHaveBeenCalled();
-    const apply = t.host.querySelector<HTMLButtonElement>(".flight-panel__aircraft-controls > button")!;
-    expect(apply.textContent).toBe("Apply & fly Lockheed Martin F-35B Lightning II");
+    const apply = t.host.querySelector<HTMLButtonElement>(".flight-panel__aircraft-apply > button")!;
+    expect(apply.textContent).toBe("Apply");
+    expect(apply.getAttribute("aria-label")).toBe("Apply & fly Lockheed Martin F-35B Lightning II");
+    expect(t.host.querySelector(".flight-panel__aircraft-apply [role=status]")?.textContent).toBe("Flying Cirrus Vision Jet G2 until you apply.");
     await act(async () => apply.click());
     expect(t.onApply).toHaveBeenCalledWith(selection);
   });
@@ -170,7 +172,7 @@ describe("aircraft selection panel", () => {
       aircraftId: "cirrus-vision-jet-g3", generationId: "g3", lodId: "lod2",
     });
     t.onApply.mockReturnValue("Could not save your aircraft choice.");
-    await act(async () => t.host.querySelector<HTMLButtonElement>(".flight-panel__aircraft-controls > button")!.click());
+    await act(async () => t.host.querySelector<HTMLButtonElement>(".flight-panel__aircraft-apply > button")!.click());
     expect(t.host.querySelector('[role="alert"]')?.textContent).toBe("Could not save your aircraft choice.");
     const generation = t.host.querySelector<HTMLSelectElement>(".flight-panel__generation-field select")!;
     await act(async () => {

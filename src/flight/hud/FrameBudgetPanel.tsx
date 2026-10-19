@@ -15,7 +15,7 @@ export function FrameBudgetPanel() {
     if (!profile || !host.current) return;
     const { ui } = profile;
     const panel = createFrameBudgetPanel({
-      ui: { document: ui.document, createParameterControl: ui.control },
+      ui: { document: ui.document, createParameterControl: ui.control, createIconButton: options => ui.publicUi.createIconButton(ui.document, options) },
       refreshPort: ui.refresh,
       actions: {
         copy: ui.copy,

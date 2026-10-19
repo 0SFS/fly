@@ -131,18 +131,23 @@ describe("flight input method selector", () => {
     expect(container.querySelector("#inputModeMenu")).toBeNull();
     // jsdom has a fine pointer and no touchscreen: a desktop, so no Touch part.
     const section = document.createElement("div");
+    // A radio fires change only once it is in the document.
+    document.body.append(section);
     const unmountSection = hud.mountInputMethod(section);
-    expect(Array.from(section.querySelectorAll(".input-mode-heading"), (el) => el.textContent)).toEqual(["Mouse or trackpad"]);
-    expect(section.querySelectorAll(".input-mode-toggle-option")).toHaveLength(2);
+    // "Pointer [Mouse / Trackpad] ?", FOSS Earth's segmented track.
+    const pointer = section.querySelector<HTMLElement>('[role="radiogroup"][aria-label="Pointer"]')!;
+    expect(pointer.querySelectorAll('input[type="radio"]')).toHaveLength(2);
     expect(section.querySelector("[data-mode=touch]")).toBeNull();
     expect(section.querySelectorAll(".gesture-card")).toHaveLength(2);
-    section.querySelector<HTMLButtonElement>(".input-mode-toggle-option[data-mode=trackpad]")!.click();
+    expect(section.textContent).not.toContain("Debug wheel events");
+    pointer.querySelector<HTMLInputElement>('input[value="trackpad"]')!.click();
     expect(onInputModeChange).toHaveBeenLastCalledWith("trackpad");
     expect(getAppSettings().get("input.mode")).toBe("trackpad");
     expect(button.getAttribute("aria-label")).toBe("Trackpad mode. Show or hide input settings");
     expect(section.querySelector('[aria-label="Two-finger swipe to orbit"]')).not.toBeNull();
     unmountSection();
     expect(section.childElementCount).toBe(0);
+    section.remove();
     const rendererButton = container.querySelector<HTMLElement>("#flightRendererButton")!;
     expect(rendererButton.classList.contains("is-rendering")).toBe(true);
     activityListener(false);

@@ -1,6 +1,6 @@
 import {
   appendHostSections, checkChoice, createBrowserClipboard, createChoiceGroup, createChoiceNote,
-  createDial, createParameterControl, createParameterSection, createSectionsElement, createTrack, wrapTurn,
+  createDial, createHelpTooltip, createIconButton, createParameterControl, createParameterSection, createSectionsElement, createTrack, wrapTurn,
 } from "@foss-earth/ui/browser";
 import type { RendererPanelUiPort } from "@foss-earth/renderer/panel";
 import type { SettingsRegistry, SettingsStorage } from "foss-earth/settings";
@@ -34,6 +34,7 @@ export interface FlightUiHost {
     createChoiceGroup: typeof createChoiceGroup; createChoiceNote: typeof createChoiceNote;
     createParameterSection: typeof createParameterSection; createSectionsElement: typeof createSectionsElement;
     createDial: typeof createDial; wrapTurn: typeof wrapTurn;
+    createHelpTooltip: typeof createHelpTooltip; createIconButton: typeof createIconButton;
   };
   dispose(): void;
 }
@@ -70,14 +71,15 @@ export function createFlightUiHost(settings: SettingsRegistry, document: Documen
     renderer: {
       document,
       isInput: (value): value is HTMLInputElement => value instanceof document.defaultView!.HTMLInputElement,
-      createChoiceGroup: (name, heading, choices) => createChoiceGroup(name, heading, choices, document),
+      createChoiceGroup: (name, heading, choices, options) => createChoiceGroup(name, heading, choices, document, options),
+      createHelpTooltip,
       createChoiceNote: text => createChoiceNote(text, document),
       checkChoice,
       createParameterSection: (registry, options) => createParameterSection(registry, { ...options, document, refresh, panelStorage: storage }),
       createSectionsElement: entries => createSectionsElement(entries, { document, storage }),
       appendHostSections: (registry, tab, target, own) => appendHostSections(registry, tab, target, own, { document, refresh, panelStorage: storage }),
     },
-    publicUi: { appendHostSections, checkChoice, createChoiceGroup, createChoiceNote, createParameterSection, createSectionsElement, createDial, wrapTurn },
+    publicUi: { appendHostSections, checkChoice, createChoiceGroup, createChoiceNote, createParameterSection, createSectionsElement, createDial, wrapTurn, createHelpTooltip, createIconButton },
     dispose() {
       if (disposed) return;
       disposed = true;

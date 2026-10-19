@@ -131,7 +131,8 @@ it("does not let a late airport lookup overwrite a switch to coordinates", async
     await search(host);
     await click(host, "MSP");
     expect(status(host)).toBe("Loading runway details…");
-    await click(host, "Enter coordinates instead");
+    expect(Array.from(host.querySelectorAll("button")).some(button => button.textContent === "Coordinates" && button.getAttribute("aria-label") === "Enter coordinates instead")).toBe(true);
+    await click(host, "Coordinates");
     expect(resolve.mock.calls[0][0].aborted).toBe(true);
     await act(async () => finish({ id: "msp", label: "MSP", latDeg: msp.latDeg, lonDeg: msp.lonDeg, hostData: { airport: msp } }));
     await act(async () => root.unmount());

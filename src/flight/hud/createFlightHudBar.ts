@@ -1,5 +1,5 @@
 import type { HudInputMode, InputSensitivitySettings } from "foss-earth/input";
-import { createExternalLinkIcon } from "@foss-earth/ui/browser";
+import { checkChoice, createChoiceGroup, createExternalLinkIcon } from "@foss-earth/ui/browser";
 import "foss-earth/shell.css";
 import "foss-earth/input-mode.css";
 
@@ -104,6 +104,9 @@ export function createFlightHudBar(container: HTMLElement, options: FlightHudBar
   const inputHud = createInputModeHud(container, pauseButton, {
     document,
     settings: getAppSettings(),
+    ui: { checkChoice, createChoiceGroup },
+    // The per-event wheel log is for developer pages: FOSS Earth's ?dev=1.
+    showDebug: new URLSearchParams(window.location.search).getAll("dev").join() === "1",
     deviceHints: inputDeviceHints(),
     log: console,
     movements: ["orbit", "zoom"],

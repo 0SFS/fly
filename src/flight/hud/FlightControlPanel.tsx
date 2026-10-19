@@ -1,7 +1,7 @@
 import "foss-earth/windowing.css";
 
 import type { FlightSectionFactory } from "../earthUiHost";
-import { createHelpTooltip, createParameterSection, MeshInspectorPanel, WindowOverlay, type PanelSection, type WindowOverlayHandle } from "foss-earth/shell";
+import { ChoiceTrack, createHelpTooltip, createParameterControl, createParameterSection, HelpTip, IconButton, MeshInspectorPanel, WindowOverlay, type PanelSection, type WindowOverlayHandle } from "foss-earth/shell";
 import type { MeshInspectorHandle } from "foss-earth/diagnosticDrawing";
 import type { SettingsRegistry } from "foss-earth/settings";
 import {
@@ -19,8 +19,6 @@ import {
   Navigation,
   ScrollText,
   Smartphone,
-  Pause,
-  Play,
   Plane,
   Volume2,
   Weight,
@@ -53,7 +51,6 @@ import {
 import { headingDegFromRad, type FlightState } from "@0sfs/ground-contact/flightState";
 import {
   KEYBOARD_STICK_PARAMETER_IDS,
-  keyboardStickParameterValues,
   readKeyboardStickSettings,
   type KeyboardStickSettings,
 } from "@0sfs/controls/keyboardStickSettings";
@@ -308,6 +305,20 @@ function EngineDetailsHost({ attach, children }: {
   return <>{createPortal(children, settingsContent)}<div className="flight-engine-host" ref={ref} /></>;
 }
 
+/** `Label [switch]`: the shared switch, label first, with the native checkbox inside. */
+function Switch({ label, accessibleLabel, checked, disabled, onChange }: {
+  label: string; accessibleLabel: string; checked: boolean; disabled?: boolean; onChange(checked: boolean): void;
+}) {
+  return <label className="flight-panel__switch">
+    <span>{label}</span>
+    <span className="foss-earth-choice foss-earth-switch">
+      <input type="checkbox" aria-label={accessibleLabel} checked={checked} disabled={disabled}
+        onChange={event => onChange(event.target.checked)} />
+      <span className="foss-earth-switch__knob" aria-hidden="true" />
+    </span>
+  </label>;
+}
+
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="flight-panel__metric">
@@ -331,10 +342,6 @@ function WeatherPanel({
 
   return (
     <div className="flight-panel__content">
-      <div className="flight-panel__section-heading">
-        <div><span>Conditions</span><strong>Custom wind</strong></div>
-        <CloudSun size={22} aria-hidden="true" />
-      </div>
       <label className="flight-panel__field">
         <span>Wind direction <output>{weather.windDirectionDeg.toFixed(0)}°</output></span>
         <input
@@ -355,8 +362,9 @@ function WeatherPanel({
           onChange={(event) => updateWeather({ windSpeedKts: Number(event.target.value) })}
         />
       </label>
-      <button className="flight-panel__command" type="button" onClick={() => updateWeather({ windDirectionDeg: 0, windSpeedKts: 0 })}>
-        Clear wind
+      <button className="flight-panel__command" type="button" aria-label="Calm: clear the wind" title="Clear the wind"
+        onClick={() => updateWeather({ windDirectionDeg: 0, windSpeedKts: 0 })}>
+        Calm
       </button>
     </div>
   );
@@ -441,42 +449,36 @@ function AircraftPanel({
         <MeshInspectorPanel inspector={meshInspector ?? null} />
       </ParameterSection>
       <ParameterSection settings={settings} tab="aircraft" section="camera">
-        <div className="flight-panel__segmented" role="group" aria-label="Camera view">
-          {(["first", "third"] as const).map((mode) => (
-            <button
-              key={mode}
-              className={snapshot.viewMode === mode ? "is-active" : ""}
-              type="button"
-              aria-pressed={snapshot.viewMode === mode}
-              onClick={() => onViewModeChange(mode)}
-            >
-              {mode === "first" ? "Cockpit" : "Chase"}
-            </button>
-          ))}
-        </div>
+        {/* "View [Cockpit / Chase] ?" */}
+        <ChoiceTrack heading="View" value={snapshot.viewMode} onChange={mode => onViewModeChange(mode as FlightViewMode)}
+          choices={[{ id: "first", label: "Cockpit" }, { id: "third", label: "Chase" }]}
+          help="Cockpit shows the view from the pilot's seat. Chase follows the aircraft from outside." />
       </ParameterSection>
-      <button className="flight-panel__command" type="button" onClick={() => onPausedChange(!snapshot.paused)}>
-        {snapshot.paused ? <Play size={16} /> : <Pause size={16} />}
-        {snapshot.paused ? "Resume simulation" : "Pause simulation"}
-      </button>
-      <div className="flight-panel__keymap" aria-label="Flight controls">
-        <span><kbd>W/S</kbd> Pitch</span><span><kbd>A/D</kbd> Roll</span>
-        <span><kbd>Q/E</kbd> Rudder</span><span><kbd>⇧/⌃</kbd> Throttle</span>
+      {/* "[Ⅱ] W/S Pitch  A/D Roll  Q/E Rudder  ⇧/⌃ Throttle": the keymap wraps as a paragraph. */}
+      <div className="flight-panel__row">
+        <IconButton icon={snapshot.paused ? "play" : "pause"} label={snapshot.paused ? "Resume simulation" : "Pause simulation"}
+          onClick={() => onPausedChange(!snapshot.paused)} />
+        <div className="flight-panel__keymap" aria-label="Flight controls">
+          <span><kbd>W/S</kbd> Pitch</span><span><kbd>A/D</kbd> Roll</span>
+          <span><kbd>Q/E</kbd> Rudder</span><span><kbd>⇧/⌃</kbd> Throttle</span>
+        </div>
       </div>
+      {/* The control law's own ? explains Auto, Manual and Fly-by-wire. */}
       {getFdmProfile(snapshot.aircraftId).controlLaw &&
-        <ParameterSection settings={settings} tab="aircraft" section="flight-controls">
-          <p className="flight-panel__hint">Auto uses this aircraft's standard control law. Fly-by-wire stabilizes pitch, roll and yaw, including hover. Manual uses direct stick, rudder and trim through the actuators. Autopilot and input assists have separate settings.</p>
-        </ParameterSection>}
+        <ParameterSection settings={settings} tab="aircraft" section="flight-controls" />}
       <ParameterSection settings={settings} tab="aircraft" section="assists" />
       <ParameterSection settings={settings} tab="aircraft" section="ground" covers={GROUND_PARAMETER_IDS}>
         <GroundInteractionSettingsPanel state={snapshot.groundInteraction} onAction={onGroundInteractionAction} />
       </ParameterSection>
       <ParameterSection settings={settings} tab="aircraft" section="start">
-        <p className="flight-panel__hint">{describeSavedFlight(snapshot.savedFlight)}</p>
-        <button className="flight-panel__command" type="button" onClick={onNewFlight}
-          title="Discard the saved flight and start again at the start position">
-          Start a new flight
-        </button>
+        <div className="flight-panel__row">
+          <p className="flight-panel__hint">{describeSavedFlight(snapshot.savedFlight)}</p>
+          <button className="flight-panel__command" type="button" onClick={onNewFlight}
+            aria-label="New flight: discard the saved flight and start again at the start position"
+            title="Discard the saved flight and start again at the start position">
+            New flight
+          </button>
+        </div>
       </ParameterSection>
     </div>
   );
@@ -561,47 +563,16 @@ function FlightPerformancePanel() {
         <Metric label="Collision p95" value={formatMilliseconds(summary.collision.p95Ms)} />
         <Metric label="Tick p95" value={formatMilliseconds(summary.flightTick.p95Ms)} />
       </div>
-      <p className="flight-panel__hint">
-        {`${summary.slowFrames.over50Ms} frames over 50 ms; ${summary.slowFrames.over100Ms} over 100 ms. `}
-        {`${summary.streamingFrames} frames streamed map tiles.`}
-      </p>
-      <button className="flight-panel__command" type="button" onClick={copyTrace}>
-        Copy performance trace
-      </button>
-      <p className="flight-panel__hint">The same trace is available in DevTools as <code>window.osfsFlightPerformance</code>.</p>
+      <div className="flight-panel__row">
+        <p className="flight-panel__hint">
+          {`${summary.slowFrames.over50Ms} over 50 ms · ${summary.slowFrames.over100Ms} over 100 ms · ${summary.streamingFrames} streamed tiles`}
+        </p>
+        <IconButton icon="copy" label="Copy performance trace" onClick={copyTrace} />
+        <HelpTip label="Explain the stutter trace">
+          <p>Frames slower than 50 and 100 ms, and how many frames streamed map tiles. The same trace is available in DevTools as <code>window.osfsFlightPerformance</code>.</p>
+        </HelpTip>
+      </div>
     </fieldset>
-  );
-}
-
-function SettingSlider({
-  label,
-  value,
-  min,
-  max,
-  step,
-  format,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  format(value: number): string;
-  onChange(value: number): void;
-}) {
-  return (
-    <label className="flight-panel__field">
-      <span>{label}<output>{format(value)}</output></span>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
-      />
-    </label>
   );
 }
 
@@ -619,193 +590,38 @@ function useKeyboardStickSettings(parameters: FlightParameterStore): KeyboardSti
   return settings;
 }
 
+/** The parameters each response mode reads; expo applies to every mode. */
+const KEYBOARD_MODE_PARAMETERS: Record<KeyboardStickSettings["mode"], readonly string[]> = {
+  direct: [],
+  smooth: ["smoothResponseSec", "smoothReturnSec"],
+  rate: ["rateTimeToFull", "rateTimeToCenter", "rateAccelAfterSec", "rateAccelMultiplier", "rateMaxDeflection"],
+  assist: ["assistRollRateDeg", "assistPitchRateDeg", "assistYawRateDeg", "assistKp", "assistKi", "assistKd", "assistMaxDeflection"],
+};
+
+/** Shared parameter controls for these ids, following the registry. */
+function RegistryControls({ settings, ids }: { settings: SettingsRegistry; ids: readonly string[] }) {
+  const host = useRef<HTMLDivElement>(null);
+  const key = ids.join(" ");
+  useLayoutEffect(() => {
+    const parent = host.current;
+    if (!parent || key === "") return;
+    const handles = key.split(" ").map(id => createParameterControl(settings, id));
+    parent.replaceChildren(...handles.map(handle => handle.element));
+    const stop = settings.subscribe(() => { for (const handle of handles) handle.update(); });
+    return () => { stop(); for (const handle of handles) handle.destroy(); };
+  }, [settings, key]);
+  return <div className="foss-earth-choices flight-panel__registry-controls" ref={host} />;
+}
+
 /**
- * Controls → Keyboard response: the mode, and only the parameters that mode
- * uses. Show all parameters below lists every one of them.
+ * Controls → Keyboard response: the section draws Response mode from the
+ * registry, then this draws the parameters that mode uses with the same
+ * shared controls. Show all parameters lists every one, with its reset.
  */
-function KeyboardStickSettingsPanel({ parameters }: { parameters: FlightParameterStore }) {
-  const settings = useKeyboardStickSettings(parameters);
-  const modeMeta = KEYBOARD_STICK_MODES.find((mode) => mode.id === settings.mode);
-  const patch = (partial: Partial<KeyboardStickSettings>): void => {
-    parameters.setMany(keyboardStickParameterValues(partial));
-  };
-
-  return (
-    <div className="flight-panel__fieldset">
-      <label className="flight-panel__field">
-        <span>Response mode</span>
-        <select
-          aria-label="Keyboard stick response mode"
-          value={settings.mode}
-          onChange={(event) => patch({ mode: event.target.value as KeyboardStickSettings["mode"] })}
-        >
-          {KEYBOARD_STICK_MODES.map((mode) => (
-            <option key={mode.id} value={mode.id}>{mode.label}</option>
-          ))}
-        </select>
-      </label>
-      <p className="flight-panel__hint">{modeMeta?.description}</p>
-
-      {settings.mode === "smooth" && <>
-        <SettingSlider
-          label="Response time"
-          value={settings.smoothResponseSec}
-          min={0.05}
-          max={2}
-          step={0.025}
-          format={(value) => `${value.toFixed(2)} s`}
-          onChange={(smoothResponseSec) => patch({ smoothResponseSec })}
-        />
-        <SettingSlider
-          label="Return time"
-          value={settings.smoothReturnSec}
-          min={0.05}
-          max={2}
-          step={0.025}
-          format={(value) => `${value.toFixed(2)} s`}
-          onChange={(smoothReturnSec) => patch({ smoothReturnSec })}
-        />
-        <p className="flight-panel__hint">Time to reach about 95% of a held deflection, and time to center after release.</p>
-      </>}
-
-      {settings.mode === "rate" && <>
-        <SettingSlider
-          label="Time to full"
-          value={settings.rateTimeToFull}
-          min={0.1}
-          max={3}
-          step={0.05}
-          format={(value) => `${value.toFixed(2)} s`}
-          onChange={(rateTimeToFull) => patch({ rateTimeToFull })}
-        />
-        <SettingSlider
-          label="Time to center"
-          value={settings.rateTimeToCenter}
-          min={0.05}
-          max={2}
-          step={0.05}
-          format={(value) => `${value.toFixed(2)} s`}
-          onChange={(rateTimeToCenter) => patch({ rateTimeToCenter })}
-        />
-        <SettingSlider
-          label="Accel after"
-          value={settings.rateAccelAfterSec}
-          min={0}
-          max={2}
-          step={0.05}
-          format={(value) => `${value.toFixed(2)} s`}
-          onChange={(rateAccelAfterSec) => patch({ rateAccelAfterSec })}
-        />
-        <SettingSlider
-          label="Accel multiplier"
-          value={settings.rateAccelMultiplier}
-          min={1}
-          max={6}
-          step={0.1}
-          format={(value) => `${value.toFixed(1)}×`}
-          onChange={(rateAccelMultiplier) => patch({ rateAccelMultiplier })}
-        />
-        <SettingSlider
-          label="Max deflection"
-          value={settings.rateMaxDeflection}
-          min={0.1}
-          max={1}
-          step={0.05}
-          format={(value) => `${Math.round(value * 100)}%`}
-          onChange={(rateMaxDeflection) => patch({ rateMaxDeflection })}
-        />
-      </>}
-
-      {settings.mode === "assist" && <>
-        <SettingSlider
-          label="Roll rate command"
-          value={settings.assistRollRateDeg}
-          min={5}
-          max={120}
-          step={1}
-          format={(value) => `${Math.round(value)} °/s`}
-          onChange={(assistRollRateDeg) => patch({ assistRollRateDeg })}
-        />
-        <SettingSlider
-          label="Pitch rate command"
-          value={settings.assistPitchRateDeg}
-          min={5}
-          max={60}
-          step={1}
-          format={(value) => `${Math.round(value)} °/s`}
-          onChange={(assistPitchRateDeg) => patch({ assistPitchRateDeg })}
-        />
-        <SettingSlider
-          label="Yaw rate command"
-          value={settings.assistYawRateDeg}
-          min={5}
-          max={60}
-          step={1}
-          format={(value) => `${Math.round(value)} °/s`}
-          onChange={(assistYawRateDeg) => patch({ assistYawRateDeg })}
-        />
-        <SettingSlider
-          label="PID Kp"
-          value={settings.assistKp}
-          min={0}
-          max={3}
-          step={0.05}
-          format={(value) => value.toFixed(2)}
-          onChange={(assistKp) => patch({ assistKp })}
-        />
-        <SettingSlider
-          label="PID Ki"
-          value={settings.assistKi}
-          min={0}
-          max={1}
-          step={0.01}
-          format={(value) => value.toFixed(2)}
-          onChange={(assistKi) => patch({ assistKi })}
-        />
-        <SettingSlider
-          label="PID Kd"
-          value={settings.assistKd}
-          min={0}
-          max={0.5}
-          step={0.005}
-          format={(value) => value.toFixed(3)}
-          onChange={(assistKd) => patch({ assistKd })}
-        />
-        <SettingSlider
-          label="Max deflection"
-          value={settings.assistMaxDeflection}
-          min={0.1}
-          max={1}
-          step={0.05}
-          format={(value) => `${Math.round(value * 100)}%`}
-          onChange={(assistMaxDeflection) => patch({ assistMaxDeflection })}
-        />
-        <p className="flight-panel__hint">Keys command body rates. Release holds the current attitude rate near zero.</p>
-      </>}
-
-      {settings.mode === "direct" && (
-        <p className="flight-panel__hint">No ramp — held keys are full deflection. Expo below still softens the output curve.</p>
-      )}
-
-      <SettingSlider
-        label="Expo"
-        value={settings.expo}
-        min={0}
-        max={1}
-        step={0.05}
-        format={(value) => `${Math.round(value * 100)}%`}
-        onChange={(expo) => patch({ expo })}
-      />
-      <p className="flight-panel__hint">Applies to keyboard bindings in the selected profile. Softens small deflections while keeping full range. HUD stick, gamepad, and phone are unchanged.</p>
-      <button
-        className="flight-panel__command"
-        type="button"
-        onClick={() => { for (const id of KEYBOARD_STICK_PARAMETER_IDS) parameters.reset(id); }}
-      >
-        Reset keyboard stick defaults
-      </button>
-    </div>
-  );
+function KeyboardModeParameters({ settings, parameters }: { settings: SettingsRegistry; parameters: FlightParameterStore }) {
+  const { mode } = useKeyboardStickSettings(parameters);
+  const fields = KEYBOARD_STICK_MODES.some(choice => choice.id === mode) ? KEYBOARD_MODE_PARAMETERS[mode] : [];
+  return <RegistryControls settings={settings} ids={[...fields, "expo"].map(field => `osfs.input.keyboard.${field}`)} />;
 }
 
 function DebugPanel({ snapshot, settings, onCollisionDebugChange, onWheelSpinModeChange, onTireSoundChange }: Pick<FlightControlPanelProps,
@@ -819,71 +635,73 @@ function DebugPanel({ snapshot, settings, onCollisionDebugChange, onWheelSpinMod
         <Metric label="Camera" value={snapshot.viewMode} />
       </div>
       <ParameterSection settings={settings} tab="debug" section="aircraft-visuals" />
-      <ParameterSection settings={settings} tab="debug" section="forces">
+      <ParameterSection settings={settings} tab="debug" section="forces" afterControls>
+        {/* A terse colour key; what the arrows mean is behind ?. */}
         <p className="flight-panel__hint">
-          Native forces at their observed application points: green lift, red drag, purple side force,
-          amber propulsion, blue weight, white applied total and yellow net including gravity.
-          Labels show actual kN even when arrow lengths are capped. Arrows point in the force direction;
-          an upward thrust arrow shows the force on the aircraft, opposite the exhaust.
-          Aerodynamic coefficients and individual parts are not inferred.
+          Green lift · red drag · purple side · amber thrust · blue weight · white total · yellow net{" "}
+          <HelpTip label="Explain the force arrows">
+            <p>
+              Native forces at their observed application points: green lift, red drag, purple side force,
+              amber propulsion, blue weight, white applied total and yellow net including gravity.
+              Labels show actual kN even when arrow lengths are capped. Arrows point in the force direction;
+              an upward thrust arrow shows the force on the aircraft, opposite the exhaust.
+              Aerodynamic coefficients and individual parts are not inferred.
+            </p>
+          </HelpTip>
         </p>
       </ParameterSection>
       <fieldset className="flight-panel__fieldset">
         <legend>Collision geometry</legend>
-        <label className="flight-panel__field flight-panel__field--inline">
-          <input type="checkbox" aria-label="Show aircraft collision geometry"
-            checked={snapshot.collisionDebugEnabled}
-            onChange={(event) => onCollisionDebugChange(event.target.checked)} />
-          <span>Show aircraft collision geometry</span>
-        </label>
-        <p className="flight-panel__hint">
-          Visible through the aircraft in either camera view. Off by default; resets when the game reloads.
-        </p>
-        {snapshot.collisionDebugEnabled && <>
+        {/* "Show [switch] ?" */}
+        <div className="flight-panel__row">
+          <Switch label="Show" accessibleLabel="Show aircraft collision geometry" checked={snapshot.collisionDebugEnabled}
+            onChange={onCollisionDebugChange} />
+          <HelpTip label="Explain collision geometry">
+            <p>Visible through the aircraft in either camera view. Off by default; resets when the game reloads.</p>
+            <p>
+              These are contact points, not a solid collision mesh. Marker sizes and lines from the centre
+              are visual guides. Body probes sweep between physics steps near the ground.
+            </p>
+            <p>Shows the current C172 physics geometry, including when a different visual aircraft is selected.</p>
+          </HelpTip>
+        </div>
+        {snapshot.collisionDebugEnabled &&
           <div className="flight-panel__metrics" aria-label="Collision geometry legend">
             <Metric label="Cyan" value="5 swept body probes" />
             <Metric label="Amber" value="3 wheel contacts" />
             <Metric label="Purple" value="4 structural contacts" />
             <Metric label="White" value="Centre of gravity" />
-          </div>
-          <p className="flight-panel__hint">
-            These are contact points, not a solid collision mesh. Marker sizes and lines from the centre
-            are visual guides. Body probes sweep between physics steps near the ground.
-          </p>
-          <p className="flight-panel__hint">
-            Shows the current C172 physics geometry, including when a different visual aircraft is selected.
-          </p>
-        </>}
+          </div>}
       </fieldset>
       <fieldset className="flight-panel__fieldset">
         <legend>Wheel spin experiment</legend>
-        <label className="flight-panel__field">
-          <span>Wheel response</span>
-          <select aria-label="Wheel spin experiment" value={snapshot.wheelSpinMode}
-            onChange={event => onWheelSpinModeChange(event.target.value as WheelSpinMode | "off")}>
-            <option value="off">Off</option>
-            <option value="instant">A · Instant rolling</option>
-            <option value="inertia">B · Gradual spin-up</option>
-          </select>
-        </label>
-        <p className="flight-panel__hint">
-          Compare wheel rotation and touchdown sound. Aircraft handling and braking stay the same.
-          Changing modes resets the wheels; compare from an airborne approach. These choices are a
-          session-only override of Aircraft → Ground handling, which can keep them.
-        </p>
-        <label className="flight-panel__field flight-panel__field--inline">
-          <input type="checkbox" aria-label="Enable tire sound" checked={snapshot.tireSoundEnabled}
-            disabled={snapshot.wheelSpinMode === "off"}
-            onChange={event => onTireSoundChange(event.target.checked)} />
-          <span>Enable tire sound</span>
-        </label>
+        {/* "[Off / A / B] ?  Tire sound [switch]" */}
+        <div className="flight-panel__row">
+          <ChoiceTrack heading="Wheel spin experiment" hideHeading value={snapshot.wheelSpinMode}
+            onChange={mode => onWheelSpinModeChange(mode as WheelSpinMode | "off")}
+            choices={[
+              { id: "off", label: "Off" },
+              { id: "instant", label: "A · Instant rolling", shortLabel: "A" },
+              { id: "inertia", label: "B · Gradual spin-up", shortLabel: "B" },
+            ]}
+            help={<>
+              <p>A rolls the wheels at once; B spins them up gradually.</p>
+              <p>
+                Compare wheel rotation and touchdown sound. Aircraft handling and braking stay the same.
+                Changing modes resets the wheels; compare from an airborne approach. These choices are a
+                session-only override of Aircraft → Ground handling, which can keep them.
+              </p>
+              <p>
+                Enable collision geometry above to see tire outlines and rotating spokes.
+                The outlines show estimated tire size; amber dots remain the contact references.
+                Spin-up sound fades as the tread matches ground speed.
+              </p>
+            </>} />
+          <Switch label="Tire sound" accessibleLabel="Enable tire sound" checked={snapshot.tireSoundEnabled}
+            disabled={snapshot.wheelSpinMode === "off"} onChange={onTireSoundChange} />
+        </div>
         {snapshot.tireAudioStatus && <p className="flight-panel__hint" role="status">{snapshot.tireAudioStatus}</p>}
         {snapshot.wheelSpinMode !== "off" && <>
-          <p className="flight-panel__hint">
-            Enable collision geometry above to see tire outlines and rotating spokes.
-            The outlines show estimated tire size; amber dots remain the contact references.
-            Spin-up sound fades as the tread matches ground speed.
-          </p>
           <div className="flight-panel__metrics" aria-label="Wheel spin telemetry">
             {snapshot.wheelSpinStates.map((wheel, index) => <Metric key={index}
               label={WHEEL_SPIN_CONFIGS[index].name.replaceAll("_", " ")}
@@ -900,9 +718,7 @@ function DebugPanel({ snapshot, settings, onCollisionDebugChange, onWheelSpinMod
       <fieldset className="flight-panel__fieldset">
         <legend>Event log</legend>
         <EventLog />
-        <button className="flight-panel__command" type="button" onClick={() => flightLog.clear()}>
-          Clear log
-        </button>
+        <IconButton icon="trash" label="Clear log" onClick={() => flightLog.clear()} />
       </fieldset>
     </div>
   );
@@ -997,8 +813,8 @@ export function FlightControlPanel(props: FlightControlPanelProps) {
                       They do not change keyboard, on-screen stick, or phone response.
                     </p>
                   </ParameterSection>
-                  <ParameterSection settings={props.settings} tab="controls" section="keyboard" covers={KEYBOARD_STICK_PARAMETER_IDS}>
-                    <KeyboardStickSettingsPanel parameters={props.parameters} />
+                  <ParameterSection settings={props.settings} tab="controls" section="keyboard" afterControls>
+                    <KeyboardModeParameters settings={props.settings} parameters={props.parameters} />
                   </ParameterSection>
                   <ParameterSection settings={props.settings} tab="controls" section="orbit" />
                   <ParameterSection settings={props.settings} tab="controls" section="feedback" />

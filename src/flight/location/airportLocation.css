@@ -1,17 +1,21 @@
 /* The flight's airport choice inside FOSS Earth's Location form. It takes a whole
    line of the form's row of fields, above Go. */
-.foss-earth-airport-controls { display: grid; flex: 1 1 100%; gap: 10px; min-width: 0; }
+/* "Position [▾] Runway [▾]" reads as one phrase; the name, notes and credits take whole lines. */
+.foss-earth-airport-controls { display: flex; flex-wrap: wrap; align-items: center; flex: 1 1 100%; gap: 3px 8px; min-width: 0; }
+.foss-earth-airport-controls > strong,
+.foss-earth-airport-controls > p { flex: 1 1 100%; }
 .foss-earth-location-coordinates .foss-earth-airport-controls label {
-  display: grid;
-  grid-template-columns: 60px minmax(0, 1fr);
+  display: inline-flex;
   align-items: center;
-  justify-self: stretch;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
 }
 /* A dropdown is as wide as its own text - its longest option - and never
    stretched to its row or column; it may shrink to fit a narrow panel.
    ../foss-earth/docs/ui-layout.md. */
 .foss-earth-airport-controls select {
-  justify-self: start; min-width: 0; width: auto; max-width: 100%; padding: 8px;
+  justify-self: start; min-width: 0; width: auto; max-width: 100%; padding: 3px 6px;
   border: 1px solid currentColor; border-radius: 4px; color: inherit;
   background: var(--panel-bg, #18202e); font: inherit;
 }
