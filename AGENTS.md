@@ -5,3 +5,5 @@ This repository is the 0SFS flight app. It composes the sibling aircraft, engine
 Follow the shared rules for every 0SFS repository in
 [0SFS/.github/AGENTS.md](https://github.com/0SFS/.github/blob/main/AGENTS.md)
 (in a local checkout of the organization: `../.github/AGENTS.md`).
+
+To serve the app to a phone, start the dev server with `--host`. It then serves HTTPS with a self-signed certificate, and the phone accepts the warning once. A plain `http://` network address is not a secure page and has no WebGPU or shared memory, so a test there says nothing about either. [README.md](README.md) has the details.

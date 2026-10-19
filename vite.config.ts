@@ -4,7 +4,7 @@ import { execSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { defaultClientConditions, defaultServerConditions, type Plugin } from 'vite'
-import { babylonBarrels, babylonShaderChunks, builtFrom, crossOriginIsolation, deployedIsolation, localSource } from 'foss-earth/vite'
+import { babylonBarrels, babylonShaderChunks, builtFrom, crossOriginIsolation, deployedIsolation, localSource, networkHttps } from 'foss-earth/vite'
 import { appFiles, bootTerminal, browserRecovery } from '@foss-earth/ui/vite'
 import { findLanAddress } from './scripts/dev-lan.mjs'
 import { linkPackPublicFiles } from './scripts/link-packs.mjs'
@@ -212,6 +212,8 @@ export default defineConfig({
   plugins: [
     // Off unless FOSS_EARTH_ISOLATION asks: a threaded WebAssembly core needs an isolated page.
     crossOriginIsolation(),
+    // https when --host lets a phone reach the server: only a secure page there shares memory or uses WebGPU.
+    networkHttps(),
     // GitHub Pages sends no such headers, so in a build a service worker adds them, and each page, /fly/ and /rc/
     // copied with it, starts with the script that asks for it (FOSS Earth's docs/docs/proposals/webassembly.md,
     // step 3). The worker keeps none of the flight's files. FOSS_EARTH_ISOLATION=report-only or off at build time

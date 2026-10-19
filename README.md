@@ -15,6 +15,8 @@ npm run dev
 
 Open the URL Vite prints and add `/fly/` for the simulator or `/rc/` for the phone controller. For example, `http://127.0.0.1:5173/fly/`. The server's `/` goes to `/fly/`: the landing page is the website's, and its README shows how to build and preview the whole site.
 
+For a phone on the same network, use `npm run dev -- --host`. The server then uses HTTPS with a self-signed certificate. The browser warns once per address; in Chrome, tap Advanced, then Proceed. After that the page is secure and can use WebGPU. A plain `http://` network address can't. `FOSS_EARTH_DEV_HTTPS=off` keeps http.
+
 To use Google Photorealistic 3D Tiles, add `?key=YOUR_GOOGLE_MAPS_API_KEY` once. The key is saved in the browser and removed from the URL. JSBSim comes from the tarball in `deps/`.
 
 Open **+ → Browser data** to review clearing this site's saved settings, window layout and caches. **Keep API keys** starts checked. The phone controller has the same review. After two failed or stalled starts, the page offers that review before the app loads. Nothing is deleted until you confirm.
