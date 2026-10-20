@@ -20,7 +20,7 @@
   "@felipegalind0/gamepad-tools": "5260c9e2e6d3feacbe1f6d95e6035ad1ae184cd9",
   "@foss-earth/about": "5685fd20b2e0e7dc29c37c7f359954cd2798b9e5",
   "@foss-earth/dev": "1ff2a89571aa7ee97edea1d15a8470218bfcb35e",
-  "@foss-earth/engine": "040b5d5f9c5c1b870cad7a8c33eb410b51b95c09",
+  "@foss-earth/engine": "468a42f2075c2ae15f4eb828b5bd56a663b31e40",
   "@foss-earth/images": "6310a262adaa14b7d8c2c1ec2695e67ce44aedb4",
   "@foss-earth/preview-sheets": "ad79fa56fe736bbed8165e5d32c412a61cd7dd45",
   "@foss-earth/rectangle-image": "cfa90d6cb6e39f3e4f58820cc2db448419011171",
@@ -32,7 +32,7 @@
   "@foss-earth/sphere-image": "0c77db69a7348a715168a87492ed973ce8fd6263",
   "@foss-earth/sphere-tiled-cubemap": "61cd96d25ae726cbb97ae5f5ac0575710ce450e7",
   "@foss-earth/toolbar": "4208b8b8406ee88c6fdb767085001160f686c4bd",
-  "@foss-earth/ui": "63318977fb677b75b35657e147c7a0ad9b882be1",
+  "@foss-earth/ui": "21fb9c9a8900ac26c334a6ae8e247c2851e5c814",
   "@foss-earth/weather": "3878cc3a0d96bce5d972fd252dc8e1ed40015b5c",
-  "foss-earth": "bae8b3bf7192904d85cc7e4f1bc5c740eb23426b"
+  "foss-earth": "a2d0b1c122b1470bbe8220a014d208ec65624c3b"
 }
