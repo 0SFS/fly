@@ -22,6 +22,13 @@ describe("pageHtmlFor", () => {
     expect(rc).toContain("<title>0SFS RC — Phone Controller</title>");
   });
 
+  it("leaves the flight's files to /fly/, where the boot terminal fetches them at once", () => {
+    const graph = 'installBootTerminal(window, {"base":"/","files":[["assets/index-1.js",9],["assets/createFlightSimApp-1.js",99]],"preload":["assets/createFlightSimApp-1.js"]});';
+    const built = home.replace("</body>", `<script>${graph}</script></body>`);
+    expect(pageHtmlFor("fly", built)).toContain(graph);
+    expect(pageHtmlFor("rc", built)).toContain('installBootTerminal(window, {"base":"/","files":[["assets/index-1.js",9],["assets/createFlightSimApp-1.js",99]]});');
+  });
+
   it("leaves the home page's tags for the home page", () => {
     expect(home).toContain('<link rel="canonical" href="https://0sfs.github.io/" />');
     expect(home).toContain("application/ld+json");

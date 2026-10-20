@@ -1,4 +1,6 @@
 const SITE_URL = "https://0sfs.github.io/";
+/** The files the boot terminal fetches at once, in its graph in the built page (@foss-earth/ui's bootTerminal). */
+const BOOT_PRELOAD = /,"preload":\[[^\]]*\]/;
 
 /**
  * The home page's built index.html, retagged for /fly/ or /rc/. Only the home page
@@ -22,8 +24,10 @@ export function pageHtmlFor(route, html) {
       ? [/(<link rel="canonical" href=")[^"]*"/, `$1${url}"`]
       : [/<link rel="canonical" href="[^"]*" ?\/?>/, '<meta name="robots" content="noindex" />'],
   ];
-  return replacements.reduce((page, [pattern, replacement]) => {
+  const page = replacements.reduce((page, [pattern, replacement]) => {
     if (!pattern.test(page)) throw new Error(`index.html has no match for ${pattern} to retag for /${route}/`);
     return page.replace(pattern, replacement);
   }, html);
+  // The boot terminal fetches the flight's lazy modules at once (vite.config.ts, waitFor), which the controller never runs.
+  return route === "rc" ? page.replace(BOOT_PRELOAD, "") : page;
 }
