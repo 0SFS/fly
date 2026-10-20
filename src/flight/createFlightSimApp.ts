@@ -7,7 +7,7 @@ import { setActiveFrameProfile } from "./diagnostics/frameProfile";
 import { createFlightUiHost } from "./earthUiHost";
 import { createBenchmarkRouteController, forceBenchmarkRouteSettings, requestedBenchmarkRoute, type BenchmarkRouteController } from "./benchmarkRoutes";
 import { bootStep, browserReportDownloads, describeIsolation } from "@foss-earth/ui/browser";
-import { getAppSettings, TOOLBAR_EDIT_PRIORITIES_ID } from "foss-earth/settings";
+import { getAppSettings, TOOLBAR_ACTIVITY_OUTLINE_ID, TOOLBAR_EDIT_PRIORITIES_ID } from "foss-earth/settings";
 import {
   getAppIdentity,
   issueReporterFromBuild,
@@ -336,6 +336,13 @@ export async function createFlightSimApp(
   const engineInitialState = engineTestStandInitialState(window.location.search);
   const benchBootstrap = engineTest ? engineTestStandBootstrapOptions(engineInitialState) : null;
   const stopWatching: (() => void)[] = [];
+  // A still outline spares the page restyling and repainting the busy chips every frame.
+  const applyActivityOutline = (): void => {
+    if (settings.get(TOOLBAR_ACTIVITY_OUTLINE_ID) === "still") document.documentElement.dataset.hudActivity = "still";
+    else delete document.documentElement.dataset.hudActivity;
+  };
+  applyActivityOutline();
+  stopWatching.push(settings.watch(TOOLBAR_ACTIVITY_OUTLINE_ID, applyActivityOutline));
   if (benchmarkRoute) {
     if (engineTest) throw new Error("A benchmark route cannot run on the engine test stand.");
     stopWatching.push(forceBenchmarkRouteSettings(settings, benchmarkRoute));
@@ -2214,11 +2221,12 @@ export async function createFlightSimApp(
   const interfaceParameterSections = (["position", "log"] as const)
     .map(section => ({ section, handle: ui.section(settings, { tab: "interface", section }) }));
   // The flight retains its existing controls. The bug shortcut alone follows
-  // the shared Auto fit choice, with its priority in the same Toolbar home.
+  // the shared Auto fit choice, with its priority in the same Toolbar home,
+  // and the busy chips' outline is the shared choice.
   const toolbarParameters = ui.section(settings, {
     tab: "interface", section: "toolbar", showAll: false,
     covers: settings.list({ tab: "interface", section: "toolbar" })
-      .filter(spec => spec.id !== "interface.toolbar.bugReport" && spec.id !== TOOLBAR_EDIT_PRIORITIES_ID)
+      .filter(spec => spec.id !== "interface.toolbar.bugReport" && spec.id !== TOOLBAR_EDIT_PRIORITIES_ID && spec.id !== TOOLBAR_ACTIVITY_OUTLINE_ID)
       .map(spec => spec.id),
   });
   // Component execution: editable settings and the running component status.
