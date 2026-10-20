@@ -4,7 +4,7 @@ import type { FlightHudOptions } from "./hud/flightHud";
 import type { FlightControlPanelOptions } from "./hud/FlightControlPanel";
 
 const mocks = vi.hoisted(() => {
-  const state = { latDeg: 1, lonDeg: 2, altMeters: 1000, headingRad: 0, airspeedKts: 110 };
+  const state = { latDeg: 1, lonDeg: 2, altMeters: 1000, headingRad: 0, rollRad: 0, pitchRad: 0, verticalSpeedFps: 0, airspeedKts: 110 };
   return {
     state,
     properties: {} as Record<string, number>,
@@ -25,12 +25,14 @@ const mocks = vi.hoisted(() => {
       renderer: { mode: "webgl2" }, status: { mode: "fallback" }, scene: { onAfterRenderObservable: { add: () => null, remove: () => true } },
       onDeviceLost: vi.fn(() => () => {}), onDeviceRestored: vi.fn(() => () => {}),
       engine: { getFps: () => 60 }, geospatialCamera: null,
-      prepareTerrain: vi.fn(async (request: { altitudeMeters?: number }) => ({
-        groundHeightMeters: 250, altitudeMeters: request.altitudeMeters ?? 1774,
+      prepareTerrain: vi.fn(async (request: { altitudeMeters?: number; altitudeAboveGroundMeters?: number }) => ({
+        groundHeightMeters: 250, altitudeMeters: request.altitudeMeters ?? 250 + (request.altitudeAboveGroundMeters ?? 1524),
       })),
       surface: { sample: vi.fn(() => null) },
       getWorldRoot: () => ({}), sky: { getEnvironment: () => null, subscribe: () => () => {}, setGroundLights: vi.fn(), setGroundLightReceiver: vi.fn() }, registerFocusPoint: vi.fn(() => () => {}), setSimViewState: vi.fn(), setSimTick: vi.fn(), setSimRunning: vi.fn(),
       getGoogleTerrainDetailState: vi.fn(() => null),
+      getTileMetrics: vi.fn(() => null),
+      getMapDownloadBytesPerSecond: vi.fn(() => 0),
       subscribeStatus: vi.fn(() => () => {}),
       isStreamingTiles: () => false,
       onTilesStreamingChange: vi.fn(() => () => {}),
@@ -65,7 +67,14 @@ vi.mock("foss-earth/runtime", () => ({
   // The runtime's profiling session is real: off, it attaches nothing to the scene.
   createBabylonRuntime: async () => {
     const { createFrameProfileSession } = await import("@foss-earth/renderer/babylon");
-    return Object.assign(mocks.runtime, { frameProfile: createFrameProfileSession({ scene: {} as never, engine: { getCaps: () => ({}) } as never, now: () => performance.now() }) });
+    const { Observable } = await import("@babylonjs/core");
+    Object.assign(mocks.runtime.scene, Object.fromEntries([
+      "onBeforeAnimationsObservable", "onAfterRenderObservable",
+      "onBeforeActiveMeshesEvaluationObservable", "onAfterActiveMeshesEvaluationObservable",
+      "onBeforeRenderTargetsRenderObservable", "onAfterRenderTargetsRenderObservable",
+      "onBeforeDrawPhaseObservable", "onAfterDrawPhaseObservable",
+    ].map(name => [name, new Observable()])));
+    return Object.assign(mocks.runtime, { frameProfile: createFrameProfileSession({ scene: mocks.runtime.scene as never, engine: { getCaps: () => ({}) } as never, now: () => performance.now() }) });
   },
   RASTER_BASE_MAP_SOURCES: [], TERRAIN_SOURCES: [], resolveTerrainSource: vi.fn(),
   resolveRasterBaseMapSource: vi.fn(), resolveMapRuntimeConfig: () => ({}),
@@ -90,7 +99,11 @@ vi.mock("@0sfs/controls/flightCameraInput", () => ({ attachFlightCameraInput: ()
 vi.mock("./hud/flightHud", () => ({ createFlightHud: mocks.createHud }));
 vi.mock("./hud/createFlightControlPanel", () => ({ createFlightControlPanel: mocks.createPanel }));
 vi.mock("./hud/createFlightHudBar", () => ({ createFlightHudBar: mocks.createHudBar }));
-vi.mock("./jsbsim/resetFlightLocation", () => ({ resetFlightLocation: vi.fn(() => mocks.state) }));
+vi.mock("./jsbsim/resetFlightLocation", () => ({ resetFlightLocation: vi.fn((_sdk: unknown, location: { latDeg: number; lonDeg: number; altMeters?: number }) => {
+  Object.assign(mocks.state, { latDeg: location.latDeg, lonDeg: location.lonDeg,
+    ...(location.altMeters !== undefined ? { altMeters: location.altMeters } : {}) });
+  return mocks.state;
+}) }));
 
 import { getAppSettings, resetAppSettings } from "foss-earth/settings";
 import { createFlightSimApp } from "./createFlightSimApp";
@@ -100,6 +113,9 @@ let tick: (dt: number) => void;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  window.history.replaceState(null, "", "/fly/");
+  mocks.runtime.status.mode = "fallback";
+  Object.assign(mocks.state, { latDeg: 1, lonDeg: 2, altMeters: 1000, headingRad: 0, rollRad: 0, pitchRad: 0, verticalSpeedFps: 0, airspeedKts: 110 });
   mocks.properties = {};
   const values = new Map<string, string>();
   vi.stubGlobal("localStorage", {
@@ -186,5 +202,35 @@ describe("0SFS autopilot engage path", () => {
     expect(lastAileron()).toBe(0);
     expect(mocks.sdk.setPropertyValue).toHaveBeenCalledWith("fcs/throttle-cmd-norm", 0.65);
     expect(getAppSettings().get("osfs.autopilot.backend")).toBe("ardupilot");
+  });
+
+  it("ignores route without dev=1 and leaves ordinary flight recording and resume alone", async () => {
+    window.history.replaceState(null, "", "/fly/?route=low");
+    await mount();
+    expect(window.osfsFlightRoute).toBeUndefined();
+    expect(getAppSettings().get("osfs.start.resume")).toBe(true);
+    expect(mocks.runtime.prepareTerrain.mock.calls[0]?.[0]).toMatchObject({ clearanceMeters: 1000 });
+  });
+
+  it("starts the dev route through AP with 150m terrain placement and reversible visit settings", async () => {
+    window.history.replaceState(null, "", "/fly/?dev=1&route=low");
+    mocks.runtime.status.mode = "google-tiles";
+    await mount();
+    expect(mocks.runtime.prepareTerrain.mock.calls[0]?.[0]).toMatchObject({ altitudeAboveGroundMeters: 150, clearanceMeters: 0 });
+    expect(getAppSettings().get("osfs.start.resume")).toBe(false);
+    expect(window.osfsFlightPerformance).toBeDefined();
+    expect(window.osfsFlightRoute?.snapshot()).toMatchObject({ aircraft: "cessna-172", status: "running", elapsedSeconds: 0,
+      targetAltitudeMslMeters: 400, coverageValidation: "unverified" });
+    expect(mocks.state.altMeters).toBe(400);
+    tick(1 / 60);
+    expect(mocks.createHud.mock.results.at(-1)?.value.update.mock.calls.at(-1)?.[4]).toMatchObject({ engaged: true, ownsPitch: true, ownsRoll: true });
+    mocks.state.altMeters = 380;
+    mocks.sdk.setPropertyValue.mockClear();
+    tick(1 / 60);
+    const elevator = mocks.sdk.setPropertyValue.mock.calls.findLast(([name]) => name === "fcs/elevator-cmd-norm")?.[1];
+    expect(elevator).toBeLessThan(0); // Existing AP commands nose-up after losing altitude.
+    app!.destroy(); app = null;
+    expect(window.osfsFlightRoute).toBeUndefined();
+    expect(getAppSettings().get("osfs.start.resume")).toBe(true);
   });
 });

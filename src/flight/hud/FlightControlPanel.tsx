@@ -166,6 +166,8 @@ export interface FlightControlPanelOptions {
   timeTab?: HTMLElement;
   /** The shared Settings tab: presets and the saved record. */
   settingsSections: readonly PanelSection[];
+  /** The shared Native tab: the startup native selection and what each converted core ran. */
+  nativeSections?: readonly PanelSection[];
   /** The shared About tab, from `createAboutPanel`: which version runs, and what it is built from. */
   aboutTab?: HTMLElement;
   /** Clears this website's saved browser state, preserving API keys by default. */
@@ -759,6 +761,7 @@ export function FlightControlPanel(props: FlightControlPanelProps) {
         skyTab={props.skyTab}
         timeTab={props.timeTab}
         settingsSections={props.settingsSections}
+        nativeSections={props.nativeSections}
         interfaceSections={props.interfaceSections}
         aboutTab={props.aboutTab}
         browserDataTab={props.browserDataTab}

@@ -5,7 +5,8 @@ import { Vector3, type WebGPUEngine } from "@babylonjs/core";
 import { bindFrameProfileSettings, FRAME_PROFILING_IDS } from "foss-earth/perf";
 import { setActiveFrameProfile } from "./diagnostics/frameProfile";
 import { createFlightUiHost } from "./earthUiHost";
-import { bootStep, browserReportDownloads } from "@foss-earth/ui/browser";
+import { createBenchmarkRouteController, forceBenchmarkRouteSettings, requestedBenchmarkRoute, type BenchmarkRouteController } from "./benchmarkRoutes";
+import { bootStep, browserReportDownloads, describeIsolation } from "@foss-earth/ui/browser";
 import { getAppSettings, TOOLBAR_EDIT_PRIORITIES_ID } from "foss-earth/settings";
 import {
   getAppIdentity,
@@ -17,6 +18,7 @@ import {
   type AppDiagnostics,
 } from "foss-earth/diagnostics";
 import { createMeshInspector } from "foss-earth/diagnosticDrawing";
+import { createNativeSections, earthNativeCores } from "foss-earth/native";
 import { describeAttitudeRendererStatus } from "./hud/attitudeRenderer";
 import { AIRCRAFT_FOCUS_POINT, registerFlightSettings } from "./settings/registerFlightSettings";
 import { flightParameterSpec, type FlightParameterStore } from "./settings/flightParameters";
@@ -316,6 +318,8 @@ export async function createFlightSimApp(
   // One registry for the page: FOSS Earth's parameters and the flight's.
   const settings = getAppSettings();
   const parameters = registerFlightSettings(settings);
+  const benchmarkRoute = requestedBenchmarkRoute(window.location.search);
+  let benchmarkRouteRun: BenchmarkRouteController | null = null;
   const diagnostics = options.diagnostics ?? startAppDiagnostics({
     log: options.log ?? createGameLog(), settings, identity: getAppIdentity(),
   });
@@ -332,6 +336,10 @@ export async function createFlightSimApp(
   const engineInitialState = engineTestStandInitialState(window.location.search);
   const benchBootstrap = engineTest ? engineTestStandBootstrapOptions(engineInitialState) : null;
   const stopWatching: (() => void)[] = [];
+  if (benchmarkRoute) {
+    if (engineTest) throw new Error("A benchmark route cannot run on the engine test stand.");
+    stopWatching.push(forceBenchmarkRouteSettings(settings, benchmarkRoute));
+  }
   // The physics log is structured and has its own UI. Only its message joins
   // the visit's trail; property snapshots and coordinates stay out of it.
   let lastFlightEventId = flightLog.entries()[0]?.id ?? 0;
@@ -508,7 +516,7 @@ export async function createFlightSimApp(
       ? { ...spawn, altitudeMeters: benchBootstrap.altFt! * 0.3048, clearanceMeters: 0 }
       : resumeFlight
       ? savedFlightTerrainRequest(resumeFlight)
-      : { ...spawn, altitudeAboveGroundMeters: startHeightMeters, clearanceMeters: 1000 }),
+      : { ...spawn, altitudeAboveGroundMeters: startHeightMeters, clearanceMeters: benchmarkRoute ? 0 : 1000 }),
     radiusMeters: 1000,
     signal: startupAbort.signal,
     onProgress: progress => loading.setPhase("terrain", {
@@ -742,6 +750,17 @@ export async function createFlightSimApp(
     airspeedKts: jsbsim.sdk.getPropertyValue("velocities/vc-kts"),
   });
   const syncArbiter = (pilot = inputManager.getControls()): ControlArbiterResult => {
+    if (benchmarkRouteRun) {
+      const target = benchmarkRouteRun.targets(readFlightState(jsbsim.sdk));
+      const held = arbiterState.our;
+      arbiterState = { ...arbiterState, our: { ...held,
+        roll: { ...held.roll, hasTarget: true, targetRad: target.rollRad },
+        pitch: { ...held.pitch, hasTarget: true, targetRad: target.pitchRad },
+        yaw: { ...held.yaw, hasTarget: true, targetRad: target.headingRad },
+        throttle: { ...held.throttle, hasTarget: true, target: target.airspeedKts,
+          command: held.throttle.hasTarget ? held.throttle.command : pilot.throttle },
+      } };
+    }
     const stepped = stepControlArbiter(arbiterState, {
       settings: autopilotSettings,
       ardupilot: ardupilotStatus,
@@ -887,7 +906,11 @@ export async function createFlightSimApp(
   };
   let externalTankStepSeconds = 0;
   let gVisionStepSeconds = 0;
-  const physicsLoop = createFixedStepPhysicsLoop(jsbsim.sdk, () => {
+  const physicsLoop = createFixedStepPhysicsLoop(jsbsim.sdk, state => {
+    if (benchmarkRouteRun) {
+      benchmarkRouteRun.acceptStep(state, () => runtime.surface.sample(state.latDeg, state.lonDeg)?.heightMeters ?? null);
+      if (benchmarkRouteRun.status !== "running") inputManager.setPaused(true);
+    }
     externalTankStepSeconds += FIXED_DT;
     gVisionStepSeconds += FIXED_DT;
     // Ahead of the wheel guard: engine sound must not depend on a wheel experiment.
@@ -911,8 +934,8 @@ export async function createFlightSimApp(
   // This stays completely out of the normal render loop unless someone opts
   // in through the URL. It makes a stutter reproducible with numbers instead
   // of trying to infer its source from a single FPS reading.
-  const flightPerformance = isFlightPerformanceCaptureEnabled()
-    ? createFlightPerformanceCapture() : null;
+  const flightPerformance = (benchmarkRoute || isFlightPerformanceCaptureEnabled())
+    ? createFlightPerformanceCapture(benchmarkRoute ? { capacity: 65_536 } : {}) : null;
   if (flightPerformance) setActiveFlightPerformanceCapture(flightPerformance);
   // Where each frame's time goes (Debug → Frame budget). The runtime owns the
   // profiler and closes each frame; the flight adds its sections. `flightPerf=1`
@@ -1812,7 +1835,7 @@ export async function createFlightSimApp(
   let secondsSinceSave = 0;
   const saveFlight = (): void => {
     secondsSinceSave = 0;
-    if (engineTest || !savingFlight || worldLoading || physicsLoop.getFault() || !parameters.get("osfs.start.resume")) return;
+    if (benchmarkRoute || engineTest || !savingFlight || worldLoading || physicsLoop.getFault() || !parameters.get("osfs.start.resume")) return;
     const flight = captureSavedFlight(jsbsim.sdk, aircraftId, inputManager.isPaused());
     if (!flight) return;
     if (savedFlights.write(flight)) {
@@ -2171,6 +2194,8 @@ export async function createFlightSimApp(
   // flight's, so they stay out.
   const presetsSection = createPresetsSection(settings);
   const savedSettingsSection = createSavedSettingsSection(settings);
+  diagnostics.addState(() => `Component execution: ${JSON.stringify(earthNativeCores(runtime) ?? [])}`);
+  diagnostics.addState(() => `Isolation: ${describeIsolation(window)}`);
   diagnostics.addState(() => `Aircraft: ${aircraftId}; generation ${aircraftGenerationId ?? "default"}; LOD ${aircraftLodId}; model ${modelState.status}; active LOD ${modelState.activeLodId ?? "none"}; ${modelState.triangles} triangles.`);
   diagnostics.addState(() => `Flight: ${worldLoading ? "loading" : inputManager.isPaused() ? "paused" : "running"}; view ${aircraft?.getViewMode() ?? "third"}; physics fault ${physicsLoop.getFault() ?? "none"}.`);
   diagnostics.addState(() => {
@@ -2195,6 +2220,18 @@ export async function createFlightSimApp(
     covers: settings.list({ tab: "interface", section: "toolbar" })
       .filter(spec => spec.id !== "interface.toolbar.bugReport" && spec.id !== TOOLBAR_EDIT_PRIORITIES_ID)
       .map(spec => spec.id),
+  });
+  // Component execution: editable settings and the running component status.
+  const nativeParameters: { destroy(): void }[] = [];
+  const native = createNativeSections({
+    document, settings, reload: url => window.location.assign(url),
+    section: (section, content) => {
+      const handle = ui.section(settings, { tab: "native", section, ...content });
+      nativeParameters.push(handle);
+      return handle.element;
+    },
+    report: () => earthNativeCores(runtime) ?? [],
+    timers: { set: (callback, delayMs) => window.setTimeout(callback, delayMs), clear: handle => window.clearTimeout(handle as number) },
   });
   const settingsSections: PanelSection[] = [
     { id: "presets", title: "Presets", element: presetsSection.element },
@@ -2244,6 +2281,7 @@ export async function createFlightSimApp(
     skyTab: skyPanel.element,
     timeTab: timePanel.element,
     settingsSections,
+    nativeSections: native.sections,
     aboutTab: about.element,
     browserDataTab: browserData.element,
     bugReportTab: bugReportPanel.element,
@@ -2482,6 +2520,7 @@ export async function createFlightSimApp(
     let terrainBlocked = false;
     const physicsStarted = frameProfiler.clock();
     const displayState = physicsLoop.update(deltaSeconds, () => {
+      if (benchmarkRouteRun && benchmarkRouteRun.status !== "running") return false;
       const contactStarted = frameProfiler.clock();
       const contact = engineTest ? true : terrainContact.update(false, googleTiles, true, true);
       frameProfiler.add("flight/physics/terrain contact", contactStarted);
@@ -2514,6 +2553,7 @@ export async function createFlightSimApp(
       if (phoneSession?.getSnapshot().owner === "phone") noticeRemoteFlaps(selected.flaps);
       else noticeLocalFlaps();
       const ap = engineTest ? { ...lastApResult, engaged: false, controls: selected, owners: idleAutopilotOwners() } : syncArbiter(selected);
+      if (benchmarkRouteRun?.status === "failed") { inputManager.setPaused(true); return false; }
       const onGround = aircraftOnGround();
       const qbarPsf = jsbsim.sdk.getPropertyValue("aero/qbar-psf");
       const vtFps = jsbsim.sdk.getPropertyValue("velocities/vt-fps");
@@ -2636,6 +2676,7 @@ export async function createFlightSimApp(
     const fault = physicsLoop.getFault();
     updateStatusOverlay(fault, tickNowMs);
     if (fault) {
+      benchmarkRouteRun?.fail(fault);
       runtime.status.lastError = fault;
       runtime.status.message = fault;
       if (!inputManager.isPaused()) {
@@ -2805,6 +2846,7 @@ export async function createFlightSimApp(
       detachCameraInput();
       detachInput();
       if (flightPerformance) setActiveFlightPerformanceCapture(null);
+      if (benchmarkRouteRun && window.osfsFlightRoute === benchmarkRouteRun) delete window.osfsFlightRoute;
       for (const stop of stopWatching.splice(0)) stop();
       removeFlightMinimumMarker();
       inputManager.dispose();
@@ -2820,6 +2862,8 @@ export async function createFlightSimApp(
       presetsSection.destroy();
       savedSettingsSection.destroy();
       diagnosticsParameters.destroy();
+      native.destroy();
+      for (const handle of nativeParameters) handle.destroy();
       diagnosticsSection.destroy();
       bugReportPanel.destroy();
       diagnostics.destroy();
@@ -2926,12 +2970,26 @@ export async function createFlightSimApp(
         physicsLoop.setPaused(inputManager.isPaused());
       }
     }
+    if (benchmarkRoute && runtime.status.mode !== "google-tiles") {
+      throw new Error("A W0 benchmark route requires Google 3D Tiles; a fallback map cannot validate this route.");
+    }
     // The page's content: the aircraft in its world, from the first frame without the loading screen.
     markBootOnFrame("boot:content", { onFrame(listener) {
       const observer = runtime.scene.onAfterRenderObservable.add(listener);
       return () => { runtime.scene.onAfterRenderObservable.remove(observer); };
     } }, () => true);
     loading.hide();
+    if (benchmarkRoute) {
+      const recordedSettings = Object.fromEntries(settings.list()
+        .filter(spec => !spec.sensitive && !/key|token|password|secret/i.test(spec.id))
+        .map(spec => [spec.id, settings.get(spec.id)]));
+      benchmarkRouteRun = createBenchmarkRouteController(benchmarkRoute, state, terrain.groundHeightMeters, FIXED_DT, recordedSettings);
+      window.osfsFlightRoute = benchmarkRouteRun;
+      frameProfile.configure({ windowFrames: 65_536 });
+      frameProfiler.reset();
+      setAutopilotEngaged(true);
+      inputManager.setPaused(false);
+    }
     if (engineTest) controlPanel?.openOrSelectTab("engine");
     runtime.requestRender();
     return app;

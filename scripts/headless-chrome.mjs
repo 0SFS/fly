@@ -5,18 +5,23 @@ import { access } from "node:fs/promises";
  * Bounded headless Chrome control through inherited pipes; no HTTP server/listener.
  * `extraArgs` adds command-line switches, such as `--enable-webgpu-developer-features`.
  */
-export async function openHeadlessChrome(profileDirectory, explicitBinary = process.env.CHROME_BIN, extraArgs = []) {
+export function openHeadlessChrome(profileDirectory, explicitBinary = process.env.CHROME_BIN, extraArgs = []) {
+  return openChrome(profileDirectory, explicitBinary, extraArgs);
+}
+
+/** The same bounded pipe controller, optionally showing Chrome's compositor. */
+export async function openChrome(profileDirectory, explicitBinary = process.env.CHROME_BIN, extraArgs = [], { headed = false, ports = {} } = {}) {
   const candidates = explicitBinary ? [explicitBinary] : [
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
     "/usr/bin/google-chrome", "/usr/bin/chromium",
   ];
   let executable;
   for (const candidate of candidates) {
-    try { await access(candidate); executable = candidate; break; } catch { /* Try the next installed binary. */ }
+    try { await (ports.access ?? access)(candidate); executable = candidate; break; } catch { /* Try the next installed binary. */ }
   }
   if (!executable) throw new Error("No installed Chrome found; set CHROME_BIN to an existing executable.");
-  const child = spawn(executable, [
-    "--headless=new", "--remote-debugging-pipe", "--no-first-run", "--no-default-browser-check",
+  const child = (ports.spawn ?? spawn)(executable, [
+    ...(!headed ? ["--headless=new"] : []), "--remote-debugging-pipe", "--no-first-run", "--no-default-browser-check",
     "--disable-background-networking", "--disable-component-update", "--disable-extensions",
     "--disable-sync", "--mute-audio", "--user-data-dir=" + profileDirectory, ...extraArgs, "about:blank",
   ], { stdio: ["ignore", "ignore", "pipe", "pipe", "pipe"] });
@@ -24,13 +29,16 @@ export async function openHeadlessChrome(profileDirectory, explicitBinary = proc
   const listeners = new Set();
   let resolveExit;
   const exitPromise = new Promise(resolve => { resolveExit = resolve; });
-  let nextId = 1, buffer = "", stderr = "", closed = false;
+  let nextId = 1, buffer = "", stderr = "", closed = false, closing;
   child.stderr.on("data", bytes => { stderr = (stderr + bytes).slice(-16000); });
   const rejectAll = error => {
     for (const item of pending.values()) { clearTimeout(item.timer); item.reject(error); }
     pending.clear();
   };
-  child.on("error", rejectAll);
+  child.on("error", error => {
+    rejectAll(error);
+    if (child.pid === undefined) { closed = true; resolveExit({ code: null, signal: null }); }
+  });
   child.on("exit", (code, signal) => {
     closed = true;
     resolveExit({ code, signal });
@@ -61,7 +69,16 @@ export async function openHeadlessChrome(profileDirectory, explicitBinary = proc
     pending.set(id, { resolve, reject, timer });
     child.stdio[3].write(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }) + "\0");
   });
-  try { await send("Browser.getVersion"); } catch (error) { child.kill(); throw error; }
+  const close = () => {
+    if (!closing) closing = (async () => {
+      try { if (!closed) await send("Browser.close"); } catch { /* Chrome may close its pipe first. */ }
+      // The profile may contain a key. Its owner must observe process exit
+      // before removing it, including concurrent signal/finally cleanup.
+      await exitPromise;
+    })();
+    return closing;
+  };
+  try { await send("Browser.getVersion"); } catch (error) { await close(); throw error; }
   return {
     send,
     onEvent(listener) { listeners.add(listener); return () => listeners.delete(listener); },
@@ -74,16 +91,7 @@ export async function openHeadlessChrome(profileDirectory, explicitBinary = proc
         })]);
       } finally { clearTimeout(timer); }
     },
-    async close() {
-      if (closed) return;
-      const exited = new Promise(resolve => child.once("exit", resolve));
-      try { await send("Browser.close"); } catch { /* Chrome may close its pipe first. */ }
-      // Chrome deletes its code-sign clone under /var/folders as it shuts down; a signal now would strand it.
-      let timer;
-      await Promise.race([exited, new Promise(resolve => { timer = setTimeout(resolve, 10000); })]);
-      clearTimeout(timer);
-      if (!closed) child.kill();
-    },
+    close,
   };
 }
 
