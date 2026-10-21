@@ -16,6 +16,8 @@
     "build:audio": "node ../sound/scripts/build-audio-wasm.mjs",
     "build:exhaust": "node ../F135/scripts/build-exhaust-optics.mjs --install",
     "check:phone-layout": "node ../rc/scripts/check-phone-layout.mjs",
+    "check:aircraft-ui": "node ../aircraft/scripts/check-aircraft-selection-headless.mjs",
+    "check:aircraft-switch": "node scripts/check-aircraft-switch-headless.mjs",
     "ci": "npm run lint && npm run test && npm run build",
     "prebuild": "node scripts/link-packs.mjs",
     "pretest": "node scripts/link-packs.mjs",

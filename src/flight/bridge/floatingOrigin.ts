@@ -61,6 +61,8 @@ export function createFloatingOrigin(scene: import("@babylonjs/core").Scene, wor
       worldShift.position.set(0, 0, 0);
       worldShift.rotationQuaternion = Quaternion.Identity();
       worldShift.scaling.set(1, 1, 1);
+      // The streamed map belongs to the renderer, which may outlive this flight.
+      worldContent.parent = null;
       aircraftRoot.dispose();
       worldShift.dispose();
       worldFromEcef = null;

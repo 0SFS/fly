@@ -43,6 +43,8 @@ export interface FlightHudBarHandle {
   update(state: FlightState, status: BabylonRuntimeStatus, fps: number | null, paused: boolean, groundHeightMeters?: number | null): void;
   /** Draws the Input method section into the Controls tab. Returns an unmount. */
   mountInputMethod(container: HTMLElement): () => void;
+  /** Loading a replacement aircraft keeps pause engaged. */
+  setResumeBlocked?(blocked: boolean): void;
   destroy(): void;
 }
 
@@ -189,6 +191,7 @@ export function createFlightHudBar(container: HTMLElement, options: FlightHudBar
   });
 
   return {
+    setResumeBlocked(blocked) { pauseButton.disabled = blocked; },
     mountInputMethod: (host) => inputHud.mountInline(host),
     update(state, runtimeStatus, fps, nextPaused, groundHeightMeters = null): void {
       updatePauseState(nextPaused);

@@ -10,7 +10,10 @@ describe("enuFrame", () => {
     const engine = new NullEngine();
     try {
       const scene = new Scene(engine);
-      const origin = createFloatingOrigin(scene, new TransformNode("world", scene));
+      const world = new TransformNode("world", scene);
+      const mapTile = new TransformNode("streamed-map-tile", scene);
+      mapTile.parent = world;
+      const origin = createFloatingOrigin(scene, world);
       expect(origin.getWorldFromEcef()).toBeNull();
       const state = { latDeg: 44.9, lonDeg: -93.2, altMeters: 500, rollRad: 0, pitchRad: 0, headingRad: 0 } as FlightState;
       origin.apply(state);
@@ -24,6 +27,13 @@ describe("enuFrame", () => {
       expect(next.m[13] - first.m[13]).toBeCloseTo(-0.031, 7);
       origin.dispose();
       expect(origin.getWorldFromEcef()).toBeNull();
+      expect(world.isDisposed()).toBe(false);
+      expect(mapTile.isDisposed()).toBe(false);
+      const replacement = createFloatingOrigin(scene, world);
+      replacement.apply(state);
+      expect(world.parent).toBe(replacement.worldShift);
+      expect(mapTile.parent).toBe(world);
+      replacement.dispose();
     } finally { engine.dispose(); }
   });
   it("preserves centimetre offsets and orientation before an Earth-radius Float32 matrix rounding", () => {

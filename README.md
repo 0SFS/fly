@@ -32,6 +32,10 @@ npm run build
 
 `npm test` runs this app's tests and the tests in the linked packages. `npm run build` checks the JSBSim, audio, exhaust, and engine artifacts, then builds `/fly/` and `/rc/` into `dist/`, which the website's build serves under its landing page.
 
+`npm run check:aircraft-ui` checks the aircraft picker at wide, narrow and short window sizes. `npm run check:aircraft-switch` runs the actual flight application, JSBSim and aircraft meshes in headless Chrome, checking switches, loading holds, failure recovery and saved selection. Both write reports and screenshots under ignored `build/` directories and require installed Chrome (`CHROME_BIN` can select its executable). The UI fixture alone does not validate aircraft activation.
+
+[Aircraft switching](docs/aircraft-switching.md) records the settings-reset cause, runtime ownership, UI decisions and validation scope for future changes.
+
 ## Community
 
 - [Code of conduct](https://github.com/0SFS/.github/blob/main/CODE_OF_CONDUCT.md)

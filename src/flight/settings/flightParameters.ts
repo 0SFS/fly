@@ -189,7 +189,7 @@ export const OSFS_PARAMETERS = [
     default: "cessna-172",
     defaultReason: "The original default aircraft.",
     home: all(MODEL),
-    appliesLive: false,
+    appliesLive: true,
     source: "src/flight/createFlightSimApp.ts",
   },
   {
@@ -202,7 +202,7 @@ export const OSFS_PARAMETERS = [
     default: "cessna-172",
     defaultReason: "The default aircraft's only generation; another aircraft uses its own first generation.",
     home: all(MODEL),
-    appliesLive: false,
+    appliesLive: true,
     source: "aircraft/src/aircraftCatalog.ts",
   },
   ...AIRCRAFT_PARAMETERS_2,

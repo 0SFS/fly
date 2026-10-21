@@ -45,6 +45,24 @@ function createTestHud(overrides: Partial<FlightHudBarOptions> = {}) {
   return { container, hud };
 }
 
+it("disables resume while a replacement aircraft loads and restores it afterwards", () => {
+  const onPausedChange = vi.fn();
+  const { container, hud } = createTestHud({ onPausedChange });
+  const pause = container.querySelector<HTMLButtonElement>("#flightPauseButton")!;
+  hud.update({ latDeg: 0, lonDeg: 0, altMeters: 1000, headingRad: 0 } as never,
+    { mode: "fallback" } as BabylonRuntimeStatus, 60, true);
+  hud.setResumeBlocked!(true);
+  expect(pause.disabled).toBe(true);
+  expect(pause.getAttribute("aria-label")).toBe("Resume simulation");
+  pause.click();
+  expect(onPausedChange).not.toHaveBeenCalled();
+  hud.setResumeBlocked!(false);
+  expect(pause.disabled).toBe(false);
+  pause.click();
+  expect(onPausedChange).toHaveBeenCalledWith(false);
+  hud.destroy();
+});
+
 describe("flight HUD fullscreen and log buttons", () => {
   afterEach(() => {
     Reflect.deleteProperty(document, "fullscreenEnabled");
@@ -211,7 +229,7 @@ describe("flight input method selector", () => {
       mode: "google-tiles",
       terrainSource: { id: "mapterhorn", label: "Mapterhorn Terrain" },
     } as BabylonRuntimeStatus, 60, false);
-    expect(mapButton.querySelector(".map-source-label")?.textContent).toBe("Google 3D Tiles");
+    expect(mapButton.querySelector(".map-source-label")?.textContent).toBe("3D Tiles");
     expect(status.textContent).toBe("0.0000°N 0.0000°E h000°");
     // The rail is the shared one, driven by the app's detail controller.
     mapDetail.setActiveSource({ key: "google", availability: "ready" });

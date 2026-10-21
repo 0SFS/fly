@@ -101,6 +101,7 @@ const mocks = vi.hoisted(() => {
     visibleMeshCollision: { reset: vi.fn(), update: vi.fn(() => false) },
     physics: { reset: vi.fn(), setPaused: vi.fn(), update: vi.fn((_delta, applyInputs) => { applyInputs(); return state; }), getLatestState: () => state, getFault: () => null },
     hudBarOptions: null as HudBarClicks | null,
+    controlPanelOptions: null as import("./hud/FlightControlPanel").FlightControlPanelOptions | null,
     stopDeviceLost: vi.fn(), stopDeviceRestored: vi.fn(),
   };
 });
@@ -215,6 +216,14 @@ vi.mock("./hud/createFlightHudBar", () => ({
     return { update: vi.fn(), destroy: vi.fn(), mountInputMethod: () => () => {} };
   },
 }));
+
+vi.mock("./hud/createFlightControlPanel", async importOriginal => {
+  const actual = await importOriginal<typeof import("./hud/createFlightControlPanel")>();
+  return { ...actual, createFlightControlPanel: (...args: Parameters<typeof actual.createFlightControlPanel>) => {
+    mocks.controlPanelOptions = args[2];
+    return actual.createFlightControlPanel(...args);
+  } };
+});
 
 import type { FrameProfileSession } from "foss-earth/perf";
 import { getAppSettings, resetAppSettings, SETTINGS_STORAGE_KEY } from "foss-earth/settings";
@@ -353,8 +362,8 @@ it("logs what limits 2D imagery once delivery settles, says it in the Map tab, a
     await act(async () => mocks.hudBarOptions!.onMapClick());
     expect(root.querySelector(".map-detail-panel__status")?.textContent).toContain(`${limited} 6 patches draw one coarser page instead.`);
     await report({ ...ready, limits: [], constraints: [] });
-    // Newest first, as the log lists them.
-    expect(logged()).toEqual(["2D imagery is no longer limited by the page tables.", `${limited} 4 patches draw one coarser page instead.`]);
+    // The shared map log updates each constraint's existing line on recovery.
+    expect(logged()).toEqual(["2D imagery is no longer limited by the page tables."]);
   } finally {
     await act(async () => app.destroy());
     mocks.runtime.status = { mode: "fallback" } as never;
@@ -707,14 +716,6 @@ function selectionControl<T extends Element>(root: HTMLElement, selector: string
   return control;
 }
 
-async function changeSelect(root: HTMLElement, selector: string, value: string) {
-  const select = selectionControl<HTMLSelectElement>(root, selector);
-  await act(async () => {
-    select.value = value;
-    select.dispatchEvent(new Event("change", { bubbles: true }));
-  });
-}
-
 async function openPanelTab(root: HTMLElement, label: string, initiallyClosed = false) {
   const existing = Array.from(root.querySelectorAll<HTMLButtonElement>(".foss-earth-tab-button"))
     .find(button => button.textContent === label);
@@ -758,8 +759,6 @@ async function mountAircraftSelection(initial: [string, string][] = []) {
 }
 
 const generationSelector = ".flight-panel__generation-field select";
-const lodSelector = ".flight-panel__model-controls select";
-const applySelector = ".flight-panel__aircraft-apply > button";
 
 it("connects external tank fuel controls to separation, respawn and simulation time", async () => {
   const readTanks = vi.spyOn(fuelTanks, "readFuelTanks").mockImplementation(() => [0, 1, 2, 3].map(index => ({
@@ -818,97 +817,158 @@ it("connects external tank fuel controls to separation, respawn and simulation t
   expect(mocks.externalTanks.dispose).toHaveBeenCalledTimes(1);
 });
 
-it("stages all Vision Jet generations and applies a complete package once", async () => {
+it("switches complete aircraft in place and holds every pause route until its model is ready", async () => {
   const t = await mountAircraftSelection();
+  const canvas = t.root.querySelector("canvas");
+  const runtimeFactory = vi.mocked(createJsbsimRuntime).getMockImplementation()!;
+  const nextRuntime = await runtimeFactory({ aircraftId: "cirrus-vision-jet-g2" });
+  let releasePhysics!: (runtime: Awaited<ReturnType<typeof createJsbsimRuntime>>) => void;
+  vi.mocked(createJsbsimRuntime).mockImplementationOnce(() => new Promise(resolve => { releasePhysics = resolve; }));
+  let modelState: import("@0sfs/aircraft/createAircraftModel").AircraftModelState = {
+    aircraftId: "cirrus-vision-jet-g2", lodId: "hd", activeLodId: null,
+    status: "loading", triangles: null, error: null, download: null,
+  };
+  vi.mocked(createAircraftModel).mockReturnValueOnce({ ...mocks.aircraftModel, getState: () => modelState });
+  let operation!: Promise<string | null>;
   try {
-    const radios = Array.from(t.root.querySelectorAll<HTMLInputElement>('input[name="flight-aircraft"]'));
-    expect(radios.map(input => input.value)).toEqual(["cessna-172", "cirrus-vision-jet", "f-35b"]);
-    expect(t.root.querySelector(generationSelector)).toBeNull();
-    await act(async () => radios[1].click());
-    expect(Array.from(selectionControl<HTMLSelectElement>(t.root, generationSelector).options, option => option.value).sort())
-      .toEqual(["g1", "g2", "g2+", "g3"]);
-    for (const generation of ["g1", "g2", "g2+", "g3"]) {
-      await changeSelect(t.root, generationSelector, generation);
-      expect(selectionControl<HTMLSelectElement>(t.root, generationSelector).value).toBe(generation);
-      expect(t.root.textContent).toContain("Currently flying Cessna 172 Skyhawk until you apply.");
-      expect(t.setItem).not.toHaveBeenCalled();
-      expect(t.reload).not.toHaveBeenCalled();
-      expect(mocks.aircraftModel.setLod).not.toHaveBeenCalled();
-    }
-    await changeSelect(t.root, generationSelector, "g2+");
-    await changeSelect(t.root, lodSelector, "hd");
-    await act(async () => selectionControl<HTMLButtonElement>(t.root, applySelector).click());
-    // One write of the whole choice, before the reload that activates it.
-    expect(t.setItem.mock.calls.filter(([key]) => key === SETTINGS_STORAGE_KEY)).toHaveLength(1);
-    expect(savedSettings(t.storage)).toMatchObject({
-      "osfs.aircraft.id": "cirrus-vision-jet-g2", "osfs.aircraft.generation": "g2+",
-      "osfs.aircraft.lod": "hd",
+    await act(async () => {
+      operation = Promise.resolve(mocks.controlPanelOptions!.onAircraftApply({
+        aircraftId: "cirrus-vision-jet-g2", generationId: "g2+", lodId: "hd",
+      }));
     });
-    expect(t.reload).toHaveBeenCalledOnce();
-    const settingsWrite = t.setItem.mock.calls.findIndex(([key]) => key === SETTINGS_STORAGE_KEY);
-    expect(t.setItem.mock.invocationCallOrder[settingsWrite]).toBeLessThan(t.reload.mock.invocationCallOrder[0]);
-    expect(mocks.aircraftModel.setAircraft).not.toHaveBeenCalled();
-    expect(mocks.aircraftModel.setLod).not.toHaveBeenCalled();
-    expect(createJsbsimRuntime).toHaveBeenCalledTimes(1);
-    await act(async () => selectionControl<HTMLButtonElement>(t.root, applySelector).click());
-    expect(t.reload).toHaveBeenCalledOnce();
-    expect(t.setItem.mock.calls.filter(([key]) => key === SETTINGS_STORAGE_KEY)).toHaveLength(1);
+    expect(createJsbsimRuntime).toHaveBeenLastCalledWith(expect.objectContaining({ aircraftId: "cirrus-vision-jet-g2" }));
+    expect(savedSettings(t.storage)).toMatchObject({
+      "osfs.aircraft.id": "cirrus-vision-jet-g2", "osfs.aircraft.generation": "g2+", "osfs.aircraft.lod": "hd",
+    });
+    expect(document.querySelector<HTMLElement>(".flight-aircraft-switch")!.hidden).toBe(false);
+    await act(async () => mocks.hudBarOptions!.onPausedChange(false));
+    expect(mocks.runtime.setSimRunning).toHaveBeenLastCalledWith(false);
+    // An import racing the download cannot pair another aircraft's mesh with this SDK.
+    await act(async () => { getAppSettings().setMany({ "osfs.aircraft.id": "f-35b", "osfs.aircraft.generation": "f-35b" }); });
+    await act(async () => { releasePhysics(nextRuntime); });
+    await vi.waitFor(() => expect(createAircraftModel).toHaveBeenLastCalledWith(
+      mocks.runtime.scene, mocks.aircraft.modelRoot, expect.objectContaining({ aircraftId: "cirrus-vision-jet-g2", lodId: "hd" }),
+    ));
+    await act(async () => {
+      mocks.controlPanelOptions!.onPausedChange(false);
+      mocks.hudBarOptions!.onPausedChange(false);
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "p", code: "KeyP", bubbles: true }));
+    });
+    expect(mocks.runtime.setSimRunning).toHaveBeenLastCalledWith(false);
+    expect(t.root.querySelector("canvas")).toBe(canvas);
+    expect(mocks.runtime.destroy).not.toHaveBeenCalled();
+    expect(t.reload).not.toHaveBeenCalled();
+    modelState = { ...modelState, status: "ready", activeLodId: "hd", triangles: 1234 };
+    await act(async () => { expect(await operation).toBeNull(); });
+    expect(captureSavedFlight).toHaveBeenLastCalledWith(nextRuntime.sdk, "cirrus-vision-jet-g2", true);
+    expect(getAppSettings().get("osfs.aircraft.id")).toBe("cirrus-vision-jet-g2");
+    expect(t.app.runtime).toBe(mocks.runtime);
+    expect(document.querySelector<HTMLElement>(".flight-aircraft-switch")!.hidden).toBe(true);
+    expect(mocks.runtime.setSimRunning).toHaveBeenLastCalledWith(false);
+    await act(async () => mocks.controlPanelOptions!.onPausedChange(false));
+    expect(mocks.runtime.setSimRunning).toHaveBeenLastCalledWith(true);
+    expect(t.root.textContent).not.toContain("Changes pending");
+    expect(createJsbsimRuntime).toHaveBeenCalledTimes(2);
   } finally { await act(async () => t.app.destroy()); }
+  expect(mocks.runtime.destroy).toHaveBeenCalledOnce();
 });
 
-it("applies presentation changes once after staging and retains per-family drafts across tabs", async () => {
+it("switches aircraft selected through shared parameters without a reload banner", async () => {
   const t = await mountAircraftSelection();
   try {
-    await changeSelect(t.root, lodSelector, "lod2");
-    expect(mocks.aircraftModel.setLod).not.toHaveBeenCalled();
-    expect(t.setItem).not.toHaveBeenCalled();
-    await act(async () => selectionControl<HTMLButtonElement>(t.root, applySelector).click());
-    expect(mocks.aircraftModel.setLod).toHaveBeenCalledExactlyOnceWith("lod2");
+    await act(async () => {
+      getAppSettings().setMany({ "osfs.aircraft.id": "cirrus-vision-jet", "osfs.aircraft.generation": "g1", "osfs.aircraft.lod": "auto" });
+    });
+    await vi.waitFor(() => expect(createJsbsimRuntime).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(document.querySelector<HTMLElement>(".flight-aircraft-switch")!.hidden).toBe(true));
+    expect(createJsbsimRuntime).toHaveBeenLastCalledWith(expect.objectContaining({ aircraftId: "cirrus-vision-jet" }));
+    expect(mocks.runtime.destroy).not.toHaveBeenCalled();
     expect(t.reload).not.toHaveBeenCalled();
-    expect(selectionControl<HTMLButtonElement>(t.root, applySelector).disabled).toBe(true);
-
-    await act(async () => selectionControl<HTMLInputElement>(t.root, 'input[name="flight-aircraft"][value="cirrus-vision-jet"]').click());
-    await changeSelect(t.root, generationSelector, "g3");
-    await changeSelect(t.root, lodSelector, "hd");
-    await act(async () => selectionControl<HTMLInputElement>(t.root, 'input[name="flight-aircraft"][value="cessna-172"]').click());
-    expect(t.root.querySelector(generationSelector)).toBeNull();
-    expect(t.root.querySelector('.flight-panel__model-controls input[type="checkbox"]')).toBeNull();
-    expect(selectionControl<HTMLSelectElement>(t.root, lodSelector).value).toBe("lod2");
-    await openPanelTab(t.root, "Weather");
-    await openPanelTab(t.root, "Aircraft");
-    await act(async () => selectionControl<HTMLInputElement>(t.root, 'input[name="flight-aircraft"][value="cirrus-vision-jet"]').click());
-    expect(selectionControl<HTMLSelectElement>(t.root, generationSelector).value).toBe("g3");
-    expect(selectionControl<HTMLSelectElement>(t.root, lodSelector).value).toBe("hd");
-    expect(mocks.aircraftModel.setLod).toHaveBeenCalledTimes(1);
-    // Switching tabs saves FOSS Earth's workspace; the settings record is written once.
-    expect(t.setItem.mock.calls.filter(([key]) => key === SETTINGS_STORAGE_KEY)).toHaveLength(1);
-    await act(async () => selectionControl<HTMLButtonElement>(t.root, ".flight-panel__command--secondary").click());
-    expect(selectionControl<HTMLInputElement>(t.root, 'input[name="flight-aircraft"][value="cessna-172"]').checked).toBe(true);
-    expect(selectionControl<HTMLSelectElement>(t.root, lodSelector).value).toBe("lod2");
-    expect(selectionControl<HTMLButtonElement>(t.root, applySelector).disabled).toBe(true);
+    expect(t.root.textContent).not.toContain("Changes pending");
   } finally { await act(async () => t.app.destroy()); }
 });
 
-it("takes back an aircraft choice that could not be saved, and does not reload", async () => {
+it("reports a failed physics download and keeps the original paused aircraft available", async () => {
+  const t = await mountAircraftSelection();
+  const canvas = t.root.querySelector("canvas");
+  vi.mocked(createJsbsimRuntime).mockRejectedValueOnce(new Error("Vision Jet data download failed"));
+  try {
+    let error: string | null = null;
+    await act(async () => {
+      error = await mocks.controlPanelOptions!.onAircraftApply({ aircraftId: "cirrus-vision-jet", lodId: "auto" });
+    });
+    expect(error).toContain("Vision Jet data download failed");
+    expect(error).toContain("cessna-172 → cirrus-vision-jet");
+    expect(getAppSettings().get("osfs.aircraft.id")).toBe("cessna-172");
+    expect(t.root.querySelector("canvas")).toBe(canvas);
+    expect(mocks.aircraftModel.dispose).not.toHaveBeenCalled();
+    expect(mocks.runtime.destroy).not.toHaveBeenCalled();
+    expect(mocks.runtime.setSimRunning).toHaveBeenLastCalledWith(false);
+    expect(t.reload).not.toHaveBeenCalled();
+    await act(async () => mocks.controlPanelOptions!.onPausedChange(false));
+    expect(mocks.runtime.setSimRunning).toHaveBeenLastCalledWith(true);
+  } finally { await act(async () => t.app.destroy()); }
+});
+
+it("restores the prior aircraft after a model failure and shows a persistent error report", async () => {
+  const t = await mountAircraftSelection();
+  const canvas = t.root.querySelector("canvas");
+  vi.mocked(createAircraftModel).mockReturnValueOnce({ ...mocks.aircraftModel, getState: () => ({
+    aircraftId: "cirrus-vision-jet", lodId: "auto", activeLodId: null,
+    status: "error", triangles: null, error: "GLB download failed", download: null,
+  }) });
+  const showModal = vi.fn(function (this: HTMLDialogElement) { this.open = true; });
+  const close = vi.fn(function (this: HTMLDialogElement) { this.open = false; });
+  Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, value: showModal });
+  Object.defineProperty(HTMLDialogElement.prototype, "close", { configurable: true, value: close });
+  try {
+    let error: string | null = null;
+    await act(async () => {
+      error = await mocks.controlPanelOptions!.onAircraftApply({ aircraftId: "cirrus-vision-jet", lodId: "auto" });
+    });
+    expect(error).toContain("GLB download failed");
+    expect(showModal).toHaveBeenCalledOnce();
+    const dialog = document.querySelector<HTMLDialogElement>('dialog[aria-label="Aircraft switch failed"]')!;
+    expect(dialog.textContent).toContain("GLB download failed");
+    await act(async () => {
+      mocks.controlPanelOptions!.onPausedChange(false);
+      dialog.querySelector("button")!.dispatchEvent(new KeyboardEvent("keydown", { key: "v", code: "KeyV", bubbles: true }));
+    });
+    expect(mocks.runtime.setSimRunning).toHaveBeenLastCalledWith(false);
+    expect(mocks.aircraft.toggleViewMode).not.toHaveBeenCalled();
+    expect(getAppSettings().get("osfs.aircraft.id")).toBe("cessna-172");
+    expect(createJsbsimRuntime).toHaveBeenCalledTimes(3);
+    expect(createJsbsimRuntime).toHaveBeenLastCalledWith(expect.objectContaining({ aircraftId: "cessna-172" }));
+    expect(t.root.querySelector("canvas")).toBe(canvas);
+    expect(mocks.runtime.destroy).not.toHaveBeenCalled();
+    expect(mocks.runtime.setSimRunning).toHaveBeenLastCalledWith(false);
+    expect(t.reload).not.toHaveBeenCalled();
+  } finally {
+    await act(async () => t.app.destroy());
+    Reflect.deleteProperty(HTMLDialogElement.prototype, "showModal");
+    Reflect.deleteProperty(HTMLDialogElement.prototype, "close");
+  }
+});
+
+it("takes back an aircraft choice that could not be saved", async () => {
   const t = await mountAircraftSelection([["osfs.aircraft", "cessna-172"], ["osfs.aircraft-lod", "lod2"]]);
   try {
-    await act(async () => selectionControl<HTMLInputElement>(t.root, 'input[name="flight-aircraft"][value="cirrus-vision-jet"]').click());
-    await changeSelect(t.root, generationSelector, "g2+");
     const beforeApply = t.storage.get(SETTINGS_STORAGE_KEY);
     t.setItem.mockImplementation((key: string, value: string) => {
       if (key === SETTINGS_STORAGE_KEY) throw new Error("storage unavailable");
       t.storage.set(key, value);
     });
-    await act(async () => selectionControl<HTMLButtonElement>(t.root, applySelector).click());
-    expect(t.root.querySelector('[role="alert"]')?.textContent).toContain("Could not save your aircraft choice");
+    let error: string | null = null;
+    await act(async () => {
+      error = await mocks.controlPanelOptions!.onAircraftApply({ aircraftId: "cirrus-vision-jet-g2", generationId: "g2+", lodId: "auto" });
+    });
+    expect(error).toContain("Could not save your aircraft choice");
     expect(t.storage.get(SETTINGS_STORAGE_KEY)).toBe(beforeApply);
     expect(getAppSettings().get("osfs.aircraft.id")).toBe("cessna-172");
     expect(getAppSettings().get("osfs.aircraft.lod")).toBe("lod2");
+    expect(createJsbsimRuntime).toHaveBeenCalledTimes(1);
     expect(t.reload).not.toHaveBeenCalled();
     expect(mocks.aircraftModel.setLod).not.toHaveBeenCalled();
-    expect(mocks.aircraftModel.setAircraft).not.toHaveBeenCalled();
-    await changeSelect(t.root, generationSelector, "g1");
-    expect(t.root.querySelector('[role="alert"]')).toBeNull();
   } finally { await act(async () => t.app.destroy()); }
 });
 
@@ -923,7 +983,8 @@ it.each([
   try {
     expect(selectionControl<HTMLSelectElement>(t.root, generationSelector).value).toBe(expectedGeneration);
     expect(createJsbsimRuntime).toHaveBeenLastCalledWith(expect.objectContaining({ aircraftId }));
-    expect(selectionControl<HTMLButtonElement>(t.root, applySelector).disabled).toBe(true);
+    expect(t.root.querySelector(".flight-panel__aircraft-current button")?.textContent).toBe("Switch");
+    expect(t.root.querySelector(".flight-panel__aircraft-apply")).toBeNull();
     expect(t.setItem).not.toHaveBeenCalled();
   } finally { await act(async () => t.app.destroy()); }
 });
@@ -1251,7 +1312,7 @@ it("shows and persists the F-35B control law, applies it while paused and restor
     const runtime = await vi.mocked(createJsbsimRuntime).mock.results.at(-1)!.value;
     expect(runtime.sdk.setPropertyValue).toHaveBeenCalledWith("fcs/control-law-mode", 1);
     const section = t.root.querySelector<HTMLElement>('[data-settings-section="aircraft/flight-controls"]')!;
-    expect(section.textContent).toContain("Autopilot and input assists have separate settings");
+    expect(section.textContent).toContain("Aircraft control law");
     const modes = Array.from(section.querySelectorAll<HTMLInputElement>('[data-parameter="osfs.aircraft.controlLaw"] input[type="radio"]'));
     expect(modes.map(mode => mode.value)).toEqual(["auto", "manual", "fly-by-wire"]);
     expect(modes.find(mode => mode.checked)?.value).toBe("manual");

@@ -41,14 +41,13 @@ import type { AircraftModelStatus } from "@0sfs/aircraft/createAircraftModel";
 import { getFdmProfile, resolveEngineModel, type EngineModelId } from "../jsbsim/fdmProfiles";
 import { JSBSIM_PACKAGE_VERSION } from "../jsbsim/jsbsimBuildIdentity";
 import { AircraftSelectionPanel } from "@0sfs/aircraft/AircraftSelectionPanel";
-import { AIRCRAFT_SELECTION_PARAMETER_IDS } from "@0sfs/aircraft/aircraftSelectionSetting";
 import { GamepadBindingsPanel, type GamepadBindingsMount } from "@0sfs/controls/GamepadBindingsPanel";
 import { flightLog, type FlightLogEntry } from "@0sfs/logging/flightLog";
 import {
   getActiveFlightPerformanceCapture,
   type FlightPerformanceSummary,
 } from "@0sfs/logging/flightPerformanceCapture";
-import { headingDegFromRad, type FlightState } from "@0sfs/ground-contact/flightState";
+import type { FlightState } from "@0sfs/ground-contact/flightState";
 import {
   KEYBOARD_STICK_PARAMETER_IDS,
   readKeyboardStickSettings,
@@ -131,6 +130,8 @@ export interface FlightControlPanelSnapshot {
   modelActiveLodId: AircraftLodId | null;
   modelTriangles: number | null;
   modelError: string | null;
+  /** A complete aircraft is being prepared; resuming is blocked until it is ready. */
+  aircraftSwitching?: boolean;
   collisionDebugEnabled: boolean;
   wheelSpinMode: WheelSpinMode | "off";
   tireSoundEnabled: boolean;
@@ -191,8 +192,8 @@ export interface FlightControlPanelOptions {
   /** Discards the saved flight and starts again at the start position. */
   onNewFlight(): void;
   onViewModeChange(mode: FlightViewMode): void;
-  /** Commit a staged aircraft and presentation choice; return a visible error if it fails. */
-  onAircraftApply(selection: AircraftSelection): string | null;
+  /** Activate an aircraft or presentation choice; resolves when ready, or with an error report. */
+  onAircraftApply(selection: AircraftSelection): string | null | Promise<string | null>;
   onCollisionDebugChange(enabled: boolean): void;
   onWheelSpinModeChange(mode: WheelSpinMode | "off"): void;
   onTireSoundChange(enabled: boolean): void;
@@ -430,58 +431,59 @@ function AircraftPanel({
   onAircraftSelectionChange,
   onAircraftFamilyChange,
 }: AircraftPanelProps) {
+  const [switchMode, setSwitchMode] = useState(false);
   return (
     <div className="flight-panel__content">
-      <div className="flight-panel__metrics">
-        <Metric label="Airspeed" value={`${Math.round(snapshot.flightState.airspeedKts)} kt`} />
-        <Metric label="Altitude" value={`${Math.round(snapshot.flightState.altMeters / 0.3048).toLocaleString()} ft`} />
-        <Metric label="Heading" value={`${Math.round(headingDegFromRad(snapshot.flightState.headingRad))}°`} />
-        <Metric label="Throttle" value={`${Math.round(snapshot.flightState.throttleNorm * 100)}%`} />
-      </div>
-      <ParameterSection settings={settings} tab="aircraft" section="model" covers={AIRCRAFT_SELECTION_PARAMETER_IDS}>
-        <AircraftSelectionPanel
-          snapshot={snapshot}
-          selection={aircraftSelection}
-          onSelectionChange={onAircraftSelectionChange}
-          onFamilyChange={onAircraftFamilyChange}
-          onApply={onAircraftApply}
-        />
-      </ParameterSection>
-      <ParameterSection settings={settings} tab="aircraft" section="mesh-inspector" afterControls>
-        <MeshInspectorPanel inspector={meshInspector ?? null} />
-      </ParameterSection>
-      <ParameterSection settings={settings} tab="aircraft" section="camera">
-        {/* "View [Cockpit / Chase] ?" */}
-        <ChoiceTrack heading="View" value={snapshot.viewMode} onChange={mode => onViewModeChange(mode as FlightViewMode)}
-          choices={[{ id: "first", label: "Cockpit" }, { id: "third", label: "Chase" }]}
-          help="Cockpit shows the view from the pilot's seat. Chase follows the aircraft from outside." />
-      </ParameterSection>
-      {/* "[Ⅱ] W/S Pitch  A/D Roll  Q/E Rudder  ⇧/⌃ Throttle": the keymap wraps as a paragraph. */}
-      <div className="flight-panel__row">
-        <IconButton icon={snapshot.paused ? "play" : "pause"} label={snapshot.paused ? "Resume simulation" : "Pause simulation"}
-          onClick={() => onPausedChange(!snapshot.paused)} />
-        <div className="flight-panel__keymap" aria-label="Flight controls">
-          <span><kbd>W/S</kbd> Pitch</span><span><kbd>A/D</kbd> Roll</span>
-          <span><kbd>Q/E</kbd> Rudder</span><span><kbd>⇧/⌃</kbd> Throttle</span>
-        </div>
-      </div>
-      {/* The control law's own ? explains Auto, Manual and Fly-by-wire. */}
-      {getFdmProfile(snapshot.aircraftId).controlLaw &&
-        <ParameterSection settings={settings} tab="aircraft" section="flight-controls" />}
-      <ParameterSection settings={settings} tab="aircraft" section="assists" />
-      <ParameterSection settings={settings} tab="aircraft" section="ground" covers={GROUND_PARAMETER_IDS}>
-        <GroundInteractionSettingsPanel state={snapshot.groundInteraction} onAction={onGroundInteractionAction} />
-      </ParameterSection>
-      <ParameterSection settings={settings} tab="aircraft" section="start">
+      <AircraftSelectionPanel
+        snapshot={snapshot}
+        selection={aircraftSelection}
+        onSelectionChange={onAircraftSelectionChange}
+        onFamilyChange={onAircraftFamilyChange}
+        onApply={onAircraftApply}
+        switching={snapshot.aircraftSwitching}
+        onSwitchModeChange={setSwitchMode}
+      />
+      <div className="flight-panel__aircraft-edit" hidden={switchMode}>
+        <ParameterSection settings={settings} tab="aircraft" section="camera">
+          {/* "View [Cockpit / Chase] ?" */}
+          <ChoiceTrack heading="View" value={snapshot.viewMode} onChange={mode => onViewModeChange(mode as FlightViewMode)}
+            choices={[{ id: "first", label: "Cockpit" }, { id: "third", label: "Chase" }]}
+            help="Cockpit shows the view from the pilot's seat. Chase follows the aircraft from outside." />
+        </ParameterSection>
+        {/* "[Ⅱ] W/S Pitch  A/D Roll  Q/E Rudder  ⇧/⌃ Throttle": the keymap wraps as a paragraph. */}
         <div className="flight-panel__row">
-          <p className="flight-panel__hint">{describeSavedFlight(snapshot.savedFlight)}</p>
-          <button className="flight-panel__command" type="button" onClick={onNewFlight}
-            aria-label="New flight: discard the saved flight and start again at the start position"
-            title="Discard the saved flight and start again at the start position">
-            New flight
-          </button>
+          <IconButton icon={snapshot.paused ? "play" : "pause"} label={snapshot.paused ? "Resume simulation" : "Pause simulation"}
+            disabled={snapshot.aircraftSwitching}
+            onClick={() => onPausedChange(!snapshot.paused)} />
+          <div className="flight-panel__keymap" aria-label="Flight controls">
+            <span><kbd>W/S</kbd> Pitch</span><span><kbd>A/D</kbd> Roll</span>
+            <span><kbd>Q/E</kbd> Rudder</span><span><kbd>⇧/⌃</kbd> Throttle</span>
+          </div>
         </div>
-      </ParameterSection>
+        {/* The control law's own ? explains Auto, Manual and Fly-by-wire. */}
+        {getFdmProfile(snapshot.aircraftId).controlLaw &&
+          <ParameterSection settings={settings} tab="aircraft" section="flight-controls" />}
+        <ParameterSection settings={settings} tab="aircraft" section="assists" />
+        <ParameterSection settings={settings} tab="aircraft" section="ground" covers={GROUND_PARAMETER_IDS}>
+          <GroundInteractionSettingsPanel state={snapshot.groundInteraction} onAction={onGroundInteractionAction} />
+        </ParameterSection>
+        <ParameterSection settings={settings} tab="aircraft" section="start">
+          <div className="flight-panel__row">
+            <p className="flight-panel__hint">{describeSavedFlight(snapshot.savedFlight)}</p>
+            <button className="flight-panel__command" type="button" onClick={onNewFlight}
+              aria-label="New flight: discard the saved flight and start again at the start position"
+              title="Discard the saved flight and start again at the start position">
+              New flight
+            </button>
+          </div>
+        </ParameterSection>
+        <details className="flight-panel__aircraft-inspector">
+          <summary>Model inspection</summary>
+          <ParameterSection settings={settings} tab="aircraft" section="mesh-inspector" afterControls>
+            <MeshInspectorPanel inspector={meshInspector ?? null} />
+          </ParameterSection>
+        </details>
+      </div>
     </div>
   );
 }

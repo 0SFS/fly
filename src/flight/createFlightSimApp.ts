@@ -1,7 +1,7 @@
 import "foss-earth/shell.css";
 // The fleet registers with the aircraft catalog before anything reads it.
 import "./aircraft/fleet";
-import { Vector3, type WebGPUEngine } from "@babylonjs/core";
+import { Matrix, Vector3, type WebGPUEngine } from "@babylonjs/core";
 import { bindFrameProfileSettings, FRAME_PROFILING_IDS } from "foss-earth/perf";
 import { setActiveFrameProfile } from "./diagnostics/frameProfile";
 import { createFlightUiHost } from "./earthUiHost";
@@ -14,6 +14,8 @@ import {
   markBoot,
   markBootOnFrame,
   reportSecrets,
+  describeError,
+  redactIssueReport,
   startAppDiagnostics,
   type AppDiagnostics,
 } from "foss-earth/diagnostics";
@@ -149,6 +151,7 @@ import {
   type FlightWeatherState,
 } from "./hud/FlightControlPanel";
 import { createFlightControlPanel } from "./hud/createFlightControlPanel";
+import { createAircraftSwitchOverlay } from "./hud/createAircraftSwitchOverlay";
 import { createFlightHud, type FlightHudHandle, type FlightHudMasterAp } from "./hud/flightHud";
 import { createFlightHudBar, type FlightHudBarHandle } from "./hud/createFlightHudBar";
 import { createFlightStatusOverlay, type FlightStatusOverlayHandle } from "./hud/createFlightStatusOverlay";
@@ -217,6 +220,7 @@ import {
   createPresetsSection,
   createRendererPanel,
   reportRendererStart,
+  markParametersApplied,
   createSavedSettingsSection,
   createDateTimePanel,
   createSkyPanel,
@@ -285,9 +289,8 @@ function approach(current: number, target: number, deltaSeconds: number, halfLif
 }
 
 /**
- * Commit the complete aircraft choice before a reload can activate it: all of
- * it is saved, or none of it, and a choice that would not survive the reload
- * is taken back.
+ * Commit the complete aircraft choice atomically, taking it back if browser
+ * storage refuses it.
  */
 function writeAircraftSelection(parameters: FlightParameterStore, selection: AircraftSelection): string | null {
   const previous = readAircraftSelection(parameters);
@@ -309,10 +312,159 @@ function reportOnlyAddress(href: string): string {
   return url.href;
 }
 
+interface FlightSessionState {
+  flight: SavedFlight | null;
+  state: FlightState;
+  selection: AircraftSelection;
+  weather: FlightWeatherState;
+  viewMode: "first" | "third";
+  position?: { x: number; y: number };
+}
+
+interface FlightSessionOptions {
+  runtime?: BabylonRuntime;
+  canvas?: HTMLCanvasElement;
+  resume?: FlightSessionState;
+  jsbsim?: Awaited<ReturnType<typeof createJsbsimRuntime>>;
+  switching?: boolean;
+  selection?: AircraftSelection;
+  signal?: AbortSignal;
+  onAircraftSwitch(selection: AircraftSelection, reportError?: boolean): Promise<string | null>;
+}
+
+interface FlightSessionHandle extends FlightSimAppHandle {
+  canvas: HTMLCanvasElement;
+  readonly alive: boolean;
+  suspend(): FlightSessionState;
+  finishSwitch(): void;
+  report(): Promise<string>;
+  destroy(preserveWorld?: boolean): void;
+}
+
+/** Keep the page, canvas and streamed world while replacing all aircraft-owned resources. */
 export async function createFlightSimApp(
   rootElement: HTMLElement,
   options: FlightSimAppOptions = {},
 ): Promise<FlightSimAppHandle> {
+  let current: FlightSessionHandle;
+  let switching = false;
+  let destroyed = false;
+  const switchAbort = new AbortController();
+  const overlay = createAircraftSwitchOverlay(rootElement.ownerDocument.body);
+  const switchLoading: FlightLoadingScreen = {
+    show() {}, hide() {}, destroy() {}, fail() {},
+    setPhase(_phase, update) {
+      if (update.state === "loading") overlay.progress(update.progress == null ? null : update.progress * 100, update.detail);
+    },
+  };
+  const switchAircraft = async (selection: AircraftSelection, reportError = false): Promise<string | null> => {
+    if (switching || destroyed) return "An aircraft switch is already in progress.";
+    const parameters = registerFlightSettings(getAppSettings());
+    switching = true;
+    let previous: FlightSessionState;
+    try {
+      previous = current.suspend();
+      const saveError = writeAircraftSelection(parameters, selection);
+      if (saveError) {
+        parameters.setMany(aircraftSelectionValues(previous.selection));
+        current.finishSwitch();
+        switching = false;
+        if (reportError) overlay.fail(saveError);
+        return saveError;
+      }
+    } catch (error) {
+      switching = false;
+      current.finishSwitch();
+      const report = redactIssueReport(`Could not prepare the aircraft switch: ${describeError(error).message}`, reportSecrets(getAppSettings()));
+      if (reportError) overlay.fail(report);
+      return report;
+    }
+    overlay.show(getAircraftDefinition(selection.aircraftId).label, previous.position);
+    let prepared: Awaited<ReturnType<typeof createJsbsimRuntime>> | undefined;
+    let replaced = false;
+    const runtime = current.runtime;
+    const canvas = current.canvas;
+    try {
+      const profile = getFdmProfile(selection.aircraftId);
+      prepared = await createJsbsimRuntime({
+        dataBaseUrl: options.dataBaseUrl,
+        aircraftId: selection.aircraftId,
+        engineModel: resolveEngineModel(selection.aircraftId, parameters.get("osfs.engine.model"))?.id,
+        bootstrap: {
+          latDeg: previous.state.latDeg, lonDeg: previous.state.lonDeg,
+          headingDeg: previous.state.headingRad / RADIANS_PER_DEGREE,
+          airspeedKts: profile.initialAirspeedKts ?? parameters.get("osfs.start.airspeed"),
+          throttleNorm: profile.initialThrottleNorm,
+        },
+        onProgress: progress => overlay.progress(progress.progress == null ? null : progress.progress * 100, progress.message),
+      });
+      if (destroyed) { prepared.dispose(); return null; }
+      // Presets/imports may have edited settings while the accepted switch loaded.
+      // Its prepared physics and visible aircraft must commit as one identity.
+      parameters.setMany(aircraftSelectionValues(selection));
+      // Recreate every aircraft-specific consumer around the same map renderer.
+      current.destroy(true);
+      replaced = true;
+      current = await createFlightSimSession(rootElement, {
+        ...options, diagnostics: undefined, log: undefined, loadingScreen: switchLoading,
+      }, { runtime, canvas, jsbsim: prepared, resume: previous, switching: true, selection, signal: switchAbort.signal, onAircraftSwitch: switchAircraft });
+      prepared = undefined;
+      if (destroyed) { current.destroy(); return null; }
+      parameters.setMany(aircraftSelectionValues(selection));
+      current.finishSwitch();
+      overlay.hide();
+      return null;
+    } catch (error) {
+      prepared?.dispose();
+      parameters.setMany(aircraftSelectionValues(previous.selection));
+      let recoveryError: unknown;
+      if (!destroyed) {
+        if (replaced) {
+          try {
+            current = await createFlightSimSession(rootElement, {
+              ...options, diagnostics: undefined, log: undefined, loadingScreen: switchLoading,
+            }, { runtime, canvas, resume: previous, switching: true, selection: previous.selection, signal: switchAbort.signal, onAircraftSwitch: switchAircraft });
+          } catch (failure) { recoveryError = failure; }
+        }
+        if (!recoveryError) current.finishSwitch();
+      }
+      const cause = describeError(error);
+      const recovery = recoveryError ? `\nRecovery also failed: ${describeError(recoveryError).message}` : "\nThe previous aircraft remains paused.";
+      const report = redactIssueReport([
+        `Aircraft switch failed: ${previous.selection.aircraftId} → ${selection.aircraftId}`,
+        `Requested generation: ${selection.generationId ?? "default"}; detail: ${selection.lodId}`,
+        cause.message, cause.stack ?? "", recovery,
+        await current.report().catch(() => ""),
+      ].join("\n"), reportSecrets(getAppSettings()));
+      if (!destroyed) {
+        if (replaced || reportError) overlay.fail(report);
+        else overlay.hide();
+      }
+      return report;
+    } finally { switching = false; }
+  };
+  try {
+    current = await createFlightSimSession(rootElement, options, { onAircraftSwitch: switchAircraft });
+  } catch (error) { overlay.dispose(); throw error; }
+  return {
+    get runtime() { return current.runtime; },
+    destroy() {
+      if (destroyed) return;
+      destroyed = true;
+      switchAbort.abort();
+      const alive = current.alive;
+      current.destroy();
+      if (!alive) current.runtime.destroy();
+      overlay.dispose();
+    },
+  };
+}
+
+async function createFlightSimSession(
+  rootElement: HTMLElement,
+  options: FlightSimAppOptions,
+  session: FlightSessionOptions,
+): Promise<FlightSessionHandle> {
   markBoot("boot:modules");
   bootStep("modules", "Starting the flight", 0);
   // One registry for the page: FOSS Earth's parameters and the flight's.
@@ -370,8 +522,9 @@ export async function createFlightSimApp(
   const savedFlights = createSavedFlightStore(preferenceStorage());
   const addressedStart = (["osfs.start.latitude", "osfs.start.longitude"] as const)
     .some(id => settings.inspect(id).provenance === "url");
-  const resumeFlight = !engineTest && parameters.get("osfs.start.resume") && !addressedStart ? savedFlights.read() : null;
+  const resumeFlight = session.resume ? session.resume.flight : !engineTest && parameters.get("osfs.start.resume") && !addressedStart ? savedFlights.read() : null;
   const spawn = benchBootstrap ? { latDeg: benchBootstrap.latDeg!, lonDeg: benchBootstrap.lonDeg! }
+    : session.resume ? { latDeg: session.resume.state.latDeg, lonDeg: session.resume.state.lonDeg }
     : resumeFlight ? { latDeg: resumeFlight.latDeg, lonDeg: resumeFlight.lonDeg } : startLocation();
   if (resumeFlight) {
     log.print({ text: `Resuming the flight saved ${new Date(resumeFlight.savedAtMs).toLocaleString()}${resumeFlight.paused ? ", paused" : ""}` });
@@ -381,7 +534,7 @@ export async function createFlightSimApp(
   const flightGamepadPolling = createGamepadPollingController(parameters);
   let startupPauseLine: GameLogLine | null = null;
   const startupPause = createStartupPause({
-    paused: resumeFlight?.paused ?? false,
+    paused: session.switching || (resumeFlight?.paused ?? false),
     shouldPoll: flightGamepadPolling.claimIdleFrame,
     onChange: paused => {
       const entry = { text: paused ? "The flight will start paused." : "The flight will start running." };
@@ -395,7 +548,7 @@ export async function createFlightSimApp(
     preferGoogleTiles: options.preferGoogleTiles,
     settings,
   });
-  const initialAircraftSelection = readAircraftSelection(parameters);
+  const initialAircraftSelection = session.selection ?? readAircraftSelection(parameters);
   const initialAircraftId: AircraftId = initialAircraftSelection.aircraftId;
   // Engine → Simulation: the engine model this flight loads, where the aircraft offers a choice.
   const engineModel = resolveEngineModel(initialAircraftId, parameters.get("osfs.engine.model"))?.id ?? null;
@@ -444,7 +597,7 @@ export async function createFlightSimApp(
     return terrain;
   }
 
-  rootElement.innerHTML = `
+  if (!session.canvas) rootElement.innerHTML = `
     <div class="flight-app">
       <canvas class="flight-app__canvas" aria-label="Flight simulator viewport"></canvas>
       <div class="flight-g-vision-root"></div>
@@ -455,7 +608,16 @@ export async function createFlightSimApp(
     </div>
   `;
 
-  const canvas = rootElement.querySelector<HTMLCanvasElement>(".flight-app__canvas");
+  if (session.canvas) {
+    const flightRoot = rootElement.querySelector<HTMLElement>(".flight-app")!;
+    for (const child of [...flightRoot.children]) if (child !== session.canvas) child.remove();
+    for (const className of ["flight-g-vision-root", "flight-hud-root", "flight-status-root", "flight-shell-root", "flight-panel-root"]) {
+      const host = rootElement.ownerDocument.createElement("div");
+      host.className = className;
+      flightRoot.append(host);
+    }
+  }
+  const canvas = session.canvas ?? rootElement.querySelector<HTMLCanvasElement>(".flight-app__canvas");
   const gVisionRoot = rootElement.querySelector<HTMLElement>(".flight-g-vision-root");
   const hudRoot = rootElement.querySelector<HTMLElement>(".flight-hud-root");
   const statusRoot = rootElement.querySelector<HTMLElement>(".flight-status-root");
@@ -468,6 +630,12 @@ export async function createFlightSimApp(
   let bootstrapFailed = false;
   const bootResources: { runtime?: BabylonRuntime; jsbsim?: Awaited<ReturnType<typeof createJsbsimRuntime>> } = {};
   const startupAbort = new AbortController();
+  if (session.signal) {
+    const abort = () => startupAbort.abort();
+    session.signal.addEventListener("abort", abort, { once: true });
+    stopWatching.push(() => session.signal?.removeEventListener("abort", abort));
+    if (session.signal.aborted) startupAbort.abort();
+  }
   // ?terrainCapture=1 records terrain timings in window.fossTerrainPerformance and
   // ?mapDebug=1 publishes the map's debug events in window.__fossMapDebug
   // (docs/near-ground-performance.md). FOSS Earth's runtime no longer reads the address.
@@ -484,7 +652,7 @@ export async function createFlightSimApp(
       },
     }
     : undefined;
-  const runtimePromise = createBabylonRuntime(canvas, {
+  const runtimePromise = (session.runtime ? Promise.resolve(session.runtime) : createBabylonRuntime(canvas, {
     googleApiKey: mapConfig.googleApiKey,
     preferGoogleTiles: mapConfig.preferGoogleTiles,
     rasterBaseMap: mapConfig.rasterBaseMap,
@@ -494,8 +662,8 @@ export async function createFlightSimApp(
     simMode: true,
     // The compat options omit observations; createBabylonRuntime passes them on to the globe runtime.
     ...(observations ? { observations } : {}),
-  } as BabylonRuntimeOptions).then(runtime => {
-    if (bootstrapFailed) { runtime.destroy(); throw new Error("Startup cancelled."); }
+  } as BabylonRuntimeOptions)).then(runtime => {
+    if (bootstrapFailed) { if (!session.runtime) runtime.destroy(); throw new Error("Startup cancelled."); }
     bootResources.runtime = runtime;
     diagnostics.attachRuntime(runtime);
     // The controller is the one writer of the renderer's detail target. The
@@ -523,6 +691,8 @@ export async function createFlightSimApp(
       ? { ...spawn, altitudeMeters: benchBootstrap.altFt! * 0.3048, clearanceMeters: 0 }
       : resumeFlight
       ? savedFlightTerrainRequest(resumeFlight)
+      : session.resume
+      ? { ...spawn, altitudeMeters: session.resume.state.altMeters, clearanceMeters: 0 }
       : { ...spawn, altitudeAboveGroundMeters: startHeightMeters, clearanceMeters: benchmarkRoute ? 0 : 1000 }),
     radiusMeters: 1000,
     signal: startupAbort.signal,
@@ -539,13 +709,14 @@ export async function createFlightSimApp(
   settings.setHostDefault("osfs.start.airspeed",
     getFdmProfile(initialAircraftId).initialAirspeedKts ?? flightParameterSpec("osfs.start.airspeed").default,
     `the ${initialAircraftId} profile`);
-  const jsbsimPromise = createJsbsimRuntime({
+  if (session.runtime) markParametersApplied(settings, ["osfs.start.airspeed", "osfs.start.throttle"]);
+  const jsbsimPromise = (session.jsbsim ? Promise.resolve(session.jsbsim) : createJsbsimRuntime({
     dataBaseUrl: options.dataBaseUrl,
     aircraftId: initialAircraftId,
     engineModel: engineModel ?? undefined,
     bootstrap: benchBootstrap ?? {
       ...spawn,
-      headingDeg: resumeFlight?.headingDeg ?? parameters.get("osfs.start.heading"),
+      headingDeg: session.resume ? session.resume.state.headingRad / RADIANS_PER_DEGREE : resumeFlight?.headingDeg ?? parameters.get("osfs.start.heading"),
       airspeedKts: parameters.get("osfs.start.airspeed"),
       throttleNorm: parameters.get("osfs.start.throttle"),
     },
@@ -557,7 +728,7 @@ export async function createFlightSimApp(
         console.warn("[jsbsim]", message);
       }
     },
-  }).then(jsbsim => {
+  })).then(jsbsim => {
     if (bootstrapFailed) { jsbsim.dispose(); throw new Error("Startup cancelled."); }
     bootResources.jsbsim = jsbsim;
     flightLog.info("jsbsim", "Runtime build identified", { identity: jsbsim.identity });
@@ -585,7 +756,7 @@ export async function createFlightSimApp(
     startupPause.dispose();
     disconnectMapDetail();
     mapDetail?.dispose();
-    bootResources.runtime?.destroy();
+    if (!session.runtime) bootResources.runtime?.destroy();
     bootResources.jsbsim?.dispose();
     loading.fail("Flight could not load. Check your connection and try again.", { cause: error });
     for (const stop of stopWatching.splice(0)) stop();
@@ -599,6 +770,7 @@ export async function createFlightSimApp(
   // The renderer has said what it is: a very slow device lights imagery as at the aircraft, and takes the ground's light as one colour.
   applySlowDeviceSkyDefaults(settings);
   let worldLoading = true;
+  let aircraftSwitching = session.switching ?? false;
   // Holds physics while hidden gear pipelines compile under the loading screen.
   let gearPipelineWarmup = false;
   let placementAbort = startupAbort;
@@ -646,7 +818,7 @@ export async function createFlightSimApp(
   let phonePairing: Promise<MountPhonePairing> | null = null;
   /** A phone flying together with this computer (Remote Control → Sharing the controls: Blend both). */
   let controlBlend: ControlBlend | null = null;
-  const pausedAtStart = startupPause.isPaused();
+  const pausedAtStart = session.switching || startupPause.isPaused();
   startupPause.dispose();
   const inputManager = createFlightInputManager({
     parameters,
@@ -1416,11 +1588,24 @@ export async function createFlightSimApp(
   const aircraftId: AircraftId = initialAircraftId;
   let aircraftLodId: AircraftLodId = initialAircraftSelection.lodId;
   let aircraftGenerationId: string = initialAircraftSelection.generationId ?? getAircraftFamilyForAircraft(aircraftId).variants[0]?.id ?? "cessna-172";
-  // The model and its detail change live, from the chooser or Show all
-  // parameters; another aircraft loads on the next start.
+  let aircraftSettingSwitchQueued = false;
+  // Direct parameter controls and preset imports use the same complete-aircraft
+  // activation as the gallery. Coalesce a batch so identity, generation and LOD
+  // are read together, after all settings in the choice have been written.
   const followAircraftPresentation = (): void => {
     const next = readAircraftSelection(parameters);
-    if (next.aircraftId !== aircraftId) return;
+    if (next.aircraftId !== aircraftId) {
+      if (!aircraftSwitching && !aircraftSettingSwitchQueued) {
+        aircraftSettingSwitchQueued = true;
+        queueMicrotask(() => {
+          aircraftSettingSwitchQueued = false;
+          if (disposed || aircraftSwitching) return;
+          const selection = readAircraftSelection(parameters);
+          if (selection.aircraftId !== aircraftId) void session.onAircraftSwitch(selection, true);
+        });
+      }
+      return;
+    }
     const generationId = next.generationId ?? aircraftGenerationId;
     if (next.lodId === aircraftLodId && generationId === aircraftGenerationId) return;
     aircraftLodId = next.lodId;
@@ -1431,7 +1616,7 @@ export async function createFlightSimApp(
     controlPanel?.update(createPanelSnapshot(physicsLoop.getLatestState() ?? initialState));
   };
   for (const id of AIRCRAFT_SELECTION_PARAMETER_IDS) stopWatching.push(parameters.watch(id, followAircraftPresentation));
-  let aircraftReloadRequested = false;
+
   let modelState: AircraftModelState = {
     aircraftId, lodId: aircraftLodId, activeLodId: null,
     status: "placeholder", triangles: null, error: null, download: null,
@@ -1568,7 +1753,7 @@ export async function createFlightSimApp(
   let fpsSampleStartedMs = performance.now();
   let fpsSampleFrames = 0;
   let measuredFps: number | null = null;
-  const weather: FlightWeatherState = { windDirectionDeg: 0, windSpeedKts: 0 };
+  const weather: FlightWeatherState = { ...(session.resume?.weather ?? { windDirectionDeg: 0, windSpeedKts: 0 }) };
 
   loading.setPhase("assets", { state: "loading", detail: "Loading your aircraft" });
   // The placeholder blocks stand in only when there is no mesh to show: none
@@ -1619,7 +1804,7 @@ export async function createFlightSimApp(
       } : {}),
     });
     if (engineTest) aircraft.setModelLoaded(true);
-    aircraft.setViewMode("third");
+    aircraft.setViewMode(session.resume?.viewMode ?? "third");
     const externalTanks = getExternalTankDefinitions(aircraftId);
     if (!engineTest && externalTanks.length > 0) {
       externalTankVisuals = createExternalTankVisuals(runtime.scene, aircraft.modelRoot, externalTanks, {
@@ -1707,6 +1892,7 @@ export async function createFlightSimApp(
 
   const onViewKeyDown = (event: KeyboardEvent): void => {
     if (event.code !== "KeyV" || event.repeat) return;
+    if (event.target instanceof Element && event.target.closest("dialog[open]")) return;
     if (controlTakesKey(event.target, event.key)) return;
     if (inputManager.isBindingCaptureActive() || inputManager.isGamepadToolsActive()) {
       event.preventDefault();
@@ -1881,6 +2067,7 @@ export async function createFlightSimApp(
       flightState,
       fps: runtime.engine.getFps(),
       paused: inputManager.isPaused(),
+      aircraftSwitching,
       savedFlight: lastSavedFlight === null ? null : {
         savedAtMs: lastSavedFlight.savedAtMs, latDeg: lastSavedFlight.latDeg, lonDeg: lastSavedFlight.lonDeg,
       },
@@ -1926,6 +2113,11 @@ export async function createFlightSimApp(
   };
 
   const syncSimulationPaused = (paused: boolean): void => {
+    // All input routes, including keyboard, gamepad and phone, share this boundary.
+    if (!paused && (aircraftSwitching || rootElement.ownerDocument.querySelector(".flight-panel__aircraft-dialog[open]"))) {
+      inputManager.setPaused(true);
+      return;
+    }
     const priorFault = physicsLoop.getFault();
     flightLog.info("sim", paused ? "Paused" : "Resume requested",
       priorFault ? { clearingFault: priorFault } : undefined);
@@ -2308,23 +2500,10 @@ export async function createFlightSimApp(
     onNewFlight: startNewFlight,
     onViewModeChange: (mode) => { aircraft?.setViewMode(mode); phoneSession?.syncStatus(); runtime.requestRender(); },
     onAircraftApply: (selection) => {
-      if (aircraftReloadRequested) return null;
       const next = normalizeAircraftSelection(selection);
+      if (next.aircraftId !== aircraftId) return session.onAircraftSwitch(next);
       const saveError = writeAircraftSelection(parameters, next);
       if (saveError) return saveError;
-      if (next.aircraftId !== aircraftId) {
-        // Package, control convention, contact geometry, gauges and visuals
-        // change together on boot. Staged model settings never touch the
-        // current aircraft while another complete identity is being chosen.
-        aircraftReloadRequested = true;
-        try {
-          window.location.reload();
-          return null;
-        } catch {
-          aircraftReloadRequested = false;
-          return "Your aircraft choice was saved, but the app could not reload. Reload the page to activate it.";
-        }
-      }
       followAircraftPresentation();
       return null;
     },
@@ -2436,6 +2615,7 @@ export async function createFlightSimApp(
       return log.isOpen();
     },
   });
+  hudBar?.setResumeBlocked?.(aircraftSwitching);
   statusOverlay = createFlightStatusOverlay(statusRoot, {
     onResume: () => setSimulationPaused(false),
   });
@@ -2833,9 +3013,44 @@ export async function createFlightSimApp(
     aircraft?.setViewMode(aircraft.getViewMode());
   };
   let preserveLoadingScreen = false;
-  const app: FlightSimAppHandle = {
-    runtime,
-    destroy(): void {
+  const app: FlightSessionHandle = {
+    runtime, canvas,
+    get alive() { return !disposed; },
+    suspend() {
+      aircraftSwitching = true;
+      hudBar?.setResumeBlocked?.(true);
+      inputManager.setPaused(true);
+      const state = physicsLoop.getLatestState() ?? readFlightState(jsbsim.sdk);
+      let position: { x: number; y: number } | undefined;
+      const camera = runtime.scene.activeCamera;
+      if (camera && floatingOrigin && typeof floatingOrigin.aircraftRoot.getAbsolutePosition === "function") {
+        const viewport = camera.viewport.toGlobal(runtime.renderer.engine.getRenderWidth(), runtime.renderer.engine.getRenderHeight());
+        const projected = Vector3.Project(floatingOrigin.aircraftRoot.getAbsolutePosition(), Matrix.IdentityReadOnly, runtime.scene.getTransformMatrix(), viewport);
+        const bounds = canvas.getBoundingClientRect();
+        const x = projected.x * bounds.width / viewport.width;
+        const y = projected.y * bounds.height / viewport.height;
+        if ([x, y, projected.z].every(Number.isFinite) && projected.z >= 0 && projected.z <= 1
+          && x >= 0 && x <= bounds.width && y >= 0 && y <= bounds.height) {
+          position = { x: bounds.left + x, y: bounds.top + y };
+        }
+      }
+      floatingOrigin?.aircraftRoot.setEnabled(false);
+      controlPanel?.update(createPanelSnapshot(state));
+      runtime.requestRender();
+      return { state, flight: captureSavedFlight(jsbsim.sdk, aircraftId, true), weather: { ...weather },
+        viewMode: aircraft?.getViewMode() ?? "third", selection: { aircraftId, generationId: aircraftGenerationId, lodId: aircraftLodId }, position };
+    },
+    finishSwitch() {
+      aircraftSwitching = false;
+      hudBar?.setResumeBlocked?.(false);
+      floatingOrigin?.aircraftRoot.setEnabled(true);
+      inputManager.setPaused(true);
+      saveFlight();
+      controlPanel?.update(createPanelSnapshot(physicsLoop.getLatestState() ?? initialState));
+      runtime.requestRender();
+    },
+    report: () => diagnostics.report({ allSettings: true }),
+    destroy(preserveWorld = false): void {
       if (disposed) return;
       disposed = true;
       placementAbort.abort();
@@ -2910,13 +3125,29 @@ export async function createFlightSimApp(
       aircraft?.dispose();
       floatingOrigin?.dispose();
       jsbsim.dispose();
-      runtime.destroy();
+      if (!preserveWorld) runtime.destroy();
       if (terrainPerformanceCapture && debugWindow.fossTerrainPerformance === terrainPerformanceCapture) delete debugWindow.fossTerrainPerformance;
-      rootElement.innerHTML = "";
+      if (!preserveWorld) rootElement.innerHTML = "";
     },
   };
   try {
     const terrain = await terrainReady;
+    if (session.switching) {
+      await new Promise<void>((resolve, reject) => {
+        const deadline = performance.now() + 120_000;
+        const check = () => {
+          if (disposed || session.signal?.aborted) { reject(new Error("Aircraft loading was cancelled.")); return; }
+          const state = aircraftModel?.getState();
+          if (state?.status === "ready") { resolve(); return; }
+          if (state?.status === "error" || state?.status === "placeholder") {
+            reject(new Error(state.error ?? "The selected aircraft has no usable model.")); return;
+          }
+          if (performance.now() > deadline) { reject(new Error("Aircraft model loading timed out after 120 seconds.")); return; }
+          setTimeout(check, 25);
+        };
+        check();
+      });
+    }
     let state: FlightState | null = null;
     if (resumeFlight && terrain) {
       try {
@@ -2931,6 +3162,7 @@ export async function createFlightSimApp(
       ...spawn, altMeters: engineTest ? terrain.groundHeightMeters : terrain.altitudeMeters,
     }, terrain.groundHeightMeters);
     if (!state) throw new Error("Missing initial engine or flight state.");
+    if (session.resume) applyWeather(weather);
     followControlLaw();
     // RunIC/saved restoration may restore the native scheduler flag. The
     // persisted assist request owns it, while feedback remains observational.
@@ -3005,7 +3237,7 @@ export async function createFlightSimApp(
     return app;
   } catch (error) {
     preserveLoadingScreen = true;
-    app.destroy();
+    app.destroy(Boolean(session.runtime));
     loading.fail("Flight could not start safely. Check your connection and map access, then retry.", { cause: error });
     throw error;
   }

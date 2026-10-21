@@ -2,7 +2,8 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createSettingsRegistry, getAppSettings, resetAppSettings, validateValue } from "foss-earth/settings";
+import { createSettingsRegistry, getAppSettings, resetAppSettings, SETTINGS_STORAGE_KEY, validateValue } from "foss-earth/settings";
+import { aircraftSelectionValues, readAircraftSelection } from "@0sfs/aircraft/aircraftSelectionSetting";
 import { FLIGHT_SECTION_TITLES, flightParameterDefaults, OSFS_PARAMETERS } from "./flightParameters";
 import { FLIGHT_PRESETS } from "./flightPresets";
 import { parameterSourceFile, registerFlightSettings } from "./registerFlightSettings";
@@ -13,6 +14,27 @@ afterEach(() => { vi.unstubAllGlobals(); resetAppSettings(); });
 const FOSS_EARTH_SECTIONS = new Set(["map/detail", "controls/orbit"]);
 
 describe("flight parameter catalogue", () => {
+  it("restores the complete aircraft choice after the page's settings are recreated", () => {
+    const saved = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => saved.get(key) ?? null,
+      setItem: (key: string, value: string) => { saved.set(key, value); },
+      removeItem: (key: string) => { saved.delete(key); },
+    });
+    const choice = { aircraftId: "cirrus-vision-jet-g2", generationId: "g2+", lodId: "hd" } as const;
+    const parameters = registerFlightSettings(getAppSettings());
+    expect(parameters.setMany(aircraftSelectionValues(choice))).toEqual({ ok: true });
+
+    resetAppSettings();
+    // Diagnostics initialize Earth's registry before the flight registers its
+    // catalogue. Neither that step nor a storage refresh may delete osfs.*.
+    const rebooted = getAppSettings();
+    rebooted.reload();
+    const restored = registerFlightSettings(rebooted);
+    expect(readAircraftSelection(restored)).toEqual(choice);
+    expect(JSON.parse(saved.get(SETTINGS_STORAGE_KEY)!).values).toMatchObject(aircraftSelectionValues(choice));
+  });
+
   it("exposes bounded history metric and storage budgets independently of hidden capture", () => {
     const settings = createSettingsRegistry({ storage: null });
     settings.register(OSFS_PARAMETERS);
