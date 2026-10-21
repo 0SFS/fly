@@ -18,7 +18,7 @@ import {
   type AppDiagnostics,
 } from "foss-earth/diagnostics";
 import { createMeshInspector } from "foss-earth/diagnosticDrawing";
-import { createNativeSections, earthNativeCores } from "foss-earth/native";
+import { createNativeSections, earthNativeCores, earthComputeScheduling } from "foss-earth/native";
 import { describeAttitudeRendererStatus } from "./hud/attitudeRenderer";
 import { AIRCRAFT_FOCUS_POINT, registerFlightSettings } from "./settings/registerFlightSettings";
 import { flightParameterSpec, type FlightParameterStore } from "./settings/flightParameters";
@@ -2202,6 +2202,7 @@ export async function createFlightSimApp(
   const presetsSection = createPresetsSection(settings);
   const savedSettingsSection = createSavedSettingsSection(settings);
   diagnostics.addState(() => `Component execution: ${JSON.stringify(earthNativeCores(runtime) ?? [])}`);
+  diagnostics.addState(() => `Compute scheduling: ${JSON.stringify(earthComputeScheduling(runtime))}`);
   diagnostics.addState(() => `Isolation: ${describeIsolation(window)}`);
   diagnostics.addState(() => `Aircraft: ${aircraftId}; generation ${aircraftGenerationId ?? "default"}; LOD ${aircraftLodId}; model ${modelState.status}; active LOD ${modelState.activeLodId ?? "none"}; ${modelState.triangles} triangles.`);
   diagnostics.addState(() => `Flight: ${worldLoading ? "loading" : inputManager.isPaused() ? "paused" : "running"}; view ${aircraft?.getViewMode() ?? "third"}; physics fault ${physicsLoop.getFault() ?? "none"}.`);
@@ -2239,6 +2240,7 @@ export async function createFlightSimApp(
       return handle.element;
     },
     report: () => earthNativeCores(runtime) ?? [],
+    computeReport: () => earthComputeScheduling(runtime),
     timers: { set: (callback, delayMs) => window.setTimeout(callback, delayMs), clear: handle => window.clearTimeout(handle as number) },
   });
   const settingsSections: PanelSection[] = [
