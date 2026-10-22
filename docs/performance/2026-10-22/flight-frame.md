@@ -15,7 +15,7 @@ the pinning config, A/B runner and comparison script kept under `fly/build/osfs-
 
 The two clean `resq` runs put `prepareFrame` and Babylon's render together at
 254–261 ms/s at 1× and 719–726 ms/s at 4×. This is the pinned C172 measurement arm,
-which includes the uncommitted landing-light and ring experiments below; it is not a measurement
+which includes the landing-light and held ring experiments below; it is not a measurement
 of committed HEAD alone. The third `resq` run overlapped a Node benchmark and is excluded here.
 
 | Work | ms/s at 1× | ms/s at 4× |
@@ -225,7 +225,7 @@ property is added. The change is aircraft `c3bcf8f`. Its test checks four things
 scalar readers give the same state. Scalar reads happen only for absent paths. A property that
 appears later is read. After the SDK disposes the batch on a model change, a new batch is made.
 
-## Ready, not committed: the landing lights read only the gear position
+## Committed: the landing lights read only the gear position
 
 The aircraft lights ask whether the gear is down (`getGearDownNorm`) for each light mounted on it.
 They ask once for each of the light's intensity evaluations and once more when placing its beam on
@@ -237,10 +237,11 @@ time. The change is aircraft `ab43a16`.
 
 The flight's side is a two-line change in `src/flight/createFlightSimApp.ts`: import
 `readGearDownNorm`, and pass `getGearDownNorm: () => readGearDownNorm(jsbsim.sdk)` to the lights.
-**It is not committed.** That file also holds another agent's large uncommitted edit, and
-committing only my two lines was refused by the session's permission check, so I left it alone.
-The patch against `HEAD` is `build/osfs-night/patch/gear.patch`. The two lines are in the working
-tree now.
+The session's permission check initially refused committing just those lines because the file
+also held another agent's large uncommitted edit. The user then explicitly approved reviewing
+and committing the whole mixed file. That complete file is now committed on `main` as `b92eb7b`.
+The earlier isolated patch remains at `build/osfs-night/patch/gear.patch` against its original
+base; no hunk-only commit was retried.
 
 F-35B, 3 + 3 runs interleaved, `aircraftAnimation.ts` and `createAircraftLights.ts` together:
 
@@ -251,6 +252,42 @@ F-35B, 3 + 3 runs interleaved, `aircraftAnimation.ts` and `createAircraftLights.
 | Frames/s, 4× | 17.3–21.8 | 18.8–22.8 |
 
 The lights' own functions shrink as well because V8 had inlined the state read into them.
+
+### Whole-file integration review and remaining dependencies
+
+The gear measurements above isolate the two-line optimization. They are not a performance or
+pixel-identity claim for the other work included in `b92eb7b`. That integration also wires:
+
+- A selected physics rate through native initialization, the fixed-step loop, autopilot/trim,
+  wheel cues, recording and benchmark timing. The supporting settings default to 60 Hz instead
+  of the previous 120 Hz, offer 30 Hz, and retain 120 Hz as an explicit choice. Changes apply to
+  the next flight, not mid-flight.
+- Per-accepted-step pilot/G-force responses and corresponding control release, with the selected
+  response model fixed for the flight and live edits within it preserving pilot state.
+- Cockpit look, cockpit screen placement and VR session/UI integration; a chase-view screen
+  background default on qualifying fast computers; live window tint; binding reset controls;
+  and a test-feedback panel.
+
+The combined working tree passes lint, both flight typechecks, a normal Vite build, and 150 tests
+across the app, cockpit, pilot and physics suites. Two 30 Hz physics cases are expected failures:
+gear-rest stability and a short full-elevator pull. They explicitly record that 30 Hz is not
+validated; these checks do not establish broad aircraft/rate or headset validation.
+
+**This is an integration checkpoint with uncommitted dependencies.** Only the approved application
+source file was included in that commit. `cockpitLook.ts`, `cockpit/*`, `createFlightPilot.ts`,
+`physics/physicsRate.ts`, and modified runtime/settings/UI support remain in the working tree,
+along with sibling aircraft and FOSS Earth API work. A checkout of this commit alone is not
+build-complete until that support is committed. Those other files were preserved and not staged.
+
+The review also identified two VR follow-up decisions, not fixed or visually validated here:
+
+- Camera switches remain active during XR. Changing to third person can stop cockpit-screen
+  updates/interactions while headset placement still suppresses HUD copies. Lock the cockpit
+  view during XR or make HUD placement follow the screen's actual visibility, with an XR app
+  integration regression.
+- G-force blackout is drawn only in the DOM overlay, which headset mirroring excludes. An
+  unconscious pilot can lose controls while retaining headset visibility. Headset eye effects
+  or an explicit product policy are needed before claiming the same pilot presentation in VR.
 
 ## Shipped: residency sorts each demand once
 
@@ -557,7 +594,8 @@ motion/visibility boundaries and visual review needed before such a change.
 - The canvas-size read is where other DOM writers' pending restyles are paid. Caching it would
   delay resize handling by a frame; it was rejected. `Math.hypot` to `sqrt` was rejected because
   the results differ in their bits.
-- No further default or scheduling changes are included. The decisions above, the held ring
-  change and the mixed-file landing-light commit need review before they can become shipped
-  improvements. All four queued comparisons completed, and Chrome clone cleanup was run.
+- The measured optimizations introduce no default or scheduling changes. The subsequently
+  approved mixed-file integration checkpoint includes separate behavior changes and incomplete
+  dependencies, listed in its review above. The held ring change and performance decisions remain
+  pending. All four queued comparisons completed, and Chrome clone cleanup was run.
 
