@@ -1,0 +1,3712 @@
+{
+  "schema": 1,
+  "captured_utc": "2026-10-22T18:16:02.480845+00:00",
+  "purpose": "Local evidence identity index for the 2026-10-22 performance handoff; not an artifact backup.",
+  "limits": [
+    "File contents are not embedded. Raw files remain in ignored build directories and can be lost to cleanup.",
+    "No credentials, tile addresses, browser profiles, source maps or built bundles are embedded.",
+    "Repository status was captured before committing this documentation checkpoint.",
+    "Historical head/before fixtures do not mean current Git HEAD.",
+    "The pin config does not freeze dependencies, public assets, environment or current Vite configuration.",
+    "distq override JSON points at a live source path; freeze that file before a future reproduction."
+  ],
+  "known_exclusions": [
+    {
+      "label": "resq",
+      "arm": "osfs-resq",
+      "time": "2026-10-22_110058",
+      "reason": "Node benchmark overlap; exclude 1x pump result and frame-breakdown baseline."
+    },
+    {
+      "label": "ring",
+      "times": [
+        "2026-10-22_110211",
+        "2026-10-22_110331"
+      ],
+      "reason": "First pair overlaps known benchmark; report uses final two pairs."
+    }
+  ],
+  "index_repair": "distq.runs was repaired from profile directories after cleanup output polluted tail-based indexing; distq.runs.raw is retained.",
+  "repositories": [
+    {
+      "path": "/Users/felg/gh/0sfs/fly",
+      "head": "b0d1295fee58bd5fd0d3fa5e7d88756fd2d89277",
+      "branch": "main",
+      "status_at_capture": [
+        " M README.md",
+        " M docs/benchmark-routes.md",
+        " M docs/bug-reporting.md",
+        " M docs/development.md",
+        " M docs/foss-earth-relationship.md",
+        " M docs/jsbsim.md",
+        " M docs/performance/2026-10-22/flight-frame.md",
+        " M docs/proposals/flight-settings.md",
+        " M scripts/dev-lan.mjs",
+        " M scripts/validation/ci/jsbsim-fixture.probe.ts",
+        " M src/flight/aircraft/createAircraftModel.test.ts",
+        " M src/flight/aircraft/createPlaceholderAircraft.test.ts",
+        " M src/flight/aircraft/fleet.ts",
+        " M src/flight/audio/f135ExhaustOnsetHarness.ts",
+        " M src/flight/audio/f35bAudio.integration.test.ts",
+        " M src/flight/audio/jsbsimAudioAdapter.integration.test.ts",
+        " M src/flight/audio/simulationResetAudio.integration.test.ts",
+        " M src/flight/benchmarkRoutes.integration.test.ts",
+        " M src/flight/benchmarkRoutes.test.ts",
+        " M src/flight/benchmarkRoutes.ts",
+        " M src/flight/createFlightSimApp.autopilot.test.ts",
+        " M src/flight/createFlightSimApp.ground.test.ts",
+        " M src/flight/createFlightSimApp.phone.test.ts",
+        " M src/flight/createFlightSimApp.test.ts",
+        " M src/flight/diagnostics/aircraftForces.integration.test.ts",
+        " M src/flight/engineTestStand.integration.test.ts",
+        " M src/flight/hud/FlightControlPanel.tsx",
+        " M src/flight/hud/attitudeRenderer.ts",
+        " M src/flight/hud/createFlightHudBar.ts",
+        " M src/flight/hud/engineMonitorModel.integration.test.ts",
+        " M src/flight/jsbsim/bootstrapC172.test.ts",
+        " M src/flight/jsbsim/bootstrapC172.ts",
+        " M src/flight/jsbsim/c172Propulsion.integration.test.ts",
+        " M src/flight/jsbsim/c172Roll.integration.test.ts",
+        " M src/flight/jsbsim/c172Yaw.integration.test.ts",
+        " M src/flight/jsbsim/createJsbsimRuntime.test.ts",
+        " M src/flight/jsbsim/createJsbsimRuntime.ts",
+        " M src/flight/jsbsim/engineControl.integration.test.ts",
+        " M src/flight/jsbsim/enginePlantSettings.integration.test.ts",
+        " M src/flight/jsbsim/f35b.integration.test.ts",
+        " M src/flight/jsbsim/f35b.powered-lift.integration.test.ts",
+        " M src/flight/jsbsim/f35bEngineModels.integration.test.ts",
+        " M src/flight/jsbsim/f35bYaw.integration.test.ts",
+        " M src/flight/jsbsim/fuelTanks.integration.test.ts",
+        " M src/flight/jsbsim/savedFlight.integration.test.ts",
+        " M src/flight/jsbsim/sf50.integration.test.ts",
+        " M src/flight/physics/fixedStepLoop.test.ts",
+        " M src/flight/physics/fixedStepLoop.ts",
+        " M src/flight/physics/gForce.integration.test.ts",
+        " M src/flight/physics/groundLaunch.integration.test.ts",
+        " M src/flight/physics/refinement.integration.test.ts",
+        " M src/flight/physics/terrainContact.test.ts",
+        " M src/flight/physics/wheelSpin.integration.test.ts",
+        " M src/flight/settings/flightParameters.test.ts",
+        " M src/flight/settings/flightParameters.ts",
+        " M src/flight/validation/sf50RolloutScenario.ts",
+        " M src/loading/createFlightLoadingScreen.test.ts",
+        " M src/loading/createFlightLoadingScreen.ts",
+        " M src/main.test.ts",
+        " M src/main.tsx",
+        " M src/styles/flight.css",
+        " M vite.config.ts",
+        "?? docs/development-ports.md",
+        "?? docs/performance/2026-10-21/README.md",
+        "?? docs/performance/2026-10-21/evidence-manifest.json",
+        "?? docs/performance/2026-10-21/evidence-summary.json",
+        "?? docs/performance/2026-10-21/exhaust-wasm-worker.md",
+        "?? docs/performance/2026-10-21/f35-model-lod.md",
+        "?? docs/performance/2026-10-21/retained-evidence.tar.gz",
+        "?? docs/performance/2026-10-21/session-handoff.md",
+        "?? docs/performance/2026-10-22/agent-prompts.md",
+        "?? docs/performance/2026-10-22/evidence-index.json",
+        "?? docs/performance/2026-10-22/session-handoff.md",
+        "?? docs/proposals/cockpit-screen.md",
+        "?? docs/proposals/g-vision-response-curves.md",
+        "?? src/flight/cockpit/",
+        "?? src/flight/cockpitLook.test.ts",
+        "?? src/flight/cockpitLook.ts",
+        "?? src/flight/createFlightPilot.test.ts",
+        "?? src/flight/createFlightPilot.ts",
+        "?? src/flight/hud/GResponsePreview.tsx",
+        "?? src/flight/hud/gResponsePreview.css",
+        "?? src/flight/physics/physicsRate.integration.test.ts",
+        "?? src/flight/physics/physicsRate.ts",
+        "?? src/loading/createLoadingReportViewer.test.ts",
+        "?? src/loading/createLoadingReportViewer.ts",
+        "?? src/loading/loadingDiagnostics.test.ts",
+        "?? src/loading/loadingDiagnostics.ts",
+        "?? src/loading/loadingReportViewer.css"
+      ]
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/aircraft",
+      "head": "ab43a16e2dea0cf18f253576964db753c74a8a5c",
+      "branch": "main",
+      "status_at_capture": [
+        " M src/AircraftSelectionPanel.tsx",
+        " M src/aircraftCatalog.ts",
+        " M src/createAircraftModel.ts",
+        " M src/createPlaceholderAircraft.ts",
+        " M src/settings.ts"
+      ]
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/engines",
+      "head": "89ba1132b1552c5d9e39cf2e748b034871e39300",
+      "branch": "main",
+      "status_at_capture": [
+        " M src/engineLiveData.ts",
+        " M src/engineSpoolRenderer.ts",
+        " M src/engineSummary.ts",
+        " M tests/engineMonitor.redesign.test.ts",
+        " M tests/engineSummary.test.ts"
+      ]
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/exhaust",
+      "head": "b4ba2c92df1079cb0c74d6bad37eeeb1a0e23656",
+      "branch": "main",
+      "status_at_capture": [
+        " M scripts/validation/f35b/check-exhaust-headless.mjs"
+      ]
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/engine",
+      "head": "b7a0bbb0734f4fb3e67eb200617a19bfd2a29990",
+      "branch": "main",
+      "status_at_capture": [
+        " M AGENTS.md",
+        "?? docs/agent-native.md"
+      ]
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/sky",
+      "head": "cb85cb00259cce02d3c5d2d69649aeade1db65e6",
+      "branch": "main",
+      "status_at_capture": [
+        " M AGENTS.md",
+        "?? docs/agent-native.md"
+      ]
+    }
+  ],
+  "runs": [
+    {
+      "label": "aoa",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-aoa-osfs-f2b/2026-10-22_110958",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "aoa",
+      "arm": "osfs-f3",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-aoa-osfs-f3/2026-10-22_111113",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f3",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "aoa",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-aoa-osfs-f2b/2026-10-22_111224",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "aoa",
+      "arm": "osfs-f3",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-aoa-osfs-f3/2026-10-22_111335",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f3",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "arrive",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-arrive-osfs-f2b/2026-10-22_095108",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1
+      ]
+    },
+    {
+      "label": "arrive",
+      "arm": "osfs-g1",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-arrive-osfs-g1/2026-10-22_095210",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-g1",
+      "cpu_rates_in_summary": [
+        1
+      ]
+    },
+    {
+      "label": "arrive",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-arrive-osfs-f2b/2026-10-22_095312",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1
+      ]
+    },
+    {
+      "label": "arrive",
+      "arm": "osfs-g1",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-arrive-osfs-g1/2026-10-22_095414",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-g1",
+      "cpu_rates_in_summary": [
+        1
+      ]
+    },
+    {
+      "label": "arrive",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-arrive-osfs-f2b/2026-10-22_095516",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1
+      ]
+    },
+    {
+      "label": "arrive",
+      "arm": "osfs-g1",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-arrive-osfs-g1/2026-10-22_095617",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-g1",
+      "cpu_rates_in_summary": [
+        1
+      ]
+    },
+    {
+      "label": "c11",
+      "arm": "osfs-base0r",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11-osfs-base0r/2026-10-21_235231",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-base0r",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "c11",
+      "arm": "osfs-c11",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11-osfs-c11/2026-10-21_235341",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-c11",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "c11",
+      "arm": "osfs-base0r",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11-osfs-base0r/2026-10-21_235451",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-base0r",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "c11",
+      "arm": "osfs-c11",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11-osfs-c11/2026-10-21_235603",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-c11",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "c11",
+      "arm": "osfs-base0r",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11-osfs-base0r/2026-10-21_235713",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-base0r",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "c11",
+      "arm": "osfs-c11",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11-osfs-c11/2026-10-21_235823",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-c11",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "c11m",
+      "arm": "osfs-base0r",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11m-osfs-base0r/2026-10-22_111445",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-base0r",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "c11m",
+      "arm": "osfs-c11+q",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11m-osfs-c11+q/2026-10-22_111554",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-c11",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "c11m",
+      "arm": "osfs-base0r",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11m-osfs-base0r/2026-10-22_111706",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-base0r",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "c11m",
+      "arm": "osfs-c11+q",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11m-osfs-c11+q/2026-10-22_111816",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-c11",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "c11m",
+      "arm": "osfs-base0r",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11m-osfs-base0r/2026-10-22_111926",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-base0r",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "c11m",
+      "arm": "osfs-c11+q",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11m-osfs-c11+q/2026-10-22_112037",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-c11",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "depth",
+      "arm": "osfs-gas",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-gas/2026-10-22_101824",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-gas",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "depth",
+      "arm": "osfs-depth",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-depth/2026-10-22_101941",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-depth",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "depth",
+      "arm": "osfs-gas",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-gas/2026-10-22_102100",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-gas",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "depth",
+      "arm": "osfs-depth",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-depth/2026-10-22_102218",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-depth",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "depth",
+      "arm": "osfs-gas",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-gas/2026-10-22_102337",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-gas",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "depth",
+      "arm": "osfs-depth",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-depth/2026-10-22_102927",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-depth",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "depth",
+      "arm": "osfs-gas",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-gas/2026-10-22_103045",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-gas",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "distq",
+      "arm": "osfs-resq",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-distq-osfs-resq/2026-10-22_115411",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-resq",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "distq",
+      "arm": "osfs-distq",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-distq-osfs-distq/2026-10-22_115521",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-distq",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "distq",
+      "arm": "osfs-resq",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-distq-osfs-resq/2026-10-22_115630",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-resq",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "distq",
+      "arm": "osfs-distq",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-distq-osfs-distq/2026-10-22_115740",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-distq",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "f2",
+      "arm": "osfs-base0r",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2-osfs-base0r/2026-10-21_234220",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-base0r",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "f2",
+      "arm": "osfs-f2",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2-osfs-f2/2026-10-21_234332",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "f2",
+      "arm": "osfs-base0r",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2-osfs-base0r/2026-10-21_234444",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-base0r",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "f2",
+      "arm": "osfs-f2",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2-osfs-f2/2026-10-21_234555",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "f2b",
+      "arm": "osfs-base0r",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2b-osfs-base0r/2026-10-21_234744",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-base0r",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "f2b",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2b-osfs-f2b/2026-10-21_234856",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "f2b",
+      "arm": "osfs-base0r",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2b-osfs-base0r/2026-10-21_235009",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-base0r",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "f2b",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2b-osfs-f2b/2026-10-21_235120",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "f2bn",
+      "arm": "osfs-base0r",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2bn-osfs-base0r/2026-10-21_235933",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-base0r",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "f2bn",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2bn-osfs-f2b/2026-10-22_000044",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "f2bn",
+      "arm": "osfs-base0r",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2bn-osfs-base0r/2026-10-22_000154",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-base0r",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "f2bn",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2bn-osfs-f2b/2026-10-22_000304",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "f2bn",
+      "arm": "osfs-base0r",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2bn-osfs-base0r/2026-10-22_000415",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-base0r",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "f2bn",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2bn-osfs-f2b/2026-10-22_000525",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "f35",
+      "arm": "osfs-base0r",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f35-osfs-base0r/2026-10-22_001408",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-base0r",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "f35",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f35-osfs-f2b/2026-10-22_001526",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "g1c",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1c-osfs-f2b/2026-10-22_094346",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "g1c",
+      "arm": "osfs-g1",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1c-osfs-g1/2026-10-22_094455",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-g1",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "g1c",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1c-osfs-f2b/2026-10-22_094604",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "g1c",
+      "arm": "osfs-g1",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1c-osfs-g1/2026-10-22_094715",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-g1",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "g1f35",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-f2b/2026-10-22_092135",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "g1f35",
+      "arm": "osfs-g1",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-g1/2026-10-22_093214",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-g1",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "g1f35",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-f2b/2026-10-22_093820",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "g1f35",
+      "arm": "osfs-g1",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-g1/2026-10-22_093935",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-g1",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "g1f35",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-f2b/2026-10-22_094050",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "g1f35",
+      "arm": "osfs-g1",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-g1/2026-10-22_094207",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-g1",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "g1f35x",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-f2b/2026-10-22_093820",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "g1f35x",
+      "arm": "osfs-g1",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-g1/2026-10-22_093935",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-g1",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "g1f35x",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-f2b/2026-10-22_094050",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "g1f35x",
+      "arm": "osfs-g1",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-g1/2026-10-22_094207",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-g1",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "gas",
+      "arm": "osfs-g1",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gas-osfs-g1/2026-10-22_100125",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-g1",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "gas",
+      "arm": "osfs-gas",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gas-osfs-gas/2026-10-22_100242",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-gas",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "gas",
+      "arm": "osfs-g1",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gas-osfs-g1/2026-10-22_100419",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-g1",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "gas",
+      "arm": "osfs-gas",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gas-osfs-gas/2026-10-22_100537",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-gas",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "gas",
+      "arm": "osfs-g1",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gas-osfs-g1/2026-10-22_100653",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-g1",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "gas",
+      "arm": "osfs-gas",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gas-osfs-gas/2026-10-22_100810",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-gas",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "gear",
+      "arm": "osfs-surface",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gear-osfs-surface/2026-10-22_104703",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-surface",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "gear",
+      "arm": "osfs-gear",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gear-osfs-gear/2026-10-22_104820",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-gear",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "gear",
+      "arm": "osfs-surface",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gear-osfs-surface/2026-10-22_104947",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-surface",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "gear",
+      "arm": "osfs-gear",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gear-osfs-gear/2026-10-22_105106",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-gear",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "gear",
+      "arm": "osfs-surface",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gear-osfs-surface/2026-10-22_105223",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-surface",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "gear",
+      "arm": "osfs-gear",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gear-osfs-gear/2026-10-22_105340",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-gear",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "ginst",
+      "arm": "osfs-ginst",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ginst-osfs-ginst/2026-10-22_094853",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-ginst",
+      "cpu_rates_in_summary": [
+        1
+      ]
+    },
+    {
+      "label": "ginst",
+      "arm": "osfs-ginst",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ginst-osfs-ginst/2026-10-22_095000",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-ginst",
+      "cpu_rates_in_summary": [
+        1
+      ]
+    },
+    {
+      "label": "ginst2",
+      "arm": "osfs-ginst2",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ginst2-osfs-ginst2/2026-10-22_095910",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-ginst2",
+      "cpu_rates_in_summary": [
+        1
+      ]
+    },
+    {
+      "label": "ginst2",
+      "arm": "osfs-ginst2",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ginst2-osfs-ginst2/2026-10-22_100017",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-ginst2",
+      "cpu_rates_in_summary": [
+        1
+      ]
+    },
+    {
+      "label": "nimg",
+      "arm": "osfs-ring",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-nimg-osfs-ring/2026-10-22_112147",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-ring",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "nimg",
+      "arm": "osfs-ring+q",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-nimg-osfs-ring+q/2026-10-22_112259",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-ring",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "nimg",
+      "arm": "osfs-ring",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-nimg-osfs-ring/2026-10-22_112408",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-ring",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "nimg",
+      "arm": "osfs-ring+q",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-nimg-osfs-ring+q/2026-10-22_112520",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-ring",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "phone",
+      "arm": "osfs-base0r",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-phone-phone-osfs-base0r/2026-10-22_000931",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-base0r",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "phone",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-phone-phone-osfs-f2b/2026-10-22_001039",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "phone",
+      "arm": "osfs-base0r",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-phone-phone-osfs-base0r/2026-10-22_001148",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-base0r",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "phone",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-phone-phone-osfs-f2b/2026-10-22_001258",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "probe",
+      "arm": "osfs-probe",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-probe-osfs-probe/2026-10-22_103951",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-probe",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "probe",
+      "arm": "osfs-probe+q",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-probe-osfs-probe+q/2026-10-22_104100",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-probe",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "resq",
+      "arm": "osfs-ring",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-resq-osfs-ring/2026-10-22_105459",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-ring",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "resq",
+      "arm": "osfs-resq",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-resq-osfs-resq/2026-10-22_105611",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-resq",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "resq",
+      "arm": "osfs-ring",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-resq-osfs-ring/2026-10-22_105722",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-ring",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "resq",
+      "arm": "osfs-resq",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-resq-osfs-resq/2026-10-22_105834",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-resq",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "resq",
+      "arm": "osfs-ring",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-resq-osfs-ring/2026-10-22_105946",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-ring",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "resq",
+      "arm": "osfs-resq",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-resq-osfs-resq/2026-10-22_110058",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-resq",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "ring",
+      "arm": "osfs-gear",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ring-osfs-gear/2026-10-22_110211",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-gear",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "ring",
+      "arm": "osfs-ring",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ring-osfs-ring/2026-10-22_110331",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-ring",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "ring",
+      "arm": "osfs-gear",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ring-osfs-gear/2026-10-22_110448",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-gear",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "ring",
+      "arm": "osfs-ring",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ring-osfs-ring/2026-10-22_110607",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-ring",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "ring",
+      "arm": "osfs-gear",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ring-osfs-gear/2026-10-22_110726",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-gear",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "ring",
+      "arm": "osfs-ring",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ring-osfs-ring/2026-10-22_110842",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-ring",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "spin",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-spin-osfs-f2b/2026-10-22_001643",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "spin",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-spin-osfs-f2b/2026-10-22_001754",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "spin",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-spin-osfs-f2b/2026-10-22_002123",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "spin",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-spin-osfs-f2b/2026-10-22_002234",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "still",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-still-osfs-f2b/2026-10-22_001903",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "still",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-still-osfs-f2b/2026-10-22_002013",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "still",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-still-osfs-f2b/2026-10-22_002344",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "still",
+      "arm": "osfs-f2b",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-still-osfs-f2b/2026-10-22_002454",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-f2b",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "surface",
+      "arm": "osfs-depth",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surface-osfs-depth/2026-10-22_103203",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-depth",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "surface",
+      "arm": "osfs-surface",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surface-osfs-surface/2026-10-22_103321",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-surface",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "surface",
+      "arm": "osfs-depth",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surface-osfs-depth/2026-10-22_103437",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-depth",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "surface",
+      "arm": "osfs-surface",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surface-osfs-surface/2026-10-22_103555",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-surface",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "surface",
+      "arm": "osfs-depth",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surface-osfs-depth/2026-10-22_103713",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-depth",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "surface",
+      "arm": "osfs-surface",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surface-osfs-surface/2026-10-22_103832",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-surface",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "surfc",
+      "arm": "osfs-depth",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surfc-osfs-depth/2026-10-22_104219",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-depth",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "surfc",
+      "arm": "osfs-surface",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surfc-osfs-surface/2026-10-22_104330",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-surface",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "surfc",
+      "arm": "osfs-depth",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surfc-osfs-depth/2026-10-22_104441",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-depth",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "surfc",
+      "arm": "osfs-surface",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surfc-osfs-surface/2026-10-22_104552",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-surface",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "/Users/felg/gh/0sfs/engines/build/ring-check/results.json",
+      "bytes": 19800,
+      "sha256": "bf333ffcb2db382ae98d5d5fb3c95b953d0480b6b17a12baf34758588186e1f5"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/engines/build/ring-check.mjs",
+      "bytes": 3716,
+      "sha256": "ed99e3674d54ad0c0eaa20f2bbcfe90847ded900d55a435d262ff298fa531340"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/ab-clean.sh",
+      "bytes": 1207,
+      "sha256": "46e78245ba2d679ece28acc7916bada5ab780393ae7835a6a778a7f03fd24d6f"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/ab.sh",
+      "bytes": 1115,
+      "sha256": "bc88dd344325a07fbb6e3632b08e4da944a1ab59e5e4dbee5461520febdb727c"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/aoa.runs",
+      "bytes": 468,
+      "sha256": "22ebc85a20262f7828e3e44dd558de2396e4bf6f3f5c61587b7bd407bca6a19e"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/arms/aircraftAnimation.gear.ts",
+      "bytes": 43065,
+      "sha256": "d1921a00f95cdf96401e8a8f9ad10f558a60ca31c750f48cfccb7ba4c4a53f8e"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/arms/aircraftAnimation.surface.ts",
+      "bytes": 42871,
+      "sha256": "373d85290d5f4d3fc3c6e876101c64ba313e8470e964390425e17860c8d9021b"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/arms/createFlightSimApp.gear.ts",
+      "bytes": 175634,
+      "sha256": "be455bc4cdc2e578f5f5e3feef3b3f702b8c42274089096f513aa68c544f790b"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/arms/createGlobeRuntime.c11.ts",
+      "bytes": 122787,
+      "sha256": "5630bd652bab0742e1bc7a095b0ff102768a6ff6d12ea6843e64a6f8df1292ed"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/arms/createGlobeRuntime.snap.ts",
+      "bytes": 122817,
+      "sha256": "c72c0603237658f351fd9860c5b4ab07a51a407919858e3697d65731b730ff8f"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/arms/createGroundLightProbe.g1.ts",
+      "bytes": 9579,
+      "sha256": "68463ac85f83e97054ef076a10db113eb859ae107e6c4154aca3b33ed4f13683"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/arms/createImageryRuntime.probe.ts",
+      "bytes": 80506,
+      "sha256": "d3560dc04510875181b066ebd7d00bdceb0d68cd7d3398c04799a2dff2cc83d2"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/arms/createRasterTilesRuntime.snap.ts",
+      "bytes": 100763,
+      "sha256": "df66f7d3cb6857afcc98cf5528a35510a9ed363baa677fe21b3cf915641c739a"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/arms/engineExhaustDepth.depth.ts",
+      "bytes": 13440,
+      "sha256": "f53af07ff155672719bc686ee2946b462872afb76d53dc43e9c6522d9b19485f"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/arms/engineGasOptics.gas.ts",
+      "bytes": 46918,
+      "sha256": "f2636cd74bf574f841189793f75921725f2c6cad16280d5a0a9fa946f05595c0"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/arms/engineGasOptics.ginst.ts",
+      "bytes": 46774,
+      "sha256": "80ae8a5bfce6a92d2ec59996635c5de0cb787aa6a1b64fb4ddddf2aa6f6d0dbb"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/arms/engineGasSupport.ginst.ts",
+      "bytes": 16156,
+      "sha256": "1a386979a6f75a290d63712ac523c7ea3acef118815e3f8210a26d1617943c2f"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/arms/engineNozzleRig.ginst2.ts",
+      "bytes": 7908,
+      "sha256": "b21f7f535644ffa97f602b1056aefde914f5f16a11d4a3bb679d063260763486"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/arms/engineSummary.ring.ts",
+      "bytes": 15611,
+      "sha256": "d322dfb7833999bddc45b03fa84f39e4e5de113a6bfc379085d5900fd0402a58"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/arms/evaluationInstruments.f3.ts",
+      "bytes": 3216,
+      "sha256": "ec1d6042ec23fd7545ab494299d389c7814fa9df213b3d7906565b20248b0ff0"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/arms/flightHud.f2.ts",
+      "bytes": 32055,
+      "sha256": "f997eb1de196c57dbf7d2cc90f8afcc4dad1a1996a77b51045b303ad7d7e918b"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/arms/flightHud.f2b.ts",
+      "bytes": 32347,
+      "sha256": "ee764068df3792583f59203aa9a608654058eb4d4274b429bccb0552027850b3"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/arms/imageryResidency.resq.ts",
+      "bytes": 35179,
+      "sha256": "e34d0854d822f3a362d69f3aa6ca91b4adf7889a3320390541a3e1b399d17cff"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/arrive.mjs",
+      "bytes": 804,
+      "sha256": "159caf732c0edec2315e72b8611b9e8c95f0730affc240d7af0bfbb514289e84"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/arrive.runs",
+      "bytes": 720,
+      "sha256": "41f805dccc6977eefae3e3c51790eb4d2ac2b578eaf024b47999fdf3b1fbae9a"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/bench.vitest.config.ts",
+      "bytes": 407,
+      "sha256": "956df0ed2e2585a2dab9da1eaaf12234ce12f778a49bb7dc8e8704458deef58b"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/byfile.mjs",
+      "bytes": 1954,
+      "sha256": "4b4d48ec6daecc610874019fec2c22eb2b9008def14ed191b7ee1c05ed28266c"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/c11.json",
+      "bytes": 121,
+      "sha256": "6e3717f3fccaafb502c56b2667fef181bf3fca73609297cac89280535efbfc1d"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/c11.runs",
+      "bytes": 726,
+      "sha256": "39daa8aebf8b5aa85b7b9720db94f97f6b769045a6440c5c66bb5dd93c7a34d4"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/c11m.runs",
+      "bytes": 744,
+      "sha256": "eababea82ac7c1c750acb54e5abae6ba2cb884e4c13219bdc5e32be2602918c1"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/callers.mjs",
+      "bytes": 2621,
+      "sha256": "09fa1d696fc743b4a1b2b66ceb2d5829648714205b7ab9493053e0bcfdbb3a64"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/cascade.mjs",
+      "bytes": 2343,
+      "sha256": "2dfe0be8b24c8cf940452f225d9cbe526099427b6334734de6abeefb323d51be"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/cmp-distq.txt",
+      "bytes": 10602,
+      "sha256": "6815ff360621363924c028dbc627e45523d07011b0803b37066b352a0dc429a4"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/cmp.mjs",
+      "bytes": 2822,
+      "sha256": "ac9b1f483ba386551b410d3e4abedc6086e3969f4516d59a4473d88fdf5242a5"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/depth.bench.test.ts",
+      "bytes": 3099,
+      "sha256": "a2f483fafd2b15daf6614adc75f119e12f11d8eeec06a63ad801bb7f53d55136"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/depth.json",
+      "bytes": 427,
+      "sha256": "7cb875a0e2c7bcd22864fd2deaa5e781a059a1f00e1c6720493fe4def892717a"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/depth.runs",
+      "bytes": 852,
+      "sha256": "feae2e5f52f6a43fd33330f63b5df015483e43f7b0eb4cc1fed990b8f0b6a0f2"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/distq.json",
+      "bytes": 1010,
+      "sha256": "79486f20173bcb9e5b15fff7325570900cb22f03814f9b682c2c237fdd1ce062"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/distq.runs",
+      "bytes": 492,
+      "sha256": "da2fd99b8f59c46ccf9e948dedcba6d22168dcee7107dc009484104061f0dbaa"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/distq.runs.raw",
+      "bytes": 378,
+      "sha256": "54e681cc0cddd6158427e35340b0ba8a569342b3f702e961a0c8b56431f02731"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/engineSummary.head.ts",
+      "bytes": 15044,
+      "sha256": "893bffbb08a073987675360dc02b86219bdc8bd1767c81cf16ed30359f9888a2"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/engineSummary.new.ts",
+      "bytes": 15611,
+      "sha256": "d322dfb7833999bddc45b03fa84f39e4e5de113a6bfc379085d5900fd0402a58"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/f2.json",
+      "bytes": 96,
+      "sha256": "d977bf00d39d2e080455a8be8aba6de202b5fc2ffbd86dd54fc14ce9ac70b214"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/f2.runs",
+      "bytes": 476,
+      "sha256": "8421bdd0dca3ace6dc9e23f0062ae3ac803609f1129a83342be9eff2ab3c0c5a"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/f2b.json",
+      "bytes": 97,
+      "sha256": "052f919d309f9a909cdd0dea3b232d6b8982e3d0fe4ccce8c6eb41a98d48b53a"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/f2b.runs",
+      "bytes": 484,
+      "sha256": "e7b24609a567ad3aacdd71b1ae4ee6897b215d74b1f76fee611c649c2e9c450e"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/f2bn.runs",
+      "bytes": 732,
+      "sha256": "c8e77586c4ca82940580c825f77a55bc571e99ad28853fbdab7ec84bb344b373"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/f3.json",
+      "bytes": 215,
+      "sha256": "6c9fb1d8010f748d43558fc971fbab87ba4c096f0e6dbffb394515be4f80bf96"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/f35.runs",
+      "bytes": 242,
+      "sha256": "0a1a4024b1aa4161158cc33666fe219540912ec176ac82d0969498968f267f03"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/g1.json",
+      "bytes": 220,
+      "sha256": "3dbdaa4064035582c039c296b7714bb17d57c1d445c9971a9a919bbf4c3ccbf1"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/g1c.runs",
+      "bytes": 468,
+      "sha256": "0d1d8e914bd88b391527f45589ffaec2930ddf7478febecaf204f475db0648ed"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/g1f35.runs",
+      "bytes": 714,
+      "sha256": "29b1ac04a8c180032bc4567d1e59ffdfcb4ff6eae62918b793a3483ee984f571"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/g1f35x.runs",
+      "bytes": 476,
+      "sha256": "9245a5d0790a3d85927bdf2042b757769cf044ac07088b0d58495ba9924ddd13"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/gas-optics-benchmark.mjs",
+      "bytes": 4186,
+      "sha256": "13fd9f9ec2f728134d062c0f0277210e6683b9ab2fbb022f61b0a8ed7eeec66a"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/gas-optics-head.mjs",
+      "bytes": 4162,
+      "sha256": "99ae1871db0a8951df6734d26e63df8b4ef8d9f7970bb706e323dc35865a4fa5"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/gas-optics-report-head.json",
+      "bytes": 1749,
+      "sha256": "48a72eb2646278c08f8a4975febf1734b073f0f70a76071516844a4a6a1c8d92"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/gas-optics-report-rows.json",
+      "bytes": 1722,
+      "sha256": "70f17204aa55780099f660a36eaa1a5a2d0b028e5c2b3db1bc395c8caa1352d2"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/gas.bench.test.ts",
+      "bytes": 6523,
+      "sha256": "6b8043c411c56043589ca8067e914226bb9f769cd76e81f4114894b8a86bf0f2"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/gas.json",
+      "bytes": 319,
+      "sha256": "768264e8e91f6ceedf68c244003ef4ff2eace4b3b6ff4875e8a40df565086c5f"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/gas.runs",
+      "bytes": 702,
+      "sha256": "fb133fbded9ee422602f9901041fa5f36a11fb397de71d6bef6ad34edb20dc41"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/gear.json",
+      "bytes": 643,
+      "sha256": "29e8af3319fff726c2f89d1b598ba2177a7616676a290983a62a21852cb592a3"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/gear.runs",
+      "bytes": 744,
+      "sha256": "5d016c5f47713bc77400c8c651a5b060e7bca35f9d52065998b99c9b482bcec7"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/ginst.json",
+      "bytes": 303,
+      "sha256": "c086eccb18cf3d4e7ac71e09c367faf52097fe9ba48f1be591687a11d6c23af5"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/ginst.runs",
+      "bytes": 248,
+      "sha256": "a98aa51c451ef6a7b4db56f49e18c7f87c416f75b8a28da7f7c063bfe24f6829"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/ginst2.json",
+      "bytes": 405,
+      "sha256": "1b8407a9fa080fc240294503f76adaeb8b2aad5fad32753c67d3d9e918312b26"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/ginst2.runs",
+      "bytes": 254,
+      "sha256": "ea515c6a5653f1b60a1c6c84f7e173d2f8bc026023fdda7ede204ba46e215394"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/invsrc.mjs",
+      "bytes": 1606,
+      "sha256": "4b8de969a04ad64531e44d3c82aaa29ef319f08dc8adb5fccbaed14881aa1427"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/nimg.runs",
+      "bytes": 492,
+      "sha256": "46206cf7fb5b5fbcc2e7ac6def258c74fed982bae64f1335408ef3289c11dad7"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/no-overrides.json",
+      "bytes": 3,
+      "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/patch/gear.patch",
+      "bytes": 1314,
+      "sha256": "00f1d8d3fce2e6942166d72dc2c82625145f43354596a3b62a4485053e11b4ba"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/phone.runs",
+      "bytes": 516,
+      "sha256": "a5b0a8561d33384cbec04cc3d159306c4c086181e31bc309e4d574177b498306"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/pin-arm.config.ts",
+      "bytes": 2923,
+      "sha256": "2cf3e4c8828197078a9b79d1c67840a4fb4147df6d8a26c0d5fe9c719d146bfc"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/probe.json",
+      "bytes": 776,
+      "sha256": "9645e7125382eb7b77eaef05a6bdd07677d025ea62269548100028b622c4b884"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/probe.runs",
+      "bytes": 252,
+      "sha256": "1ac7e52b44c55f1f862daf3d50119516c0d65c1a551e7cb4755d2cd193d6629f"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/queue.log",
+      "bytes": 5081,
+      "sha256": "81b35f7f1417a8e0fb74cea859aa7995a26779e6388b10e4afba18993620a281"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/queue.sh",
+      "bytes": 366,
+      "sha256": "529f623c4a2ee3b19e204e0c610d4647c61da6e52256c06de1d9f565affb3fbd"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/queue.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/resq.json",
+      "bytes": 864,
+      "sha256": "70da0b85b709d98b71383ad0c3080a26ba2cfd981a5183c39a40dcf832fdbcb4"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/resq.runs",
+      "bytes": 726,
+      "sha256": "f54f1195065800ffe76575277f20794541749402816d8e421f92760c19d89c18"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/review-whole-app.build.log",
+      "bytes": 26311,
+      "sha256": "fcf3bd2da0a42e09c86381f3898895269b67c05b93f0d62e48fd1c879f4607ed"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/review-whole-app.tests.log",
+      "bytes": 20057,
+      "sha256": "aaa6c570f5239ecbcbef091f6f24ce7c7568288186969d42b1f27104d7c60018"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/ring.json",
+      "bytes": 740,
+      "sha256": "59a3eed5cea4d4f2a2c317720e07149c5a70e250c44a31ff62e6bfcb44406435"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/ring.runs",
+      "bytes": 726,
+      "sha256": "fa7f91b119d4c539e4e10257f1d68150897efdf92c3b4913ef616446b4806870"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/snap-0.json",
+      "bytes": 8254940,
+      "sha256": "790bcddbe31bed500bf98b352211f05a005c5cd17ba3e579d8a9a95328d96d28"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/spin.runs",
+      "bytes": 476,
+      "sha256": "4a8291f144decba3dab9f77f96cfd9276b2b5000ff8fdebe0caab33de754154e"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/stackof.mjs",
+      "bytes": 2340,
+      "sha256": "5372ec59b94dd9f0f772e6f77dc495ffa9182ca797c6aee7e1a727f8fc7984bf"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/still.runs",
+      "bytes": 480,
+      "sha256": "c7b1512c297c3a9e5bb33f7d64f9ca4ed7d8a1dc10aeb6fea217d0dc8f467408"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/surface.bench.test.ts",
+      "bytes": 3776,
+      "sha256": "d1412da04dfe0e20b2eec3d81b5a661c7194b252cfc6460337128d2fe7620310"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/surface.json",
+      "bytes": 536,
+      "sha256": "d148a83c467ff46942ad5633fca635887fcedeb580efd83e352eb25985b7c52b"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/surface.runs",
+      "bytes": 768,
+      "sha256": "072614d6ff32d16a4b535e4767c5d28864b46ea20295191f407ed1897b649ded"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/surfc.runs",
+      "bytes": 504,
+      "sha256": "aa2aacc7ca8ae41b1f9316f2ef04e18e57e0efcfa4ec271514e83620a5b255a1"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/under.mjs",
+      "bytes": 2268,
+      "sha256": "d720a562da119d08fe8f8f24fccbe21b0360e499c030de6e29336a8d11d411f9"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/when.mjs",
+      "bytes": 1382,
+      "sha256": "ecad74c4cf0c279fcb03be55a3dd8958387b77ef13c4fe29c3f9669ada47f36b"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/whenfn.mjs",
+      "bytes": 1835,
+      "sha256": "5c8ce44d84bf9a12d05ca379560a7f68cbd43d5113995730ea66c86a3a1a36b2"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/engine/build/distq/distribution.test.ts",
+      "bytes": 2858,
+      "sha256": "b8b20659dc3bb994f26d0f8d094edfe2cf74a08c7e2ce0ba6e615955ce4b4ccc"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/engine/build/distq/imageryBinding.before.ts",
+      "bytes": 20844,
+      "sha256": "4720658a8ddd4acf65b7d6446b8b3d91763fdd00a5606423734b7b381632248b"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/engine/build/distq/imageryBinding.head.ts",
+      "bytes": 20892,
+      "sha256": "34ae9521842b73554b1676ba90a2a5b62e40b6463c726d5a415c4e90b3a6b806"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/engine/build/distq/vitest.config.ts",
+      "bytes": 138,
+      "sha256": "ebc89e988dfefc3367fc23ebe63756a2019f7d2ca7ebe61407c7c47a030a953c"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/engine/build/evq/head/src/terrain/imagery/imagerySelector.ts",
+      "bytes": 66413,
+      "sha256": "22a21a63439f1a9784d546c03f9190215f4d64962bbc6c4e51d74a0e0926a363"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/engine/build/evq/imagerySelector.before.ts",
+      "bytes": 66413,
+      "sha256": "22a21a63439f1a9784d546c03f9190215f4d64962bbc6c4e51d74a0e0926a363"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/engine/build/evq/selection.test.ts",
+      "bytes": 1059,
+      "sha256": "8b887711376bf5beea900e6c32300d3985a97ac1efc5cf70a50051617fe7131e"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/engine/build/evq/shared.ts",
+      "bytes": 3220,
+      "sha256": "07bf7e8757b3009e75a769c3f4b7bc58c20dda11dd02bdd282f71e50cb7ae15f"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/engine/build/evq/vitest.config.ts",
+      "bytes": 194,
+      "sha256": "5fb4392d9f2814463b1f2d1d23e3379ae642b9eb4f59b4931bf8a8bd8ddb15c4"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/engine/build/resq/imageryResidency.head.ts",
+      "bytes": 34125,
+      "sha256": "10402bbda262408156b4b0ff45e0ad56793aa9b8188e22e074c2527ff91d9a8d"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/engine/build/resq/mut1.ts",
+      "bytes": 35155,
+      "sha256": "e9484fa79878d4028aeca58a51f683950b16478f45a9a9b42c3383955ba2642b"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/engine/build/resq/mut2.ts",
+      "bytes": 35162,
+      "sha256": "11a69f145760dd9fa7fcb624b8dcf4dc13b3f050fbd6676174d21d4e7fa4cea5"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/engine/build/resq/mut3.ts",
+      "bytes": 35186,
+      "sha256": "cf2ecc45beb7ec6d1dbbcccbdb04eb16ad1dda034bf56717d072475a2bd46bee"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/engine/build/resq/residency.diff.test.ts",
+      "bytes": 5583,
+      "sha256": "d5423afe97551f47ab6a97c1a287e701aa6fcc625def019430e403a1913836ba"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/engine/build/resq/vitest.config.ts",
+      "bytes": 145,
+      "sha256": "0753a887034fbb765fa0882dce2d29bc74bba8e1b844e404456ef62b9b13f7c4"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-aoa-osfs-f2b/2026-10-22_110958/fly-still-1x.cpuprofile",
+      "bytes": 889207,
+      "sha256": "40a9414b8f9d6d2cee60f082c7f96be1236661795d3ea767785e6e3c0bd1294a"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-aoa-osfs-f2b/2026-10-22_110958/fly-still-4x.cpuprofile",
+      "bytes": 947330,
+      "sha256": "e0a1711738853d625385caebaf0b8e535a4745e7e4bad0a869ca56d911593631"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-aoa-osfs-f2b/2026-10-22_110958/summary.md",
+      "bytes": 23687,
+      "sha256": "0f2750a4dbf48cf2ec1e086b22f5d5e357554fc159b42f983adde600203dca7b"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-aoa-osfs-f2b/2026-10-22_111224/fly-still-1x.cpuprofile",
+      "bytes": 925992,
+      "sha256": "ae51d589c48fa4e51360ae60ebcefeb83e41220185d0745f434d4498c131dd87"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-aoa-osfs-f2b/2026-10-22_111224/fly-still-4x.cpuprofile",
+      "bytes": 950963,
+      "sha256": "1f579dd7fbece1e564e9433d2f6cb1ffb2aa9f60205c88f0bc64fc14e846239b"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-aoa-osfs-f2b/2026-10-22_111224/summary.md",
+      "bytes": 23561,
+      "sha256": "ef081d196ecaf51d572551c5ee793e8b223e899b4fdf721872f9c646ca6396cb"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-aoa-osfs-f3/2026-10-22_111113/fly-still-1x.cpuprofile",
+      "bytes": 950336,
+      "sha256": "1a7b3324be7874688eeb52e861d6b91fcf3a5b9baeb4b64eed586611369a2f58"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-aoa-osfs-f3/2026-10-22_111113/fly-still-4x.cpuprofile",
+      "bytes": 932537,
+      "sha256": "5f4adda771de7219397369bb854049a32185ef4367b3571a6fc763bfa77aa8d1"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-aoa-osfs-f3/2026-10-22_111113/summary.md",
+      "bytes": 23370,
+      "sha256": "f4ec118ebb4947cda7af0dfda28490433b80f1e918aa6631f38ebd19d457c236"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-aoa-osfs-f3/2026-10-22_111335/fly-still-1x.cpuprofile",
+      "bytes": 901315,
+      "sha256": "1355e40035fa3d1cad0365fa5bf933443c7b1acbdea0ccad6268c26878ec628b"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-aoa-osfs-f3/2026-10-22_111335/fly-still-4x.cpuprofile",
+      "bytes": 911275,
+      "sha256": "2b6fb557e51352837c60731630095a88f8598e167b149134ded32b4f0de29f41"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-aoa-osfs-f3/2026-10-22_111335/summary.md",
+      "bytes": 23429,
+      "sha256": "d4c11a08e5b260bd87b803ea017b706d0af97518bc3714722dffe1d94d3e2020"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-arrive-osfs-f2b/2026-10-22_095108/fly-still-1x.cpuprofile",
+      "bytes": 675371,
+      "sha256": "43200ebcd8eac2865583b0a04e5a9682e9dc38b7aef3891b1149cdfc3497a67c"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-arrive-osfs-f2b/2026-10-22_095108/summary.md",
+      "bytes": 12668,
+      "sha256": "21a57db7dd2a127f7b4f84670076b33ec88472b8c77333ab90452a77414679e6"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-arrive-osfs-f2b/2026-10-22_095312/fly-still-1x.cpuprofile",
+      "bytes": 815433,
+      "sha256": "52ecdaabe67da3cd0c8ad40e424162318a66698916b31ba5ad13239615d58cb9"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-arrive-osfs-f2b/2026-10-22_095312/summary.md",
+      "bytes": 12854,
+      "sha256": "9c619bc5cae745643ec7a0eed85428e5f5dbf06b8e7b85671f3981d54a442f16"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-arrive-osfs-f2b/2026-10-22_095516/fly-still-1x.cpuprofile",
+      "bytes": 400753,
+      "sha256": "70e4dcd3b51a5248f88844ef990679739b48153d1f83ada830b4c47522524f00"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-arrive-osfs-f2b/2026-10-22_095516/summary.md",
+      "bytes": 12681,
+      "sha256": "b70d8f31f52616e8ed8cd8fe0ad7023e9ca52c6a1c4fbaf6f2922af00f1ad26d"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-arrive-osfs-g1/2026-10-22_095210/fly-still-1x.cpuprofile",
+      "bytes": 617097,
+      "sha256": "21a8655c51e9dd94218993c220fa2b2852d008d35b43cffe3441d4540f979e9d"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-arrive-osfs-g1/2026-10-22_095210/summary.md",
+      "bytes": 12830,
+      "sha256": "0d19418bcad2ad12dbd6c008eb1af3d181a76eff590fd3792d027d9fe2d7dfd9"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-arrive-osfs-g1/2026-10-22_095414/fly-still-1x.cpuprofile",
+      "bytes": 901964,
+      "sha256": "be61aa1bd652514855664a3f6552968b0dd5e5f995dc30fdac57eed4c45bf1fb"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-arrive-osfs-g1/2026-10-22_095414/summary.md",
+      "bytes": 12782,
+      "sha256": "5c9ff09fc57ec225b73a66d67d9d79f97722f3d8be5ee2f351d5676f6057f9d9"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-arrive-osfs-g1/2026-10-22_095617/fly-still-1x.cpuprofile",
+      "bytes": 386078,
+      "sha256": "2af01f8e8d07239cb2f6d52dd521e112db951af2e6e7927f8d718e0fa455c166"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-arrive-osfs-g1/2026-10-22_095617/summary.md",
+      "bytes": 12758,
+      "sha256": "1be4b139d5fb042a4ba55d8259624edbcb11acf422c034c45d4510024d8ab0a9"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11-osfs-base0r/2026-10-21_235231/fly-still-1x.cpuprofile",
+      "bytes": 824814,
+      "sha256": "773d9bfa73ea0d56d95e8a02782df89ac021dcaabb665a13e6e7910ff4819443"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11-osfs-base0r/2026-10-21_235231/fly-still-4x.cpuprofile",
+      "bytes": 855809,
+      "sha256": "c331c6141c86d3ffb2ac590375563d314f9ed0b4f789dc5e1dbf3a099b2f4bbc"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11-osfs-base0r/2026-10-21_235231/summary.md",
+      "bytes": 23361,
+      "sha256": "241f3420694d5dc1072ad1bc0004ad5069311690ac14ec465dbc8c4c07fc582b"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11-osfs-base0r/2026-10-21_235451/fly-still-1x.cpuprofile",
+      "bytes": 814688,
+      "sha256": "6e577530278eeaa5be83d4f2ed21b1bfcdaed710a9c697149180da1d20410d4a"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11-osfs-base0r/2026-10-21_235451/fly-still-4x.cpuprofile",
+      "bytes": 856832,
+      "sha256": "b9f8df146f27d56b9541a9a3c30fe58497f6ac0a5d4081674f639bda3b315b68"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11-osfs-base0r/2026-10-21_235451/summary.md",
+      "bytes": 23307,
+      "sha256": "169cd6c2c2d4cfd375d37efa0076078b179326142bd39ab29ad18fd73c6440d9"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11-osfs-base0r/2026-10-21_235713/fly-still-1x.cpuprofile",
+      "bytes": 842744,
+      "sha256": "b7f2376ea9e0e17c50103a43be75b42f9ccd457588db37bfbd7beed3b5c319c1"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11-osfs-base0r/2026-10-21_235713/fly-still-4x.cpuprofile",
+      "bytes": 900847,
+      "sha256": "fc676ed96f34f5d0a30d5a9dd0da659f12e5235f83959fe2ee3cffcae903539e"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11-osfs-base0r/2026-10-21_235713/summary.md",
+      "bytes": 23613,
+      "sha256": "59af061af78bfe7022119be3b4ef4459b4e3bcd3e59c67f786e7d57ad45b6860"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11-osfs-c11/2026-10-21_235341/fly-still-1x.cpuprofile",
+      "bytes": 741594,
+      "sha256": "83aa49d2bdc165c3669b6e3c033181852f1185e710c0757532a10044cfe4634e"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11-osfs-c11/2026-10-21_235341/fly-still-4x.cpuprofile",
+      "bytes": 798735,
+      "sha256": "f996bb58b995620f952297352be4d2b303a81d0b15ca85f3e58115f9de990f30"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11-osfs-c11/2026-10-21_235341/summary.md",
+      "bytes": 23040,
+      "sha256": "4503016fadb6d11d9b2d99d9a19f62d1c42c70dd77edfb4abc7b7712f3947520"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11-osfs-c11/2026-10-21_235603/fly-still-1x.cpuprofile",
+      "bytes": 755336,
+      "sha256": "07604ccebc072e0fd74a0f11ba7e6fe064f25a2458239d0f2992cff5c5b2dbac"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11-osfs-c11/2026-10-21_235603/fly-still-4x.cpuprofile",
+      "bytes": 800497,
+      "sha256": "9c92dc72eedc8fcadcaa9c6885cc20304ce19839f967198551575140377bd42e"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11-osfs-c11/2026-10-21_235603/summary.md",
+      "bytes": 23108,
+      "sha256": "112137780d573c771131743d7ba2e92e7bcb6a1b768b33e632f120300b88ff0f"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11-osfs-c11/2026-10-21_235823/fly-still-1x.cpuprofile",
+      "bytes": 786625,
+      "sha256": "0c99c47339707148d1247258fbb28d2903293027f0019e75c5322ff059b6f0b6"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11-osfs-c11/2026-10-21_235823/fly-still-4x.cpuprofile",
+      "bytes": 807066,
+      "sha256": "f8cec69fef6ccce4804fb81f3fa1f16ae8015022edbffab18a84758174448788"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11-osfs-c11/2026-10-21_235823/summary.md",
+      "bytes": 23170,
+      "sha256": "056f8d53c155b32c9be48a7ff6b04b4df30b4701b64c3497159bda42b26f845f"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11m-osfs-base0r/2026-10-22_111445/fly-still-1x.cpuprofile",
+      "bytes": 922079,
+      "sha256": "7b2df5e7e01c91d5d200ee7d6df8240bb201f2cdd121c3d19d2c06a323dbdf31"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11m-osfs-base0r/2026-10-22_111445/fly-still-4x.cpuprofile",
+      "bytes": 939605,
+      "sha256": "c490f744976c6c071b876c7d75a78c57cd06334d7ce316d027e3b86b4c723055"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11m-osfs-base0r/2026-10-22_111445/summary.md",
+      "bytes": 23395,
+      "sha256": "e533724222a902b49095b57a3ffb8a230823edbcf516c268fc7dc22f40fadb1e"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11m-osfs-base0r/2026-10-22_111706/fly-still-1x.cpuprofile",
+      "bytes": 903310,
+      "sha256": "d64a788e4b6858451ab0cd5309f8454230821ef759b5ffabbe598285a20d6c9c"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11m-osfs-base0r/2026-10-22_111706/fly-still-4x.cpuprofile",
+      "bytes": 935863,
+      "sha256": "12ad7a852884f4aee7fbcd369b6175e5e2ba2d8550bead3ca9236c98e765ee17"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11m-osfs-base0r/2026-10-22_111706/summary.md",
+      "bytes": 23485,
+      "sha256": "0f8033e4583b9c0d772bc2fcdc1ef5093c865f97039245e2cfdf3078faae5db8"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11m-osfs-base0r/2026-10-22_111926/fly-still-1x.cpuprofile",
+      "bytes": 888968,
+      "sha256": "87e86de373ae076cc50b4a73551582263f1289a92f210fdd2a42b847515c32dc"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11m-osfs-base0r/2026-10-22_111926/fly-still-4x.cpuprofile",
+      "bytes": 889093,
+      "sha256": "5b6d849c2155f383038651e16170e3016c635131955ff274807c41b7093dc041"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11m-osfs-base0r/2026-10-22_111926/summary.md",
+      "bytes": 23430,
+      "sha256": "9bb2ae581ad6ab47fbbe04e5e1d7841ee4d3824f4fbd07f4d8daf86826ecd144"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11m-osfs-c11+q/2026-10-22_111554/fly-still-1x.cpuprofile",
+      "bytes": 814041,
+      "sha256": "c9e96a2ee83972670c40892a1671f1aa7866a1499414a27950c35b43c06c6636"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11m-osfs-c11+q/2026-10-22_111554/fly-still-4x.cpuprofile",
+      "bytes": 891475,
+      "sha256": "a084c8c18bd5f3f7d0a961b85072fb6dc3cc7cf6dbb8ff03a60005a00d7b3cb5"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11m-osfs-c11+q/2026-10-22_111554/summary.md",
+      "bytes": 23399,
+      "sha256": "b9a67f43efce3379fb78123ef44c1c87ea465f25798ced614688c410d056903c"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11m-osfs-c11+q/2026-10-22_111816/fly-still-1x.cpuprofile",
+      "bytes": 822827,
+      "sha256": "94dcd7ed2774982d72dd6d73ea79586bfb8cac493dc8ec812a28c6e7f013a8b2"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11m-osfs-c11+q/2026-10-22_111816/fly-still-4x.cpuprofile",
+      "bytes": 845066,
+      "sha256": "c7028b9971f8dda116ea2873c515e860aafbc82d88c59935d9726b17619f99ac"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11m-osfs-c11+q/2026-10-22_111816/summary.md",
+      "bytes": 23487,
+      "sha256": "20739c1a5a72c0fcff36ab5cbfd77f3d0e1583b2bce5534ca9925a39b19b1e4f"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11m-osfs-c11+q/2026-10-22_112037/fly-still-1x.cpuprofile",
+      "bytes": 821194,
+      "sha256": "640a22b3a0a0c1ff6c8c4f95eff88f42b8a3d5e4798809441426d476506dc784"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11m-osfs-c11+q/2026-10-22_112037/fly-still-4x.cpuprofile",
+      "bytes": 862411,
+      "sha256": "6863c47be04c32f80a0fe4d0dd66f7051571d9e781df0d789c781973f1b3ad10"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-c11m-osfs-c11+q/2026-10-22_112037/summary.md",
+      "bytes": 23215,
+      "sha256": "3d3991c3dd463d893fb49be3d70457b053ab3b7af6d5ab9c89176d6a7134292e"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-depth/2026-10-22_101941/fly-still-1x.cpuprofile",
+      "bytes": 1619689,
+      "sha256": "8862be637e269199d217818fbf880d7127c6c5871415717420f1395fabfd730d"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-depth/2026-10-22_101941/fly-still-4x.cpuprofile",
+      "bytes": 1262309,
+      "sha256": "29bae7960242a44c317f6f65e935344c641cdf3a324cda055b96ec485a9811a4"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-depth/2026-10-22_101941/summary.md",
+      "bytes": 22852,
+      "sha256": "653199372acd816d313b3dadf5bd6197f5acbd1b45a9af9f3ed717d332838feb"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-depth/2026-10-22_102218/fly-still-1x.cpuprofile",
+      "bytes": 1257189,
+      "sha256": "1c55e44ebc4e11ce605c15495daee9f7cf601555758445e5bebeddcb71b915cb"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-depth/2026-10-22_102218/fly-still-4x.cpuprofile",
+      "bytes": 1203273,
+      "sha256": "cc66429a9a77bafc1917859accb74e9ceec605dc27401e7c2d33d7885e3285c2"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-depth/2026-10-22_102218/summary.md",
+      "bytes": 22807,
+      "sha256": "07f9f602e8a4188b5e6ba598b02980feee4d17dee83c71e844e74c8da78417d4"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-depth/2026-10-22_102927/fly-still-1x.cpuprofile",
+      "bytes": 1575669,
+      "sha256": "fa4ea6045acfaf0b514d1c0482754e5d43dfbe8d3a4013bd3b4cf214b9505716"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-depth/2026-10-22_102927/fly-still-4x.cpuprofile",
+      "bytes": 1269782,
+      "sha256": "7d3e6cb4abe3cab33e3a68b97d8a786408f7ba4152446be2fac9fb8288ec69dd"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-depth/2026-10-22_102927/summary.md",
+      "bytes": 23013,
+      "sha256": "e57f5e14bcd3b9370455d48bebf53bee0350e146101ea03d7a8ef5786c85a42c"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-gas/2026-10-22_101824/fly-still-1x.cpuprofile",
+      "bytes": 1611318,
+      "sha256": "660a612152d4f6e442c510d7efc8f60bcda53f528f217b8cdabbb50dcf2c15a7"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-gas/2026-10-22_101824/fly-still-4x.cpuprofile",
+      "bytes": 1266339,
+      "sha256": "4893ac40b600464e6a7770cd322857dc1d4a3deaeb37c1a95f9935f654be67f6"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-gas/2026-10-22_101824/summary.md",
+      "bytes": 22872,
+      "sha256": "7fea154841a7992814b212d5036b214fccb48885e622e8d483d894985d6eae1c"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-gas/2026-10-22_102100/fly-still-1x.cpuprofile",
+      "bytes": 1302828,
+      "sha256": "c06761d3bac4e4bdbe97fc0a9a1f9ec1260481598ffe39bf5e981ee7d45bfb14"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-gas/2026-10-22_102100/fly-still-4x.cpuprofile",
+      "bytes": 1259170,
+      "sha256": "7fb55a714dd5ea0341239b8727f88ce64f7db0ece8aa56e0d05b73f248f4f5e1"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-gas/2026-10-22_102100/summary.md",
+      "bytes": 22901,
+      "sha256": "e117577bcd3c701d89aa063689be8fd33aabcdcbc3e28d8b1e90adf319ce244f"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-gas/2026-10-22_102337/fly-still-1x.cpuprofile",
+      "bytes": 1611437,
+      "sha256": "cbc45128a91e76d3533a0fb4afa61c04ab09a7736a160e829f395ec6beb2592a"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-gas/2026-10-22_102337/fly-still-4x.cpuprofile",
+      "bytes": 1271353,
+      "sha256": "3a4dc394081c554a1ff057c530b5c266814b3c587ce2725167be1bee35047b41"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-gas/2026-10-22_102337/summary.md",
+      "bytes": 22883,
+      "sha256": "5d054aec9249dbc94b5d5da0a140b61d14d88ad469cf62f0ae26c6419c13fcee"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-gas/2026-10-22_103045/fly-still-1x.cpuprofile",
+      "bytes": 1649505,
+      "sha256": "57b465f8ae3d1ec421102117d677a6924ffe89662d1be102d846d65765ad1859"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-gas/2026-10-22_103045/fly-still-4x.cpuprofile",
+      "bytes": 1298209,
+      "sha256": "a34cc34d238a720512776f8663cde0bed3e047ccff5edbbaa9d4fce722cbe804"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-gas/2026-10-22_103045/summary.md",
+      "bytes": 22771,
+      "sha256": "2123d90bd716a1f2c426c6cdfba77d138ab8fc305ad641dd68137f5ed0f47857"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-distq-osfs-distq/2026-10-22_115521/fly-still-1x.cpuprofile",
+      "bytes": 882843,
+      "sha256": "3c58cda7a2e7918aa1b66ae7c34ba45cd98671462e00ecb4f0bd1d3dff29614d"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-distq-osfs-distq/2026-10-22_115521/fly-still-4x.cpuprofile",
+      "bytes": 938320,
+      "sha256": "6503f89e97ac628650b8f3b1e49a6efdd329af6e7895f119d5b199b0800cee58"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-distq-osfs-distq/2026-10-22_115521/summary.md",
+      "bytes": 23451,
+      "sha256": "11e0c74d49e6e1cb7b82a1b6e7772a5283e2876a439425eab0a0d861437e9974"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-distq-osfs-distq/2026-10-22_115740/fly-still-1x.cpuprofile",
+      "bytes": 884914,
+      "sha256": "a84698696aa66769ad453d4c249bd7525772e8fad3075875d8c9fc20f1b81065"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-distq-osfs-distq/2026-10-22_115740/fly-still-4x.cpuprofile",
+      "bytes": 899194,
+      "sha256": "d857ddf0517abe7477c3356d15f0bd3a47f217c1db1c93351e1b97d571b01f19"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-distq-osfs-distq/2026-10-22_115740/summary.md",
+      "bytes": 23270,
+      "sha256": "8ed6d547de303c5f18cba2790e6aa1745871aacfd790775897a62d2b3a0c2619"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-distq-osfs-resq/2026-10-22_115411/fly-still-1x.cpuprofile",
+      "bytes": 907081,
+      "sha256": "450f20e5ef9c694c39c587cf36f293a98f3124e3a517c7e97a52460916418d5a"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-distq-osfs-resq/2026-10-22_115411/fly-still-4x.cpuprofile",
+      "bytes": 933136,
+      "sha256": "fe2978b41a71056d7ef61e6ade113cd1e7ad0e806c0b186a99a20487ebe1467d"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-distq-osfs-resq/2026-10-22_115411/summary.md",
+      "bytes": 23568,
+      "sha256": "51e60207fd2454bc765f80c75ab3033d595d101ef88590ae099118fb8e65585c"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-distq-osfs-resq/2026-10-22_115630/fly-still-1x.cpuprofile",
+      "bytes": 889607,
+      "sha256": "dbed0556ee37375cbbf8d98556ef9d6ba6df52db6defc29dd47d566bb2b13f3a"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-distq-osfs-resq/2026-10-22_115630/fly-still-4x.cpuprofile",
+      "bytes": 932067,
+      "sha256": "0525139effcdacf513a58978c30bd7dbe3cf56c903b33ffe2c41b65fd76987d3"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-distq-osfs-resq/2026-10-22_115630/summary.md",
+      "bytes": 23387,
+      "sha256": "3e6c36439471bb95361cc62752b42bd2228f3cb8e32855b5fb7e0bedb14ddfcf"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2-osfs-base0r/2026-10-21_234220/fly-still-1x.cpuprofile",
+      "bytes": 956920,
+      "sha256": "2a82436d7a29db76cf161a32632ac15b910ae926165e03a1361524006b620be2"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2-osfs-base0r/2026-10-21_234220/fly-still-4x.cpuprofile",
+      "bytes": 930416,
+      "sha256": "d8d603896b9007936a799d2e74cd4ae7da0b53b8b4ecae3979c44da0c9a189b3"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2-osfs-base0r/2026-10-21_234220/summary.md",
+      "bytes": 26944,
+      "sha256": "33b166004709d9e4e8bf824f9eaea3ac0f3e16fd1504a3fa41f4861dd56b4d5a"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2-osfs-base0r/2026-10-21_234444/fly-still-1x.cpuprofile",
+      "bytes": 960619,
+      "sha256": "8eb0fcbdc5cf618280cc0a2ac565e7e013df902cb3138dee45925c69ee9458ed"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2-osfs-base0r/2026-10-21_234444/fly-still-4x.cpuprofile",
+      "bytes": 943479,
+      "sha256": "3af54b65ac1fc19a1aaa20be27d9b9d84684a8d530ac6535d2242d7e5ed350d5"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2-osfs-base0r/2026-10-21_234444/summary.md",
+      "bytes": 27079,
+      "sha256": "ed9c7735456c4f363c35bfbfcb3215d781e50cfca9f85c295c72d7527e4ff98a"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2-osfs-f2/2026-10-21_234332/fly-still-1x.cpuprofile",
+      "bytes": 950275,
+      "sha256": "49f54cd53d838c52c3c01c934332577a1a2882e63ea87a95c6b06752e7622310"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2-osfs-f2/2026-10-21_234332/fly-still-4x.cpuprofile",
+      "bytes": 946316,
+      "sha256": "2873fe8808899d4fa47f06625049afa0eead01ea22752493995afd7a03e5fa68"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2-osfs-f2/2026-10-21_234332/summary.md",
+      "bytes": 29299,
+      "sha256": "ea9c3b1f32052e1d7bed635f723afa7eab2957e2f25257964b4468170afa12be"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2-osfs-f2/2026-10-21_234555/fly-still-1x.cpuprofile",
+      "bytes": 916383,
+      "sha256": "71edc7b114eab38c9d84a8ad49fcca0890b54c0d85570a1c579ff148d1840e4c"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2-osfs-f2/2026-10-21_234555/fly-still-4x.cpuprofile",
+      "bytes": 940450,
+      "sha256": "f9829b85db3527ad4af8db7a0441cdb35bbc3a3fdd28aa870321f53d5940c0db"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2-osfs-f2/2026-10-21_234555/summary.md",
+      "bytes": 28699,
+      "sha256": "5e257b0c10b782dfb4af6b8e0c192fdd1de92c5c2a39ead6b4c146393579369e"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2b-osfs-base0r/2026-10-21_234744/fly-still-1x.cpuprofile",
+      "bytes": 951929,
+      "sha256": "1dc80ff864c4d1a3ee1efb08b89c94c1c61c868f3960fac4549624ee30d12636"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2b-osfs-base0r/2026-10-21_234744/fly-still-4x.cpuprofile",
+      "bytes": 919561,
+      "sha256": "816f78c9e832d75734852fa2241d00740cf46150cf99bfe02b25b3ef2f05d96e"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2b-osfs-base0r/2026-10-21_234744/summary.md",
+      "bytes": 26962,
+      "sha256": "7f1c2cbdb4400098670c5ae71c729fc36e9378e46aa39bb5529bbee566dfc19c"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2b-osfs-base0r/2026-10-21_235009/fly-still-1x.cpuprofile",
+      "bytes": 944613,
+      "sha256": "243c5d7d4836dd93c3633b4856f4b66415f1054f7f076102deffe30902d093ec"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2b-osfs-base0r/2026-10-21_235009/fly-still-4x.cpuprofile",
+      "bytes": 948369,
+      "sha256": "f9ff2c7a899ddc4e48b413f76e926f71f1d620c7478a370aaf11aea502e7010a"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2b-osfs-base0r/2026-10-21_235009/summary.md",
+      "bytes": 27057,
+      "sha256": "81133a395e4f8dfafb1345edfd30969269aa8700474460b43ac1b2cb15356340"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2b-osfs-f2b/2026-10-21_234856/fly-still-1x.cpuprofile",
+      "bytes": 990199,
+      "sha256": "c05eb4534441177b0bec0b907e1db4a359b81b94681066ce7dcf0e9eb0bc5534"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2b-osfs-f2b/2026-10-21_234856/fly-still-4x.cpuprofile",
+      "bytes": 930847,
+      "sha256": "23c987212ec331e9d1632733e0c6e45e745d6ef999785e843ae0b05852d7ad2e"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2b-osfs-f2b/2026-10-21_234856/summary.md",
+      "bytes": 28785,
+      "sha256": "bbc769f2ff9d2306c9002789a84bc5b70f3b8d68dee6a27dfdd29794143795de"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2b-osfs-f2b/2026-10-21_235120/fly-still-1x.cpuprofile",
+      "bytes": 947387,
+      "sha256": "3c6291cf464bd6ca8eda04118f47e20ca5c477199f3f5841c1af8eb8d607dbd1"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2b-osfs-f2b/2026-10-21_235120/fly-still-4x.cpuprofile",
+      "bytes": 953757,
+      "sha256": "3511b84659736c27f94ec7572f713c8672369872bdd38ec890eb83c2f5601686"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2b-osfs-f2b/2026-10-21_235120/summary.md",
+      "bytes": 28559,
+      "sha256": "3bee376ae646c3acc43d860923edb16c2a84b256f124b514e53549d14703208b"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2bn-osfs-base0r/2026-10-21_235933/fly-still-1x.cpuprofile",
+      "bytes": 877909,
+      "sha256": "6c1567154b10bf1ff27164430e0d80fe98bc008ed438e207bc93b0403034d53c"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2bn-osfs-base0r/2026-10-21_235933/fly-still-4x.cpuprofile",
+      "bytes": 880379,
+      "sha256": "bc29257e706b0c4c480e90bb4b972a478f2f15bdfa4bb912fd8860e82288d4d6"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2bn-osfs-base0r/2026-10-21_235933/summary.md",
+      "bytes": 23521,
+      "sha256": "11011d271d7366e62c150883e7b38588412d634533dbd46d19d30ac76a9e90c0"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2bn-osfs-base0r/2026-10-22_000154/fly-still-1x.cpuprofile",
+      "bytes": 799504,
+      "sha256": "c0c61a934c98ed386055de58c14da5ddcdb5cb1022277beb9c89c518239a9271"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2bn-osfs-base0r/2026-10-22_000154/fly-still-4x.cpuprofile",
+      "bytes": 823881,
+      "sha256": "dd3de1f833d3514476c56f56d6174fc36eb0fb590d3268d3383ee50c2dfe74c5"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2bn-osfs-base0r/2026-10-22_000154/summary.md",
+      "bytes": 23413,
+      "sha256": "8e8c26e3e51a00f4ee6aabcf6e34e129389a2153829e23dfd16567f40b6e77f8"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2bn-osfs-base0r/2026-10-22_000415/fly-still-1x.cpuprofile",
+      "bytes": 802456,
+      "sha256": "ee62055849f189a93a302cc6c54e8b8197037002fbd564ed43d40c6b1404cb15"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2bn-osfs-base0r/2026-10-22_000415/fly-still-4x.cpuprofile",
+      "bytes": 872333,
+      "sha256": "384e61dc2b3181dc871d0fe4dda577ada792fadbc3951890df24fdb001811ae3"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2bn-osfs-base0r/2026-10-22_000415/summary.md",
+      "bytes": 23484,
+      "sha256": "d7cb69d27144f1f40c4ed71c384d2e9a8ec40f41ef24b7888d53f10cfeaa674e"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2bn-osfs-f2b/2026-10-22_000044/fly-still-1x.cpuprofile",
+      "bytes": 869247,
+      "sha256": "a54a1ac24752c83b176fc3bb260535b19aa57a1d713834bd995f75f8705fd073"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2bn-osfs-f2b/2026-10-22_000044/fly-still-4x.cpuprofile",
+      "bytes": 896044,
+      "sha256": "f9832469d9315dfcba186236e8741e5099251275413f9804919a1fa44b3c85e8"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2bn-osfs-f2b/2026-10-22_000044/summary.md",
+      "bytes": 23514,
+      "sha256": "7f4f00e93ef82e18a9bab0784db2db213e02721de8f97b7353814ab8f6ef8929"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2bn-osfs-f2b/2026-10-22_000304/fly-still-1x.cpuprofile",
+      "bytes": 800420,
+      "sha256": "0547d9fbc92f79648568f4d7025fa74001005f6bf203e524e562f3c594926cfd"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2bn-osfs-f2b/2026-10-22_000304/fly-still-4x.cpuprofile",
+      "bytes": 894997,
+      "sha256": "4df5f6575274f828283f28a3316aecb8c94eed76abfa20014a8815693cf7b7b2"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2bn-osfs-f2b/2026-10-22_000304/summary.md",
+      "bytes": 23359,
+      "sha256": "04b3006a753c0edf339ae2548a385022bef0782dc895bf2451f6d6a9ed1e5a1f"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2bn-osfs-f2b/2026-10-22_000525/fly-still-1x.cpuprofile",
+      "bytes": 812123,
+      "sha256": "5f1fadd7c20622fb51ad08be8549596f649553e8b0cff540338f6fe8c7bc66d3"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2bn-osfs-f2b/2026-10-22_000525/fly-still-4x.cpuprofile",
+      "bytes": 866993,
+      "sha256": "81350bf67eaf5b70295926f3cb551e7d76fb3b05454d8e4ed689e80d731f185a"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f2bn-osfs-f2b/2026-10-22_000525/summary.md",
+      "bytes": 23444,
+      "sha256": "200accaaf553c2bef3e0bb61cbfddfb2a6529aa9005acfc40f9783111aeafac4"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f35-osfs-base0r/2026-10-22_001408/fly-still-1x.cpuprofile",
+      "bytes": 1454904,
+      "sha256": "53211f2d961ff0fd3831659347aef628ed04c5e03ff5724bef122d1ebeadb1c6"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f35-osfs-base0r/2026-10-22_001408/fly-still-4x.cpuprofile",
+      "bytes": 1195929,
+      "sha256": "3305e6ea854fcd58c80483bdfc7b3398d009ff1b5d2fadbac50e6399779e8cda"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f35-osfs-base0r/2026-10-22_001408/summary.md",
+      "bytes": 22907,
+      "sha256": "07a64280687bca3baf16b5b813771abf749dbc3c84e1b20c01c42e272f894f01"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f35-osfs-f2b/2026-10-22_001526/fly-still-1x.cpuprofile",
+      "bytes": 1428664,
+      "sha256": "46d51314b00a8036f6dc4032500c48e4270b14e19e771ab60a1ca04cb699f027"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f35-osfs-f2b/2026-10-22_001526/fly-still-4x.cpuprofile",
+      "bytes": 1183066,
+      "sha256": "8c23711e3f0081a09a62b74706eda579ff05b4f96e05c1c0243fc897e0926302"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-f35-osfs-f2b/2026-10-22_001526/summary.md",
+      "bytes": 22987,
+      "sha256": "1403b57031a191e7de2fc2fdb8a0a7b4afff9c87962932c6da6aa53cc56d6fc9"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1c-osfs-f2b/2026-10-22_094346/fly-still-1x.cpuprofile",
+      "bytes": 912061,
+      "sha256": "f7f7a0c7f60d8735edab07b2ca4ecf4fdd3c3ddf76c7f4ea4ef8dab640e8085a"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1c-osfs-f2b/2026-10-22_094346/fly-still-4x.cpuprofile",
+      "bytes": 951411,
+      "sha256": "0df1687c6f3e7f9149f87e2a2f568a2675cdabb12dbe2abde6b8051c64679a92"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1c-osfs-f2b/2026-10-22_094346/summary.md",
+      "bytes": 23431,
+      "sha256": "2cffea4ffbf344b1cf8925c79c93355112783b25929abad4a80b961bd4fc38fb"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1c-osfs-f2b/2026-10-22_094604/fly-still-1x.cpuprofile",
+      "bytes": 950587,
+      "sha256": "9815e5983fd0b49f783f2a986da286d92d067fd3be4559db5e5ae2379b2e2a09"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1c-osfs-f2b/2026-10-22_094604/fly-still-4x.cpuprofile",
+      "bytes": 938213,
+      "sha256": "def9d85fa8ffa1aa732223e9b954be6bf3914e91449a97e3e789738e96978276"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1c-osfs-f2b/2026-10-22_094604/summary.md",
+      "bytes": 23454,
+      "sha256": "19730bfe0247969713fc8337f3fa8fa7107c4bd66d2232ba006ebc91cc2c3767"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1c-osfs-g1/2026-10-22_094455/fly-still-1x.cpuprofile",
+      "bytes": 903655,
+      "sha256": "acc41f878597e65c30a4416c68ce417c7e68ff17135a9d7ae707f81120d4875c"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1c-osfs-g1/2026-10-22_094455/fly-still-4x.cpuprofile",
+      "bytes": 938114,
+      "sha256": "15e6778bb7ffb941f21e5d797256624a6387c7432053222a567c2022b6f6571b"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1c-osfs-g1/2026-10-22_094455/summary.md",
+      "bytes": 23270,
+      "sha256": "aa3fe9ead6e46b07cd5bc7d0b29abc862de91df795fdcba03812aeb7e587a28e"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1c-osfs-g1/2026-10-22_094715/fly-still-1x.cpuprofile",
+      "bytes": 898035,
+      "sha256": "65611dd38b9a1be81874f29f5c60fbf0782c28118de391035b95265e19a3e0b7"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1c-osfs-g1/2026-10-22_094715/fly-still-4x.cpuprofile",
+      "bytes": 916018,
+      "sha256": "8497af87407be03220861bc2d9dc72a35fcce2daad2d6185dc23c42cdb0e69ca"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1c-osfs-g1/2026-10-22_094715/summary.md",
+      "bytes": 23608,
+      "sha256": "f740c5468ffbc2a7dd51ee749cd0bd412b0a59187dcd9b0d84b468b7131cc21d"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-f2b/2026-10-22_092135/fly-still-1x.cpuprofile",
+      "bytes": 1927993,
+      "sha256": "3defb79b29185230bf51d0c28164ec2114d89dcf8898b6bcf46d0420c3bb6fe1"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-f2b/2026-10-22_092135/fly-still-4x.cpuprofile",
+      "bytes": 181878,
+      "sha256": "d9ccc1b28c74de614dfb0e82ae8fedc946a4ef65d0562307ae1cf90a56fdcab5"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-f2b/2026-10-22_092135/summary.md",
+      "bytes": 23054,
+      "sha256": "364083e33306f0143a1cbe294b0b1aa6669468020a902ace5855e627157da3c9"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-f2b/2026-10-22_093820/fly-still-1x.cpuprofile",
+      "bytes": 1594017,
+      "sha256": "736f0c4f53e793bd15c23d85ceac08c0a09e1f5ae31bf08c9aae0499cbd674c0"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-f2b/2026-10-22_093820/fly-still-4x.cpuprofile",
+      "bytes": 1281640,
+      "sha256": "b934a55ee887e34fb367c94209e8911e78673cce89b0fe1a573815c1cec2277a"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-f2b/2026-10-22_093820/summary.md",
+      "bytes": 22961,
+      "sha256": "dd96a32860f026e2711451d4206f42925437aaf9c5518a8386c67eaaa350f7b5"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-f2b/2026-10-22_094050/fly-still-1x.cpuprofile",
+      "bytes": 1615898,
+      "sha256": "1b8b87de6bd341aa1dc3529970cb2fdad1ba172136c3d4f487aa87e10182229e"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-f2b/2026-10-22_094050/fly-still-4x.cpuprofile",
+      "bytes": 1281590,
+      "sha256": "96fa2f747681d90077a954c1c878a336207c15ea63fba1f99069949d92aee949"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-f2b/2026-10-22_094050/summary.md",
+      "bytes": 22946,
+      "sha256": "e278a8bf440f259e911585d1cf9370448e08903ef764a2269d213999c215b91a"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-g1/2026-10-22_093214/fly-still-1x.cpuprofile",
+      "bytes": 1089850,
+      "sha256": "a51503778e5933f966639582fa5ac209a0a00ff033a1d4920854396616410043"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-g1/2026-10-22_093214/fly-still-4x.cpuprofile",
+      "bytes": 1104595,
+      "sha256": "a027626b00d8ea71a8129e52fcef6a514bf7d46989c7e6cf6d0584de92cb91e3"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-g1/2026-10-22_093214/summary.md",
+      "bytes": 22989,
+      "sha256": "bc38c3799c2d2543030d9e4cd8a353cc2a3f5837742b1627c831cacab84abeb9"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-g1/2026-10-22_093935/fly-still-1x.cpuprofile",
+      "bytes": 1223114,
+      "sha256": "f045272d2447b9a5e6d4ef9a8183ad9df294944f44b920dd64f3085c4640b614"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-g1/2026-10-22_093935/fly-still-4x.cpuprofile",
+      "bytes": 1159226,
+      "sha256": "b25d6a2bf1dff0bf2ac062b1904516c28b86a15afc7ae2f0ef95fb7052b93e90"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-g1/2026-10-22_093935/summary.md",
+      "bytes": 22778,
+      "sha256": "7c84d926df19761b4154f5042d88602dca4bb6fa24f1ce52077bee0f62d551e3"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-g1/2026-10-22_094207/fly-still-1x.cpuprofile",
+      "bytes": 1276405,
+      "sha256": "0dbd2c3dd6ed7f97d85642c2d419e4db29ad9d030f066320d7cafc1afbe6c40f"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-g1/2026-10-22_094207/fly-still-4x.cpuprofile",
+      "bytes": 1165923,
+      "sha256": "2a440781a82ec06b36affbc40fbdf8bea586f29e9a14154c65d18bb5460a56d9"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-g1f35-osfs-g1/2026-10-22_094207/summary.md",
+      "bytes": 22950,
+      "sha256": "39cc4b4f46d2eeb9ecb74456f7d43dabc009cd9a4e38830e9f5e61c4b25ce293"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gas-osfs-g1/2026-10-22_100125/fly-still-1x.cpuprofile",
+      "bytes": 1460083,
+      "sha256": "2aa146440ab08cb4d874b5960dc8a1faf4693cbbf3689521937bf4d06387e62b"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gas-osfs-g1/2026-10-22_100125/fly-still-4x.cpuprofile",
+      "bytes": 1201521,
+      "sha256": "be54cb901a36f3942fa441996384c125f62e5cc4d064637bc5a9927f7510ff42"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gas-osfs-g1/2026-10-22_100125/summary.md",
+      "bytes": 22896,
+      "sha256": "ceec2c4864c6cffbdda2520e8d3afc4a5d125d670c1e662bad39d62c25b7f642"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gas-osfs-g1/2026-10-22_100419/fly-still-1x.cpuprofile",
+      "bytes": 1383108,
+      "sha256": "78393a046e057fef9506a2f068382c36d545c5b03068f9ca0448f231a52c305e"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gas-osfs-g1/2026-10-22_100419/fly-still-4x.cpuprofile",
+      "bytes": 1251243,
+      "sha256": "70f890d651440addb7fc464152386f5414afc57cbd5fad26a8d3db4817000635"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gas-osfs-g1/2026-10-22_100419/summary.md",
+      "bytes": 22888,
+      "sha256": "9bc525a78650a3bc47f6e626b6d43a610da54a59a64648f2913cc2a0c6e588af"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gas-osfs-g1/2026-10-22_100653/fly-still-1x.cpuprofile",
+      "bytes": 1556279,
+      "sha256": "3ab3f0b437807748d2f59a7ee43c76e1f0cbe600a22a0f9efc8f40655039221c"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gas-osfs-g1/2026-10-22_100653/fly-still-4x.cpuprofile",
+      "bytes": 1303290,
+      "sha256": "ac0ae16dbc8328bae8d64cfd83da6bcb6c43ec8aa37980ae191f90de84a495a6"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gas-osfs-g1/2026-10-22_100653/summary.md",
+      "bytes": 22903,
+      "sha256": "44b15569cdf25e12b8064c74f991cb1d66cdd638c9c571e930f53ce06dbcf082"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gas-osfs-gas/2026-10-22_100242/fly-still-1x.cpuprofile",
+      "bytes": 1585162,
+      "sha256": "7cd1c2a4422d30b1da88e46fafc411f6d4c11bf2820bd4995891196bac147ca3"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gas-osfs-gas/2026-10-22_100242/fly-still-4x.cpuprofile",
+      "bytes": 1264422,
+      "sha256": "7c8db6aa62e860357e663bcd7bce6a8fb84a3d16c62ef0918966b601feaf85f0"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gas-osfs-gas/2026-10-22_100242/summary.md",
+      "bytes": 22824,
+      "sha256": "2e2921fc193d36046aabba73f7a7a0a5aeed1fdcc11c42396d6a56756894cb7f"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gas-osfs-gas/2026-10-22_100537/fly-still-1x.cpuprofile",
+      "bytes": 1423397,
+      "sha256": "5766213aff26fcd1be1b8be4898eb8833cdd464e23fad7a4b5d172c53faf7cc7"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gas-osfs-gas/2026-10-22_100537/fly-still-4x.cpuprofile",
+      "bytes": 1250935,
+      "sha256": "6ba363e1e7231ee13b615c9fa6c21074c75f3b7893c7e4add57e16d5288d4bac"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gas-osfs-gas/2026-10-22_100537/summary.md",
+      "bytes": 22903,
+      "sha256": "7954f9c7b3869f4c6d74e4179f7fbb7c70fca3b446d15446f6e6e5a99f276b5d"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gas-osfs-gas/2026-10-22_100810/fly-still-1x.cpuprofile",
+      "bytes": 1649681,
+      "sha256": "36a11290b79319dc6f518c2d01d965b3102ca72a74439c005d5228df7f15a2bb"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gas-osfs-gas/2026-10-22_100810/fly-still-4x.cpuprofile",
+      "bytes": 1268352,
+      "sha256": "7fa3beea0a493d4f54f6228beb74339c5f018e566609d6928e1dbc4439fb0f84"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gas-osfs-gas/2026-10-22_100810/summary.md",
+      "bytes": 22734,
+      "sha256": "3b6e14f14894f1693637bc343bf38d24c16a2ba40462f79e55466213a59e7446"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gear-osfs-gear/2026-10-22_104820/fly-still-1x.cpuprofile",
+      "bytes": 1130801,
+      "sha256": "820589486e917016eee400037736d31f6ba27bee9e59c387864e2fdcdb197af9"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gear-osfs-gear/2026-10-22_104820/fly-still-4x.cpuprofile",
+      "bytes": 1032564,
+      "sha256": "7395f4e86a473b92098e40a5526c91fe28971e813c1633dd5e55b3f77c52a685"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gear-osfs-gear/2026-10-22_104820/summary.md",
+      "bytes": 22956,
+      "sha256": "057e3d95af593f9357d00a0c86c47b808951416d874554912bc788867f3f2160"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gear-osfs-gear/2026-10-22_105106/fly-still-1x.cpuprofile",
+      "bytes": 1593422,
+      "sha256": "66a664fe6a50f9bc53c565f9e2209fdee10c1a94642394c125bc0e904ac44aaf"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gear-osfs-gear/2026-10-22_105106/fly-still-4x.cpuprofile",
+      "bytes": 1225444,
+      "sha256": "42f9e538626571d75195adb01ee751c047280acf7896ac3e5690bf466e27c155"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gear-osfs-gear/2026-10-22_105106/summary.md",
+      "bytes": 22864,
+      "sha256": "6297e47faeeec5df5b21b08a212488723b980744364191264dc029b318279b4d"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gear-osfs-gear/2026-10-22_105340/fly-still-1x.cpuprofile",
+      "bytes": 1214239,
+      "sha256": "d3711e84072404abd9650a4379fc10149a5c14bc19a05ad3d64fccbbb93557b6"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gear-osfs-gear/2026-10-22_105340/fly-still-4x.cpuprofile",
+      "bytes": 1126991,
+      "sha256": "c07854cdd0e911057695df53dc14dc8a35ffe86aa26c8d6f693f7f7d7087a55f"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gear-osfs-gear/2026-10-22_105340/summary.md",
+      "bytes": 22809,
+      "sha256": "8d459ea82193c8bfac53cdcc39679bd34a306e7377ad66bb48062331a4085c7e"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gear-osfs-surface/2026-10-22_104703/fly-still-1x.cpuprofile",
+      "bytes": 1644145,
+      "sha256": "82d4eb8347d2f4984c35de4de8646141eb22661a78216add1c515564e9c22a9a"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gear-osfs-surface/2026-10-22_104703/fly-still-4x.cpuprofile",
+      "bytes": 1241560,
+      "sha256": "9132619001081f6f2affe0ae53ad3355866cbb1c35d40ef13d3884de417aedf9"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gear-osfs-surface/2026-10-22_104703/summary.md",
+      "bytes": 22735,
+      "sha256": "135b7698a555a2cdd1260bcb611ad08779cd6ddb0118edcb0b525e7b7bd5a6fd"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gear-osfs-surface/2026-10-22_104947/fly-still-1x.cpuprofile",
+      "bytes": 1224349,
+      "sha256": "33709ee3437cdf4a33ef8563d9feae3496845aed4a1099614dd00f92743682eb"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gear-osfs-surface/2026-10-22_104947/fly-still-4x.cpuprofile",
+      "bytes": 1088219,
+      "sha256": "6e12c24b2db2135be2467183d2d12f09bebaaa4595dac2a3022e81ba4082e1e8"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gear-osfs-surface/2026-10-22_104947/summary.md",
+      "bytes": 22932,
+      "sha256": "15c6ddbd83daed19be66260001c4041d8cc044929609ad94ee129105b98de028"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gear-osfs-surface/2026-10-22_105223/fly-still-1x.cpuprofile",
+      "bytes": 1281075,
+      "sha256": "6a483a79595880abcbb5c54c11518f7cbc44d24f8bf84426d921e5d7d3c40f23"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gear-osfs-surface/2026-10-22_105223/fly-still-4x.cpuprofile",
+      "bytes": 1161410,
+      "sha256": "edfd7a096b297547bf8daa512cb4cb620e4f8e16a3da5695d776ef04ad72c85d"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-gear-osfs-surface/2026-10-22_105223/summary.md",
+      "bytes": 22904,
+      "sha256": "11b9652050be723f077fb000fd0760514ae660f2e54e6d6d4f42e231c32c3ee1"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ginst-osfs-ginst/2026-10-22_094853/fly-still-1x.cpuprofile",
+      "bytes": 1653776,
+      "sha256": "9231a1f574d7e5de965570972e09a259dfddcb5ce62f6965a6d8d3913cfc7300"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ginst-osfs-ginst/2026-10-22_094853/summary.md",
+      "bytes": 11578,
+      "sha256": "7f132bccc4066ea98128ee9be0cec170f7fc400ac9bae622d588a06b9097c079"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ginst-osfs-ginst/2026-10-22_095000/fly-still-1x.cpuprofile",
+      "bytes": 1342772,
+      "sha256": "dfc5c6aec9617e7f89644fa8b47f2735351b7841bdf0f28e2a2fca1d1cfff2da"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ginst-osfs-ginst/2026-10-22_095000/summary.md",
+      "bytes": 11708,
+      "sha256": "b553c1393ae5acce61c417cca083a0940e9c9aa444edec8f92a9617f295b7c7c"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ginst2-osfs-ginst2/2026-10-22_095910/fly-still-1x.cpuprofile",
+      "bytes": 1444462,
+      "sha256": "f00a461bc7f77b25f3eace253a88c39e33c7848ccb51f28a8e9ba8f33f20358c"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ginst2-osfs-ginst2/2026-10-22_095910/summary.md",
+      "bytes": 13254,
+      "sha256": "847b64c2063ad496c2e196a5eccff15ea92773e646ddc7d96116a4d53fce35f5"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ginst2-osfs-ginst2/2026-10-22_100017/fly-still-1x.cpuprofile",
+      "bytes": 1452439,
+      "sha256": "deb78f38563a8e648dca904d87563674d62be53ca83f64cc901e19e0bb5848ac"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ginst2-osfs-ginst2/2026-10-22_100017/summary.md",
+      "bytes": 13302,
+      "sha256": "a6936eb33ddb3ca219c003ad272604af632dcee4e4687033525fd8d19824e4f1"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-nimg-osfs-ring/2026-10-22_112147/fly-still-1x.cpuprofile",
+      "bytes": 898028,
+      "sha256": "bb1b26256b311e8f43b0ff5d9abb8b5fa3fc9ec28ab1c2130de17258b9017f37"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-nimg-osfs-ring/2026-10-22_112147/fly-still-4x.cpuprofile",
+      "bytes": 951268,
+      "sha256": "bc87ec52ac1802451aade59d8661e3ac13e37f23bf62cfc34ce84158aa07a955"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-nimg-osfs-ring/2026-10-22_112147/summary.md",
+      "bytes": 23562,
+      "sha256": "7206b7f15f5d8b1a787b588d24b744fda73848a663f1a91c7c7513f5ed900b7f"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-nimg-osfs-ring/2026-10-22_112408/fly-still-1x.cpuprofile",
+      "bytes": 896452,
+      "sha256": "affa49999168a0141bfdc4d3c11f1b7f72da18d94c13f4e8902bd87765185346"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-nimg-osfs-ring/2026-10-22_112408/fly-still-4x.cpuprofile",
+      "bytes": 906456,
+      "sha256": "92c6fcbc0e495909bc61f16e2e1fcfd4babfee9648ede1e220e96ace3b74ba0a"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-nimg-osfs-ring/2026-10-22_112408/summary.md",
+      "bytes": 23650,
+      "sha256": "5b697d828c658b78b7033b50d5e89c8d84aa9096b45507d1baa4eef4775fc064"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-nimg-osfs-ring+q/2026-10-22_112259/fly-still-1x.cpuprofile",
+      "bytes": 1009184,
+      "sha256": "194fdb56e7117c5edc20d343cae5a98d3c907fc6d4017af13721af9c8495edfb"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-nimg-osfs-ring+q/2026-10-22_112259/fly-still-4x.cpuprofile",
+      "bytes": 942401,
+      "sha256": "d877dc71ffcf875132d82cdbd6a97643732c86e527040f6de61e607c982c708a"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-nimg-osfs-ring+q/2026-10-22_112259/summary.md",
+      "bytes": 23549,
+      "sha256": "e5f2c3dea11e6f23657a331b4c4eff05b688bb175e042c1b3b77aae8f02476d7"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-nimg-osfs-ring+q/2026-10-22_112520/fly-still-1x.cpuprofile",
+      "bytes": 912642,
+      "sha256": "1093b467fb61a1d02c4d48efadba305cb48aa68744f6c0ba4cbbe396f9fb3c2f"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-nimg-osfs-ring+q/2026-10-22_112520/fly-still-4x.cpuprofile",
+      "bytes": 889318,
+      "sha256": "d19506ca85717e091704a6101714d6433de13e43284735c9d193a4f6d9ba3819"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-nimg-osfs-ring+q/2026-10-22_112520/summary.md",
+      "bytes": 23382,
+      "sha256": "361fcbc9f16ebf86311398d303ed0f971bcbf9cee284d1aee010c5e0c5002303"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-phone-phone-osfs-base0r/2026-10-22_000931/fly-still-1x.cpuprofile",
+      "bytes": 1000044,
+      "sha256": "a47c302e2d3d828315b52103e95dceb3e7555fd72c833c69bcd9576bc83435d6"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-phone-phone-osfs-base0r/2026-10-22_000931/fly-still-4x.cpuprofile",
+      "bytes": 912265,
+      "sha256": "624cbe238d16b21905aa43cf6fe89bb51e1c16ed3fd47af677190c2597f03cea"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-phone-phone-osfs-base0r/2026-10-22_000931/summary.md",
+      "bytes": 23403,
+      "sha256": "00a4c96ac8055b946008d7bf1fe0a0427245c5021fc6dd9d0dd32c50808b83e7"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-phone-phone-osfs-base0r/2026-10-22_001148/fly-still-1x.cpuprofile",
+      "bytes": 1000825,
+      "sha256": "83bf527ae7077bc9fa1ff51c47865ac6236f0e78c12e2aef7f6ff7394fcb6be2"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-phone-phone-osfs-base0r/2026-10-22_001148/fly-still-4x.cpuprofile",
+      "bytes": 909432,
+      "sha256": "f1a522eabe7af718e8a0d56c6eda4c434ada59722dcf814db4128ce0f86d7c20"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-phone-phone-osfs-base0r/2026-10-22_001148/summary.md",
+      "bytes": 23224,
+      "sha256": "6a9aad9e1c47f591d129967c03556d03129143e2e7fb490c68b0b21d6ce19a8d"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-phone-phone-osfs-f2b/2026-10-22_001039/fly-still-1x.cpuprofile",
+      "bytes": 1049556,
+      "sha256": "cf83ee3a1adeef3b47fc4cc9ead4d4ea1140637bdd1b361e70d624ce6fe8592e"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-phone-phone-osfs-f2b/2026-10-22_001039/fly-still-4x.cpuprofile",
+      "bytes": 905662,
+      "sha256": "0d6379df128c0d18c3303b29bd7492dc8f17d2d847a78bbfdef819990d4fc17a"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-phone-phone-osfs-f2b/2026-10-22_001039/summary.md",
+      "bytes": 23398,
+      "sha256": "4805346a747f42a639f18d1b8b6c2de61b4f99c0ecde1a34604e50e47409a7a4"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-phone-phone-osfs-f2b/2026-10-22_001258/fly-still-1x.cpuprofile",
+      "bytes": 1067121,
+      "sha256": "29cea0f502c5d9c366082c6b12e9cd7990772d26e87c2f812f6ea7b877a71f0f"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-phone-phone-osfs-f2b/2026-10-22_001258/fly-still-4x.cpuprofile",
+      "bytes": 905260,
+      "sha256": "a56a588f84c2f635c9e88a939bf9a47181ea02bdc40768748d6c6e2ac14554f3"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-phone-phone-osfs-f2b/2026-10-22_001258/summary.md",
+      "bytes": 23405,
+      "sha256": "5feb46541a73e93f49325c729fd586af8dc25b6429e6678c721b925134fa3263"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-probe-osfs-probe/2026-10-22_103951/fly-still-1x.cpuprofile",
+      "bytes": 925379,
+      "sha256": "656167e6b03e7aa59a256b25830453166094139187a6f73926fdbde9207e1687"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-probe-osfs-probe/2026-10-22_103951/fly-still-4x.cpuprofile",
+      "bytes": 951222,
+      "sha256": "cf5e1259c329668445dedd8800b9ed0bfb225c7fc6c6dc96550d6a11251ef1b4"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-probe-osfs-probe/2026-10-22_103951/summary.md",
+      "bytes": 24865,
+      "sha256": "d7af4588919b3db89863465e752d8a9df86db241d9a693ed344b45a79c7dc515"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-probe-osfs-probe+q/2026-10-22_104100/fly-still-1x.cpuprofile",
+      "bytes": 1578669,
+      "sha256": "676703c27e1159c9ee424243adbc1512e5cee0e47f165ff8120a56796d30e3db"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-probe-osfs-probe+q/2026-10-22_104100/fly-still-4x.cpuprofile",
+      "bytes": 1137634,
+      "sha256": "06439c28cb2afd908d3efd85a4370cf49d85cfc6a53985f6d9ea24302d494691"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-probe-osfs-probe+q/2026-10-22_104100/summary.md",
+      "bytes": 24448,
+      "sha256": "ba441b8976d165c7ffc0b86c5e2149937a38ce5f00a8dac990396ab5f2b6f96d"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-resq-osfs-resq/2026-10-22_105611/fly-still-1x.cpuprofile",
+      "bytes": 884205,
+      "sha256": "bc9ed5f07206f89ed4adfe4160f03ce7a6126892502fff96f60ac817aede7fd0"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-resq-osfs-resq/2026-10-22_105611/fly-still-4x.cpuprofile",
+      "bytes": 903754,
+      "sha256": "e9c7a653a8f72988417d7da06f803a05dbbb105db70e72fe89e75f1ba0ff96eb"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-resq-osfs-resq/2026-10-22_105611/summary.md",
+      "bytes": 23436,
+      "sha256": "ece10849b8f6b4e141429a6c9b6602cbe7cb156ee9d2c6f15acafe825afdc79d"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-resq-osfs-resq/2026-10-22_105834/fly-still-1x.cpuprofile",
+      "bytes": 905371,
+      "sha256": "dc071a064b3d72facfe665c599ab4a2be35af69fca21a904d76c4c34ffb5c3fa"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-resq-osfs-resq/2026-10-22_105834/fly-still-4x.cpuprofile",
+      "bytes": 958813,
+      "sha256": "d2eef674de37e23bd85be279627e184af657d09541144330c14e120db88284c4"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-resq-osfs-resq/2026-10-22_105834/summary.md",
+      "bytes": 23387,
+      "sha256": "6b3a6a0e6e692c012d9b3724556708eab243821dabcd28cad056fd1b2589c5d5"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-resq-osfs-resq/2026-10-22_110058/fly-still-1x.cpuprofile",
+      "bytes": 1223645,
+      "sha256": "ee0e2013c0044b4380f09de5d20343384567611b59e25ef9cf0933802baa3995"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-resq-osfs-resq/2026-10-22_110058/fly-still-4x.cpuprofile",
+      "bytes": 988751,
+      "sha256": "e10dfd235102a1a7513a09bc6ebc1bc1e8bd47bcc2ceb02ea5ffc8dea3893674"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-resq-osfs-resq/2026-10-22_110058/summary.md",
+      "bytes": 23449,
+      "sha256": "5aa67deda0b053292f83f5be398e4ebcd127e30ff76e1a86d5a4b58fd9ef4277"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-resq-osfs-ring/2026-10-22_105459/fly-still-1x.cpuprofile",
+      "bytes": 880867,
+      "sha256": "2e601085bd947c3a07e793b69aebbb8055a3e59ad0a7f0747104c55b309a9a78"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-resq-osfs-ring/2026-10-22_105459/fly-still-4x.cpuprofile",
+      "bytes": 963919,
+      "sha256": "2b108060dbe634d953a0e654e98e11d517a232ea9c3829c771d1e9fb939fad07"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-resq-osfs-ring/2026-10-22_105459/summary.md",
+      "bytes": 23446,
+      "sha256": "d12fd96620604a65c8625e7828456f0c7cac2f2b43a23703a674d8abf9b7278d"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-resq-osfs-ring/2026-10-22_105722/fly-still-1x.cpuprofile",
+      "bytes": 891609,
+      "sha256": "6e793a2413a083fc31022dc73120a6e4fe8289f50529ba156b80556fa234d8e0"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-resq-osfs-ring/2026-10-22_105722/fly-still-4x.cpuprofile",
+      "bytes": 945022,
+      "sha256": "a2c7a13ff2fc6742ab90dd1fd12725af9e28c7103036593f67a0af7878714fb6"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-resq-osfs-ring/2026-10-22_105722/summary.md",
+      "bytes": 23525,
+      "sha256": "d9ef0191044fbacf33171af894a778f2abde50e8aa6e02dd61bd710c84e2da45"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-resq-osfs-ring/2026-10-22_105946/fly-still-1x.cpuprofile",
+      "bytes": 942974,
+      "sha256": "54291fe8a0dcfd4078c6f6a5b25b53835bb119c2bd4a1103961c18211c74c493"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-resq-osfs-ring/2026-10-22_105946/fly-still-4x.cpuprofile",
+      "bytes": 935636,
+      "sha256": "83cdf624b8f086a0ecd42846bdfebaade1d57956fb41db1d44fd65fc9ad46c8c"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-resq-osfs-ring/2026-10-22_105946/summary.md",
+      "bytes": 23408,
+      "sha256": "611eb5ddb5785dd3be3f966e0ac175a9f74346a96d7f2674d657310bd5f17b8d"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ring-osfs-gear/2026-10-22_110211/fly-still-1x.cpuprofile",
+      "bytes": 1309714,
+      "sha256": "e842adc3cfc32586e3fd80624dddf0cff9a32d38d6b486374623f56852d25c39"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ring-osfs-gear/2026-10-22_110211/fly-still-4x.cpuprofile",
+      "bytes": 1142173,
+      "sha256": "ed92129a2c23915a280b59b3ecca9d22bc4a25cfc9633f723cfae48f6f8acf93"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ring-osfs-gear/2026-10-22_110211/summary.md",
+      "bytes": 25195,
+      "sha256": "9ac87fde409b77c8235e05ea75b0244704af0fbeb38c1696f6896a2930b81ae6"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ring-osfs-gear/2026-10-22_110448/fly-still-1x.cpuprofile",
+      "bytes": 1235051,
+      "sha256": "44d90a7f48891aab5e0c59c73d940e7c60361946e86487ba783d7389e7180434"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ring-osfs-gear/2026-10-22_110448/fly-still-4x.cpuprofile",
+      "bytes": 1164541,
+      "sha256": "c94a8314f72adda49402126bd291e88c742c04d460815452be42060c1b812e35"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ring-osfs-gear/2026-10-22_110448/summary.md",
+      "bytes": 25105,
+      "sha256": "8f0456d342e24f7eac4643428c73f2f53143e1219a59aa0fcb42daaeb9b16b02"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ring-osfs-gear/2026-10-22_110726/fly-still-1x.cpuprofile",
+      "bytes": 1324779,
+      "sha256": "333c12813be496429c90e6ea68c3bdc5e370ae818c3fd9410d71eb9e84c836a3"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ring-osfs-gear/2026-10-22_110726/fly-still-4x.cpuprofile",
+      "bytes": 1118807,
+      "sha256": "6475bd172d42121574276d15a0fa28118a7e56d78099facc01cfb6cd26265116"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ring-osfs-gear/2026-10-22_110726/summary.md",
+      "bytes": 25132,
+      "sha256": "f60e754be1da5c3e93cc61ebef6c3f8aae563819b1ac6e6a58bd2531e0ff87bb"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ring-osfs-ring/2026-10-22_110331/fly-still-1x.cpuprofile",
+      "bytes": 1673006,
+      "sha256": "a8ae89537644d3259906ebb1bf0d63be6cf5725a69ab7607b4b6741d8f3919af"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ring-osfs-ring/2026-10-22_110331/fly-still-4x.cpuprofile",
+      "bytes": 1237116,
+      "sha256": "f77f90441a9db677e192a0662244cfa19922df9d233faf21c255270767606c77"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ring-osfs-ring/2026-10-22_110331/summary.md",
+      "bytes": 25143,
+      "sha256": "5d0bb06105fde631194eb27fe24dcd90779abb179b4c07ad5bdea8e371c27013"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ring-osfs-ring/2026-10-22_110607/fly-still-1x.cpuprofile",
+      "bytes": 1623895,
+      "sha256": "2f3dec5bc7fc80dc6bc00390385e72c7e89d50fac1703182253e1d7e0a210e19"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ring-osfs-ring/2026-10-22_110607/fly-still-4x.cpuprofile",
+      "bytes": 1277934,
+      "sha256": "0f261406b877d6744f9d527cd7ccce6dbd6718ebf91eeb48566014412af31835"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ring-osfs-ring/2026-10-22_110607/summary.md",
+      "bytes": 25067,
+      "sha256": "2e0fb050a28ecbd724fbe120a4b8b94f2bb732f21b15fbb97704a54e5ff0e648"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ring-osfs-ring/2026-10-22_110842/fly-still-1x.cpuprofile",
+      "bytes": 1290018,
+      "sha256": "c7954cbcb133bb6135ba7a5de8436e4f4401e9bbb1662575c075bdd0480da553"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ring-osfs-ring/2026-10-22_110842/fly-still-4x.cpuprofile",
+      "bytes": 1144741,
+      "sha256": "9599bfceb95b2cdbec84f47f9f36ceb8d8704dfdd397b9e93ae20de36b3022bd"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-ring-osfs-ring/2026-10-22_110842/summary.md",
+      "bytes": 25063,
+      "sha256": "7efed8cd79dcdcbae32e5f830eedfb3d3d101ef05688417dba16045fcad24e02"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-spin-osfs-f2b/2026-10-22_001643/fly-still-1x.cpuprofile",
+      "bytes": 844603,
+      "sha256": "a984343cb8c389e056f61faab02549d80747ee9dab378d8cfd4dc83597b9abc4"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-spin-osfs-f2b/2026-10-22_001643/fly-still-4x.cpuprofile",
+      "bytes": 877622,
+      "sha256": "3a8319f590ec8d493b5a03b0900a682033c49eb1ee97a36c66c6da9801acd519"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-spin-osfs-f2b/2026-10-22_001643/summary.md",
+      "bytes": 23671,
+      "sha256": "a6618acc3a14204ff82e36663ed07747c977deec1a34323909045496260f97be"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-spin-osfs-f2b/2026-10-22_001754/fly-still-1x.cpuprofile",
+      "bytes": 832223,
+      "sha256": "cc6cd608bea53491e590dafa03db293d95eff4a45b33b59c8ab400ccb1ddf486"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-spin-osfs-f2b/2026-10-22_001754/fly-still-4x.cpuprofile",
+      "bytes": 885118,
+      "sha256": "6601708e5b53bdfd205793f527d142f16be7774d10509ab78d6a3fe58bd29c80"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-spin-osfs-f2b/2026-10-22_001754/summary.md",
+      "bytes": 23507,
+      "sha256": "73cdcc1873d4af83631c0c0caefedebec1f4d4f6b14bda14b2a784a279f9eadd"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-spin-osfs-f2b/2026-10-22_002123/fly-still-1x.cpuprofile",
+      "bytes": 819395,
+      "sha256": "22965f6776f5f91abb24f3099598002df12e61e4801340b7f88caef040b99299"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-spin-osfs-f2b/2026-10-22_002123/fly-still-4x.cpuprofile",
+      "bytes": 873719,
+      "sha256": "c949ef3503423e3dd58d0ab72c4919ba2df8a0a3d26b974e33faa0b45afcbe13"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-spin-osfs-f2b/2026-10-22_002123/summary.md",
+      "bytes": 23436,
+      "sha256": "9beeb51fd029fa12a111c4cf844521c35deed2151fea4825604b916d41e42186"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-spin-osfs-f2b/2026-10-22_002234/fly-still-1x.cpuprofile",
+      "bytes": 809812,
+      "sha256": "757b0c02fa2119e12423ce971e1cd8ee6fa07b91f8a103487acd3c073cfe5e85"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-spin-osfs-f2b/2026-10-22_002234/fly-still-4x.cpuprofile",
+      "bytes": 863058,
+      "sha256": "b0169f8e0758a42fc8926a6c13b1c6857a0e2ad2e509bd18c006271787d689bb"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-spin-osfs-f2b/2026-10-22_002234/summary.md",
+      "bytes": 23463,
+      "sha256": "464b52977ec53319a3eaab6c3ac9ee1054c12d449a9ae3b65e03af18f78a1f71"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-still-osfs-f2b/2026-10-22_001903/fly-still-1x.cpuprofile",
+      "bytes": 798870,
+      "sha256": "010432e670e3a195b019cf516c145b99c6000dcca44d38c19fb4d92f0051c888"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-still-osfs-f2b/2026-10-22_001903/fly-still-4x.cpuprofile",
+      "bytes": 864581,
+      "sha256": "e53d2ae756a69071abebcb7f7f651d7f3d341144de868e79e9656d07f363d1e9"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-still-osfs-f2b/2026-10-22_001903/summary.md",
+      "bytes": 23404,
+      "sha256": "56bf8abab5f49ef9fae54f070271199fdd71a815dac12b4e478abf235c46300b"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-still-osfs-f2b/2026-10-22_002013/fly-still-1x.cpuprofile",
+      "bytes": 803781,
+      "sha256": "7758d83eac2dad5df148b16083916ec79a64f8f00388dff413b1adf21a9dfca5"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-still-osfs-f2b/2026-10-22_002013/fly-still-4x.cpuprofile",
+      "bytes": 840094,
+      "sha256": "5d7e066061f50b1c213059da933aaea87dd9cf0524e490a3a4221c426fc9002d"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-still-osfs-f2b/2026-10-22_002013/summary.md",
+      "bytes": 23552,
+      "sha256": "87a1ad11c8fe3b6fc296c07e57cfd79e224fb2b922153e50073d10c30585759f"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-still-osfs-f2b/2026-10-22_002344/fly-still-1x.cpuprofile",
+      "bytes": 797508,
+      "sha256": "43dd8d1122a011a7d02d14aa3def6f10e3f2b472f92114b0e6a1973e7891d4c2"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-still-osfs-f2b/2026-10-22_002344/fly-still-4x.cpuprofile",
+      "bytes": 915251,
+      "sha256": "7addd4a7291703cf0362d267a348590d69f6807f145c4f021047f6bf15872447"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-still-osfs-f2b/2026-10-22_002344/summary.md",
+      "bytes": 23374,
+      "sha256": "d027c40adfdf1b83b43385952aecf9d75031dba6a32045a5bbf734d803d9cb41"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-still-osfs-f2b/2026-10-22_002454/fly-still-1x.cpuprofile",
+      "bytes": 822074,
+      "sha256": "0c64aee8d222c76688b5ea61d11c8c3fc8fb3dbab7ef8de6e63ade4e667c2937"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-still-osfs-f2b/2026-10-22_002454/fly-still-4x.cpuprofile",
+      "bytes": 855987,
+      "sha256": "4d70e1596d2af497149724273136d5e214dca578c78eb89f523ecfc0655ac56e"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-still-osfs-f2b/2026-10-22_002454/summary.md",
+      "bytes": 23544,
+      "sha256": "f35211170826b8ea3b2fc3e59a4bb4d7b7c2628f21c937d6d0116196256e4575"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surface-osfs-depth/2026-10-22_103203/fly-still-1x.cpuprofile",
+      "bytes": 1569704,
+      "sha256": "4a14b50216e96648df343d7c7e1455d1e5b0e2cb473512aa1e7997c15430452d"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surface-osfs-depth/2026-10-22_103203/fly-still-4x.cpuprofile",
+      "bytes": 1302075,
+      "sha256": "f6bbfb2ed17a0ecfa06e4075ecef6670f0af0919939901ede03af79ba64bcb6d"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surface-osfs-depth/2026-10-22_103203/summary.md",
+      "bytes": 22952,
+      "sha256": "a525edab532cfcc77a85069ce370f8b2320a37211cd28d582d6912a3108cffae"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surface-osfs-depth/2026-10-22_103437/fly-still-1x.cpuprofile",
+      "bytes": 1601821,
+      "sha256": "8881c16ac57c1a9847eeb4659322331716207229d99cabbadff16c44f1c2f2c2"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surface-osfs-depth/2026-10-22_103437/fly-still-4x.cpuprofile",
+      "bytes": 1284032,
+      "sha256": "e56e539c35c7c919637f2b8203f7a7671c62f51b662381caac7ce0e06a8e4496"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surface-osfs-depth/2026-10-22_103437/summary.md",
+      "bytes": 22859,
+      "sha256": "d094bd41e2412923755edc8c078a11fcb53b410b94d96edcaf79ae428df6908d"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surface-osfs-depth/2026-10-22_103713/fly-still-1x.cpuprofile",
+      "bytes": 1651254,
+      "sha256": "c8a295e5973aca9c07433422592f00a0b9b92afbf527a81120cb07d5d32d8596"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surface-osfs-depth/2026-10-22_103713/fly-still-4x.cpuprofile",
+      "bytes": 1238412,
+      "sha256": "456ecc981d2821f8e84239db8e9e0e356bb7a0d351eba86e5319bdad2558489f"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surface-osfs-depth/2026-10-22_103713/summary.md",
+      "bytes": 22885,
+      "sha256": "ab76d71e289d41cc1b18e21a0195802fca972efde099ef8398bd5b219be914cc"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surface-osfs-surface/2026-10-22_103321/fly-still-1x.cpuprofile",
+      "bytes": 1488058,
+      "sha256": "4b9d52a3c21dbbeee6378fba8e5d14d4f8158f48d610fe020d3926f7fac04b0c"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surface-osfs-surface/2026-10-22_103321/fly-still-4x.cpuprofile",
+      "bytes": 1229961,
+      "sha256": "d91ceaeefbefeeefd699af910f2f6f53fc25e94cb640c13fc6766fb1c9b20814"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surface-osfs-surface/2026-10-22_103321/summary.md",
+      "bytes": 22996,
+      "sha256": "0bff6b5a6e3182b74827674babcd93258aa54db8454ecaf31ad373c5c9c6c15c"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surface-osfs-surface/2026-10-22_103555/fly-still-1x.cpuprofile",
+      "bytes": 1643168,
+      "sha256": "a594f96b5e9d2a98700152a4da6b2df8fc21bd167f7a0e8201e8149d3a20a0a5"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surface-osfs-surface/2026-10-22_103555/fly-still-4x.cpuprofile",
+      "bytes": 1254833,
+      "sha256": "29771c4f8f3750d3e0f749f07a76670dbdedc767657371a108d45ce1cd188787"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surface-osfs-surface/2026-10-22_103555/summary.md",
+      "bytes": 23013,
+      "sha256": "55716ed5c18ad59cd293153665c7d26619be1d03071f237d8a786b15b6c8b092"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surface-osfs-surface/2026-10-22_103832/fly-still-1x.cpuprofile",
+      "bytes": 1316905,
+      "sha256": "2c32ef5cd1f8430d0b5979f1099e30323b162046d821804982639ac9d9bba8e7"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surface-osfs-surface/2026-10-22_103832/fly-still-4x.cpuprofile",
+      "bytes": 1201007,
+      "sha256": "270839894caa946881abac8623efcbb4302cefbe80f668320f59f96382e056c9"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surface-osfs-surface/2026-10-22_103832/summary.md",
+      "bytes": 22935,
+      "sha256": "506274288aae33c485f08e7b38660dc0cec0c8c7372e368ac0b7efc8504cf625"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surfc-osfs-depth/2026-10-22_104219/fly-still-1x.cpuprofile",
+      "bytes": 896690,
+      "sha256": "231ea7ac6524a9133ae1cb3552f08560dc5455b4762f291a6c45a28082a11b49"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surfc-osfs-depth/2026-10-22_104219/fly-still-4x.cpuprofile",
+      "bytes": 918607,
+      "sha256": "9ea7a13fe722cc96740a1eedaf02008074a87b239cebc7295725ecfcad522a70"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surfc-osfs-depth/2026-10-22_104219/summary.md",
+      "bytes": 23511,
+      "sha256": "304ab1c4237c530dc81068fc680a6f397d328df5f5d25072ea22851d93b85c7a"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surfc-osfs-depth/2026-10-22_104441/fly-still-1x.cpuprofile",
+      "bytes": 899469,
+      "sha256": "cd6f12dab7836142835c0f51a439501a67938eb621248c249a20015f709f960a"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surfc-osfs-depth/2026-10-22_104441/fly-still-4x.cpuprofile",
+      "bytes": 947013,
+      "sha256": "19f0875d0fd5edb568197d7a6240953d78518d2d7bb448354de3f803334f4348"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surfc-osfs-depth/2026-10-22_104441/summary.md",
+      "bytes": 23595,
+      "sha256": "039a8d5f26473c303604e9dc731d087e8240007272b8255c81c516382bd86f9f"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surfc-osfs-surface/2026-10-22_104330/fly-still-1x.cpuprofile",
+      "bytes": 929980,
+      "sha256": "fce5bff4ecf6d24363ff6bfc05c974f5eb6f56afd9405e2df5dfa4b53e66c0f3"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surfc-osfs-surface/2026-10-22_104330/fly-still-4x.cpuprofile",
+      "bytes": 928135,
+      "sha256": "01400ac7697bdcc5ecfd4702e973294dfea56082360a921fb80744ceb170dba2"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surfc-osfs-surface/2026-10-22_104330/summary.md",
+      "bytes": 23617,
+      "sha256": "1d5e019d5ed1e716e1458052071579115881eb251a99050eb7f217706e44ef70"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surfc-osfs-surface/2026-10-22_104552/fly-still-1x.cpuprofile",
+      "bytes": 898543,
+      "sha256": "4fbaadd8e4c9add8eb264b27a7989e632a564e176996c09483d37733c722f39a"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surfc-osfs-surface/2026-10-22_104552/fly-still-4x.cpuprofile",
+      "bytes": 949093,
+      "sha256": "5de1dbbb9ea6ba7a5595337721bc948567afc8395c2d8f027d3da15a690cf68d"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-surfc-osfs-surface/2026-10-22_104552/summary.md",
+      "bytes": 23379,
+      "sha256": "a1fe614c3e8f3f5fee455e5ae0165acee67515216c76792fdb5252f969d6021a"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/heights/bysource.mjs",
+      "bytes": 2513,
+      "sha256": "6063fdf30e4f155ea3fc63ee147baf6119771d1509a13923006d4c9889b142bc"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/scripts/benchmarks/startup-audit/profile.mjs",
+      "bytes": 37176,
+      "sha256": "d2c6ef5f3b4b0c3ead57e63c8b1bda3105ed424e6ca362ed058e4d5aadc0842b"
+    }
+  ],
+  "missing_expected_paths": []
+}

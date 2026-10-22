@@ -1,5 +1,9 @@
 # The flight's frame: measured improvements and remaining performance decisions
 
+For continuation, read the [session handoff](session-handoff.md) and
+[independent agent prompts](agent-prompts.md). They record ownership, validation, reproduction
+and the current status of the approved mixed-file integration.
+
 Measured overnight on 2026-10-21/22 in headless Chrome, WebGPU through ANGLE Metal, on an
 M5 MacBook Air on AC power. The page was 1280×800 CSS px at DPR 1, flying the default C172 from the
 default spawn. Each run is an 8 s CPU profile at 1× and at 4× CPU throttle. A/B arms were built
