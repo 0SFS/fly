@@ -1,4 +1,5 @@
 import "foss-earth/shell.css";
+import "foss-earth/immersive.css";
 // The fleet registers with the aircraft catalog before anything reads it.
 import "./aircraft/fleet";
 import { Matrix, Vector3, type WebGPUEngine } from "@babylonjs/core";
@@ -6,7 +7,7 @@ import { bindFrameProfileSettings, FRAME_PROFILING_IDS } from "foss-earth/perf";
 import { setActiveFrameProfile } from "./diagnostics/frameProfile";
 import { createFlightUiHost } from "./earthUiHost";
 import { createBenchmarkRouteController, forceBenchmarkRouteSettings, requestedBenchmarkRoute, type BenchmarkRouteController } from "./benchmarkRoutes";
-import { bootStep, browserReportDownloads, describeIsolation } from "@foss-earth/ui/browser";
+import { attachResetButton, bootStep, browserReportDownloads, describeIsolation, createTestFeedbackPanel } from "@foss-earth/ui/browser";
 import { getAppSettings, TOOLBAR_ACTIVITY_OUTLINE_ID, TOOLBAR_EDIT_PRIORITIES_ID } from "foss-earth/settings";
 import {
   getAppIdentity,
@@ -87,7 +88,7 @@ import {
   type AircraftLodId,
   type AircraftSelection,
 } from "@0sfs/aircraft/aircraftCatalog";
-import { applyAircraftRig, readControlSurfaceState } from "@0sfs/aircraft/aircraftAnimation";
+import { applyAircraftRig, readControlSurfaceState, readGearDownNorm } from "@0sfs/aircraft/aircraftAnimation";
 import { flightLog } from "@0sfs/logging/flightLog";
 import { createFlightRecorder } from "@0sfs/logging/flightRecorder";
 import { createEvaluationInstruments } from "./hud/evaluationInstruments";
@@ -157,6 +158,10 @@ import { createFlightHudBar, type FlightHudBarHandle } from "./hud/createFlightH
 import { createFlightStatusOverlay, type FlightStatusOverlayHandle } from "./hud/createFlightStatusOverlay";
 import type { FlightStatusOverlayState } from "./hud/FlightStatusOverlay";
 import { attachFlightCameraInput } from "@0sfs/controls/flightCameraInput";
+import { createCockpitLook } from "./cockpitLook";
+import { createCockpitScreen, type CockpitScreenPart } from "./cockpit/cockpitScreen";
+import { createHeadsetPanel, createHeadsetSession, headsetFramesOf, offerHeadsetTab, type HeadsetSurface } from "foss-earth/immersive";
+import { applyFastestComputerCockpitDefaults } from "./cockpit/cockpitScreenDefaults";
 import { applyFlightControls } from "@0sfs/controls/applyFlightControls";
 import { automaticFlapCommand } from "@0sfs/controls/autoFlaps";
 import { createAutoTrimState, readAutoTrimTuning, setAutoTrimEnabled, stepPitchAutoTrim, stepRollAutoTrim } from "@0sfs/controls/autoTrim";
@@ -203,8 +208,10 @@ import type { OrbitInvertSettings } from "foss-earth/input";
 import { createJsbsimRuntime } from "./jsbsim/createJsbsimRuntime";
 import { CONTROL_LAW_MODE_VALUES, getFdmProfile, resolveEngineModel } from "./jsbsim/fdmProfiles";
 import { createAircraftEngineVisuals } from "@0sfs/aircraft/createAircraftEngineVisuals";
-import { createFixedStepPhysicsLoop, FIXED_DT } from "./physics/fixedStepLoop";
-import { ALERT_PILOT, readPilotG, stepPilot, type GVisionSettings, type PassOutSettings } from "@0sfs/g-forces/gForce";
+import { createFixedStepPhysicsLoop } from "./physics/fixedStepLoop";
+import { maxCatchUpSteps, PHYSICS_RATE_PARAMETER_ID, physicsStepSeconds, readPhysicsHz } from "./physics/physicsRate";
+import { readPilotG } from "@0sfs/g-forces/gForce";
+import { createFlightPilot, PILOT_PARAMETER_IDS, readFlightPilotSettings, type PilotTransition } from "./createFlightPilot";
 import { cameraAttitudeView } from "./hud/cameraAttitudeView";
 import { createFlightCompass } from "./hud/flightCompass";
 import type { AttitudeView } from "./hud/attitudeIndicator";
@@ -264,6 +271,19 @@ const FLIGHT_MINIMUM_COLOUR = "#ff6b6b";
  * which is why a swipe there and a swipe on the phone feel like one gesture.
  */
 const PHONE_SWIPE_RADIANS = 5;
+
+/** The flight's instruments, as the cockpit screen and a headset's HUD pick them. */
+const FLIGHT_INSTRUMENTS = ".flight-hud-root, .flight-status-root";
+/** What no copy of the page shows: the 3D view itself, and what acts on the pilot's eyes. */
+const FLIGHT_NEVER_MIRRORED = ".flight-app__canvas, .flight-g-vision-root";
+/** The VR tab's list: what the controllers do in the cockpit. */
+const FLIGHT_HEADSET_CONTROLS: readonly (readonly [string, string])[] = [
+  ["Trigger or pinch", "Press what you point at on the cockpit screen, a window or the toolbar."],
+  ["Grip", "Hold a window to move it; let it go near its place to put it back."],
+  ["Thumbstick up or down", "Scroll what you point at, or push a held window away and bring it near."],
+  ["+ below the view", "With the windows in the HUD: open a window, or a tab once both sides hold one."],
+  ["Flying", "A keyboard, a game controller or a paired phone flies the aircraft; the headset's controllers do not yet."],
+];
 
 function preferenceStorage(): Storage | null {
   try {
@@ -391,6 +411,8 @@ export async function createFlightSimApp(
         dataBaseUrl: options.dataBaseUrl,
         aircraftId: selection.aircraftId,
         engineModel: resolveEngineModel(selection.aircraftId, parameters.get("osfs.engine.model"))?.id,
+        // A switch starts a new flight: the saved physics rate applies to it.
+        physicsHz: readPhysicsHz(parameters),
         bootstrap: {
           latDeg: previous.state.latDeg, lonDeg: previous.state.lonDeg,
           headingDeg: previous.state.headingRad / RADIANS_PER_DEGREE,
@@ -715,6 +737,7 @@ async function createFlightSimSession(
     dataBaseUrl: options.dataBaseUrl,
     aircraftId: initialAircraftId,
     engineModel: engineModel ?? undefined,
+    physicsHz: readPhysicsHz(parameters),
     bootstrap: benchBootstrap ?? {
       ...spawn,
       headingDeg: session.resume ? session.resume.state.headingRad / RADIANS_PER_DEGREE : resumeFlight?.headingDeg ?? parameters.get("osfs.start.heading"),
@@ -764,12 +787,21 @@ async function createFlightSimSession(
     if (!options.diagnostics) diagnostics.destroy();
     throw error;
   }
+  // One step for the whole flight: the rate the native model was initialized
+  // with, not the setting now. The loop, controls, autopilot, trim, wheel
+  // cues and time accounting all use it; a changed setting waits for the next flight.
+  const physicsHz = jsbsim.physicsHz;
+  const physicsDt = physicsStepSeconds(physicsHz);
+  flightLog.info("physics", "Fixed-step rate", { physicsHz, stepSeconds: physicsDt, maxCatchUpSteps: maxCatchUpSteps(physicsHz) });
+  if (session.runtime && readPhysicsHz(parameters) === physicsHz) markParametersApplied(settings, [PHYSICS_RATE_PARAMETER_ID]);
   if (runtime.geospatialCamera) {
     runtime.geospatialCamera.detachControl();
     runtime.geospatialCamera.setEnabled(false);
   }
   // The renderer has said what it is: a very slow device lights imagery as at the aircraft, and takes the ground's light as one colour.
   applySlowDeviceSkyDefaults(settings);
+  // And one of the fastest draws the chase view behind the cockpit screen's interface.
+  applyFastestComputerCockpitDefaults(settings);
   let worldLoading = true;
   let aircraftSwitching = session.switching ?? false;
   // Holds physics while hidden gear pipelines compile under the loading screen.
@@ -946,7 +978,7 @@ async function createFlightSimSession(
       ardupilot: ardupilotStatus,
       pilot,
       gearDownNorm: inputManager.getGearDownNorm(),
-      flight: readArbiterFlight(FIXED_DT),
+      flight: readArbiterFlight(physicsDt),
       stickOverride: parameters.get("osfs.autopilot.stickOverride"),
     });
     arbiterState = stepped.state;
@@ -1085,21 +1117,21 @@ async function createFlightSimSession(
     tireAudio.update(0);
   };
   let externalTankStepSeconds = 0;
-  let gVisionStepSeconds = 0;
-  const physicsLoop = createFixedStepPhysicsLoop(jsbsim.sdk, state => {
+  const physicsLoop = createFixedStepPhysicsLoop(jsbsim.sdk, (state, stepSeconds) => {
     if (benchmarkRouteRun) {
       benchmarkRouteRun.acceptStep(state, () => runtime.surface.sample(state.latDeg, state.lonDeg)?.heightMeters ?? null);
       if (benchmarkRouteRun.status !== "running") inputManager.setPaused(true);
     }
-    externalTankStepSeconds += FIXED_DT;
-    gVisionStepSeconds += FIXED_DT;
+    externalTankStepSeconds += stepSeconds;
+    stepFlightPilot(stepSeconds);
     // Ahead of the wheel guard: engine sound must not depend on a wheel experiment.
     flightAudio.publishStep();
     if (engineTest || wheelSpinMode === "off") return;
-    wheelSpin.step(FIXED_DT, wheelSpinMode);
+    wheelSpin.step(stepSeconds, wheelSpinMode);
     acceptedWheelSteps += 1;
-    wheelCues.publish(acceptedWheelSteps * FIXED_DT, FIXED_DT, wheelSpin.getStates());
+    wheelCues.publish(acceptedWheelSteps * stepSeconds, stepSeconds, wheelSpin.getStates());
   }, {
+    physicsHz,
     getArcadeGroundLaunches: arcadeGroundLaunches,
   });
   const flightSurface = createFrameSurfaceQuery(runtime.surface);
@@ -1367,6 +1399,7 @@ async function createFlightSimSession(
       aircraft: initialAircraftId,
       generation: initialAircraftSelection.generationId ?? "",
       jsbsim: JSON.stringify(jsbsim.identity),
+      physics_hz: String(physicsHz),
     },
   });
   const recordingFileName = () =>
@@ -1393,40 +1426,54 @@ async function createFlightSimSession(
   const evaluationInstruments = createEvaluationInstruments(
     hudRoot.querySelector<HTMLElement>(".flight-hud__eval") ?? hudRoot,
   );
-  // G-forces: the load at the pilot's seat is read once a frame, for the
-  // indicator, for the vignettes it closes over the view and for the pilot
-  // passing out. All of it is DOM, so none of it asks the globe for a frame.
+  // G-forces: the load at the pilot's seat is read after each accepted physics
+  // step, for the pilot, and shown by the indicator and the vignettes once a
+  // frame. All of it is DOM, so none of it asks the globe for a frame.
   const gMeter = createGMeter(hudRoot.querySelector<HTMLElement>(".flight-hud__g") ?? hudRoot, {
     onToggleTab: () => controlPanel?.toggleTab("gforces"),
   });
   const gVisionOverlay = createGVisionOverlay(gVisionRoot);
-  const readGVisionSettings = (): GVisionSettings => ({
-    blackout: parameters.get("osfs.gForce.blackoutRange"),
-    redout: parameters.get("osfs.gForce.redoutRange"),
-    onsetSeconds: parameters.get("osfs.gForce.onsetTime"),
-    recoverySeconds: parameters.get("osfs.gForce.recoveryTime"),
-  });
-  const readPassOutSettings = (): PassOutSettings | null => parameters.get("osfs.gForce.passOut") ? {
-    meanSeconds: parameters.get("osfs.gForce.unconsciousTime"),
-    spreadSeconds: parameters.get("osfs.gForce.unconsciousSpread"),
-  } : null;
   let gIndicatorShown = parameters.get("osfs.gForce.indicator");
   let gVisionEnabled = parameters.get("osfs.gForce.vision");
-  let gVisionSettings = readGVisionSettings();
-  let passOutSettings = readPassOutSettings();
-  let pilot = ALERT_PILOT;
-  const pilotOut = (): boolean => pilot.secondsOut > 0;
+  let passOutEnabled = parameters.get("osfs.gForce.passOut");
+  // The response is the flight's: its states do not translate, so a change waits for the next flight.
+  const pilot = createFlightPilot(parameters.get("osfs.gForce.response"), readFlightPilotSettings(parameters));
+  if (session.runtime) markParametersApplied(settings, ["osfs.gForce.response"]);
+  flightLog.info("pilot", "Response", { response: pilot.profileId() });
+  /** The load the last accepted step gave the pilot, for the indicator; null after the frame has shown it. */
+  let steppedPilotG: number | null = null;
+  const logPilotTransition = (transition: PilotTransition, details: Record<string, number> = {}): void => {
+    if (!transition) return;
+    const secondsOut = pilot.kind === "curve" && transition === "passed-out" ? pilot.diagnostics().secondsOut : undefined;
+    flightLog.info("pilot", transition === "passed-out" ? "Pilot passed out" : "Pilot came to", {
+      response: pilot.profileId(), ...details,
+      ...(secondsOut === undefined ? {} : { secondsOut: Number(secondsOut.toFixed(1)) }),
+    });
+  };
+  // Once per accepted step, with that step's load and length: a pilot who
+  // passes out in one step lets go of the controls from the next, also within
+  // a frame. With the vignettes and passing out both off, nothing is followed.
+  function stepFlightPilot(stepSeconds: number): void {
+    if (!gVisionEnabled && !passOutEnabled) return;
+    const pilotG = readPilotG(jsbsim.sdk);
+    steppedPilotG = pilotG;
+    logPilotTransition(pilot.step(pilotG, stepSeconds), { loadG: Number(pilotG.toFixed(1)) });
+  }
   const showGVision = (): void => {
     // A pilot who is out sees nothing, in every view and at any strength.
-    if (pilotOut()) { gVisionOverlay.show(1, 0); return; }
+    if (pilot.isOut()) { gVisionOverlay.show(1, 0); return; }
     const drawn = gVisionEnabled
       && (parameters.get("osfs.gForce.visionViews") === "all" || aircraft?.getViewMode() === "first");
     const strength = drawn ? parameters.get("osfs.gForce.visionStrength") : 0;
-    gVisionOverlay.show(pilot.vision.blackout * strength, pilot.vision.redout * strength);
+    gVisionOverlay.show(pilot.blackout() * strength, pilot.redout() * strength);
   };
   const clearGVision = (): void => {
-    pilot = ALERT_PILOT;
-    gVisionStepSeconds = 0;
+    pilot.reset();
+    showGVision();
+  };
+  /** Edits within the response keep what the pilot has used up: they never grant a recovery. */
+  const configurePilot = (): void => {
+    logPilotTransition(pilot.configure(readFlightPilotSettings(parameters)));
     showGVision();
   };
   const coverGVision = (): void => gVisionOverlay.cover(parameters.get("osfs.gForce.visionLayer") === "everything");
@@ -1442,26 +1489,26 @@ async function createFlightSimSession(
     // The load is still followed while passing out is on, to pass out by.
     parameters.watch("osfs.gForce.vision", enabled => {
       gVisionEnabled = enabled;
-      if (!enabled && !passOutSettings) clearGVision();
+      if (!enabled && !passOutEnabled) clearGVision();
       else showGVision();
     }),
-    parameters.watch("osfs.gForce.passOut", () => {
-      passOutSettings = readPassOutSettings();
-      if (passOutSettings) return;
+    parameters.watch("osfs.gForce.passOut", enabled => {
+      passOutEnabled = enabled;
       // Off wakes a pilot who is out, with their sight coming back from black.
-      if (pilotOut()) flightLog.info("pilot", "Pilot came to: passing out was turned off");
-      pilot = { vision: pilot.vision, secondsOut: 0 };
-      if (gVisionEnabled) showGVision();
+      const transition = pilot.configure(readFlightPilotSettings(parameters));
+      if (transition === "came-to") flightLog.info("pilot", "Pilot came to: passing out was turned off");
+      else logPilotTransition(transition);
+      if (enabled || gVisionEnabled) showGVision();
       else clearGVision();
     }),
     parameters.watch("osfs.gForce.visionLayer", coverGVision),
   );
-  for (const id of ["osfs.gForce.unconsciousTime", "osfs.gForce.unconsciousSpread"] as const) {
-    stopWatching.push(parameters.watch(id, () => { passOutSettings = readPassOutSettings(); }));
+  for (const id of PILOT_PARAMETER_IDS) {
+    if (id !== "osfs.gForce.passOut") stopWatching.push(parameters.watch(id, configurePilot));
   }
-  for (const id of ["osfs.gForce.blackoutRange", "osfs.gForce.redoutRange", "osfs.gForce.onsetTime",
-    "osfs.gForce.recoveryTime", "osfs.gForce.visionStrength", "osfs.gForce.visionViews"] as const) {
-    stopWatching.push(parameters.watch(id, () => { gVisionSettings = readGVisionSettings(); showGVision(); }));
+  // How the vignettes are drawn: the pilot is unchanged.
+  for (const id of ["osfs.gForce.visionStrength", "osfs.gForce.visionViews"] as const) {
+    stopWatching.push(parameters.watch(id, showGVision));
   }
   const engineMonitor = createEngineMonitor(
     hudRoot.querySelector<HTMLElement>(".flight-hud__engine") ?? hudRoot,
@@ -1749,6 +1796,102 @@ async function createFlightSimSession(
     zoom: applyCameraZoom,
     getTouchWheelCooldownMs: () => parameters.get("osfs.input.touchWheelCooldown"),
   });
+  // The Cockpit view looks around as a FOSS Earth 360 photograph does; the chase input above acts only outside it.
+  const cockpitLook = createCockpitLook({
+    canvas,
+    aircraft: () => aircraft,
+    fieldOfViewDeg: () => parameters.get("osfs.camera.fieldOfView"),
+    inputMode: () => inputMode,
+    requestRender: () => runtime.requestRender(),
+    now: () => performance.now(),
+  });
+  // The cockpit's touchscreen shows the page's interface, as the chase view does.
+  const cockpitScreen = createCockpitScreen({
+    scene: runtime.scene,
+    document: rootElement.ownerDocument,
+    canvas,
+    aircraft: () => aircraft,
+    settings: () => ({
+      content: parameters.get("osfs.cockpit.screen.content"),
+      background: parameters.get("osfs.cockpit.screen.background"),
+      places: {
+        instruments: parameters.get("osfs.cockpit.screen.instruments"),
+        toolbar: parameters.get("osfs.cockpit.screen.toolbar"),
+        windows: parameters.get("osfs.cockpit.screen.windows"),
+      },
+      refreshRateHz: parameters.get("osfs.cockpit.screen.refreshRate"),
+      resolutionPx: parameters.get("osfs.cockpit.screen.resolution"),
+    }),
+    parts: { instruments: FLIGHT_INSTRUMENTS, toolbar: ".flight-shell-root", windows: ".flight-panel-root" },
+    never: FLIGHT_NEVER_MIRRORED,
+    viewHolders: ".flight-app",
+    requestRender: () => runtime.requestRender(),
+    now: () => performance.now(),
+  });
+  for (const id of ["content", "background", "instruments", "toolbar", "windows", "refreshRate", "resolution"] as const) {
+    stopWatching.push(parameters.watch(`osfs.cockpit.screen.${id}`, () => cockpitScreen.refresh()));
+  }
+  // A VR headset seats the pilot in the cockpit, the space turning with the
+  // aircraft. The interface is on the cockpit's touchscreen, as in the cockpit
+  // view; the parts placed in the HUD are on panels around the head instead.
+  const headsetFrames = headsetFramesOf(runtime);
+  const cockpitSurface: HeadsetSurface = {
+    id: "cockpit-screen",
+    hit: (origin, direction) => cockpitScreen.hit(origin, direction),
+    locate: page => cockpitScreen.locate(page.x, page.y),
+  };
+  const headset = headsetFrames ? createHeadsetSession({
+    scene: runtime.scene, frames: headsetFrames, navigator: window.navigator,
+    holdRendering() {
+      runtime.beginContinuous();
+      let released = false;
+      return () => { if (!released) { released = true; runtime.endContinuous(); } };
+    },
+    requestRender: () => runtime.requestRender(),
+    place() {
+      if (!aircraft) return null;
+      const seat = aircraft.cockpit.computeWorldMatrix(true);
+      // The cockpit camera is the pilot's eye, placed in the cockpit.
+      const eye = Vector3.TransformCoordinates(aircraft.firstPersonCamera.position, seat);
+      // At rest the cockpit camera faces the nose: half a turn from its own look, which is −z in a right-handed scene.
+      const forward = Vector3.TransformNormal(new Vector3(0, 0, runtime.scene.useRightHandedSystem ? 1 : -1), seat).normalize();
+      const up = Vector3.TransformNormal(Vector3.Up(), seat).normalize();
+      return { position: [eye.x, eye.y, eye.z], forward: [forward.x, forward.y, forward.z], up: [up.x, up.y, up.z] };
+    },
+    globeCamera: () => aircraft?.firstPersonCamera ?? null,
+    ui: {
+      document: rootElement.ownerDocument,
+      selectors: { toolbar: ".flight-shell-root .hud-bar", instruments: FLIGHT_INSTRUMENTS },
+      never: FLIGHT_NEVER_MIRRORED,
+      seeThrough: ".flight-app",
+      parts() {
+        // The aircraft's own picture on its screen leaves every part to the HUD.
+        const onScreen = cockpitScreen.showsInterface();
+        const inHud = (part: CockpitScreenPart): boolean => !onScreen || parameters.get(`osfs.cockpit.screen.${part}`) === "hud";
+        return { toolbar: inHud("toolbar"), windows: inHud("windows"), instruments: inHud("instruments") };
+      },
+      surfaces: () => [cockpitSurface],
+    },
+    report: (message, error) => flightLog.warn("vr", message, { error: error instanceof Error ? error.message : String(error ?? "") }),
+  }) : null;
+  // The headset is in the cockpit: the view comes back to what it was after.
+  let viewBeforeHeadset: "first" | "third" | null = null;
+  const offHeadsetView = headset?.subscribe(() => {
+    const seated = headset.state === "starting" || headset.state === "presenting";
+    if (seated && viewBeforeHeadset === null && aircraft) {
+      viewBeforeHeadset = aircraft.getViewMode();
+      aircraft.setViewMode("first");
+    } else if (!seated && viewBeforeHeadset !== null) {
+      aircraft?.setViewMode(viewBeforeHeadset);
+      viewBeforeHeadset = null;
+    }
+    runtime.requestRender();
+  });
+  const headsetPanel = headset ? createHeadsetPanel(rootElement.ownerDocument, headset, {
+    about: "Fly from the cockpit in a VR headset. The interface is on the cockpit's screen; Aircraft → Cockpit screen moves its parts to panels around you.",
+    controls: FLIGHT_HEADSET_CONTROLS,
+  }) : null;
+  stopWatching.push(() => { offHeadsetView?.(); headsetPanel?.destroy(); headset?.dispose(); });
   let skipResumeDelta = false;
   let disposed = false;
   let lastPanelUpdateMs = 0;
@@ -1833,8 +1976,12 @@ async function createFlightSimSession(
       aircraftId,
       lodId: aircraftLodId,
       renderStowedGear: parameters.get("osfs.debug.renderStowedGear"),
+      windowTint: parameters.get("osfs.aircraft.windowTint"),
       engineOnly: engineTest,
-      onMeshRootsChange: roots => meshInspector.setRoots(roots),
+      onMeshRootsChange: roots => {
+        meshInspector.setRoots(roots);
+        cockpitScreen.setModel(roots, definition.screenMaterialNames ?? []);
+      },
       getChaseDistanceMeters: () => aircraft?.getChaseDistanceMeters() ?? 0,
       onStateChange: (state) => {
         onModelState(state);
@@ -1855,7 +2002,7 @@ async function createFlightSimSession(
         getSettings: readLightSettings,
         getWhiteLuminance: skyWhiteLuminance,
         setGroundLights: lights => runtime.sky.setGroundLights(lights),
-        getGearDownNorm: () => readControlSurfaceState(jsbsim.sdk, aircraftId).gearDownNorm,
+        getGearDownNorm: () => readGearDownNorm(jsbsim.sdk),
         // Paused or loading, the render loop is idle: the flashes hold and ask for no frames.
         isRunning: () => !inputManager.isPaused() && !worldLoading,
         requestRender: () => runtime.requestRender(),
@@ -1877,9 +2024,13 @@ async function createFlightSimSession(
   stopWatching.push(parameters.watch("osfs.debug.renderStowedGear", enabled => {
     aircraftModel?.setRenderStowedGear(enabled);
   }));
+  stopWatching.push(parameters.watch("osfs.aircraft.windowTint", fraction => {
+    aircraftModel?.setWindowTint(fraction);
+  }));
 
   stopWatching.push(parameters.watch("osfs.camera.fieldOfView", degrees => {
     aircraft?.setFieldOfView(degrees);
+    cockpitLook.setFieldOfView(degrees);
     runtime.requestRender();
   }));
   stopWatching.push(parameters.watch("osfs.camera.nearClipMeters", meters => {
@@ -1920,8 +2071,17 @@ async function createFlightSimSession(
         toggleCameraView();
         phoneSession?.syncStatus();
       },
-      onCameraOrbitActive: (active) => setOrbitInputActive("gamepad", active),
+      onCameraOrbitActive: (active) => {
+        setOrbitInputActive("gamepad", active);
+        if (!active) cockpitLook.setStick(0, 0);
+      },
       onCameraOrbit: (yaw, pitch, dt) => {
+        // The camera stick moves the chase camera around the aircraft, so pushed right its yaw is negative.
+        // In the cockpit it looks the way it is pushed, as in a photograph.
+        if (aircraft?.getViewMode() === "first") {
+          cockpitLook.setStick(-yaw, pitch);
+          return;
+        }
         const inversion = orbitInvert();
         applyOrbitDelta(
           yaw * dt * parameters.get("osfs.camera.gamepadOrbitYawRate") * RADIANS_PER_DEGREE * (inversion.invertYaw ? -1 : 1),
@@ -1965,6 +2125,8 @@ async function createFlightSimSession(
             create: () => createStandardFlightProfile(inputManager.getSelectedGamepadSlot(), parameters.get("osfs.input.stickDeadzone")),
           },
         ],
+        // FOSS Earth's tiny circular reset, on a control away from its default.
+        attachReset: (control, { label, reset }) => { attachResetButton(document, control, { label: () => label, shown: () => true, reset }); },
         onProfileChange: (profile) => {
           const signature = JSON.stringify(profile.bindings);
           if (signature === flightBindingSignature) return;
@@ -2413,6 +2575,11 @@ async function createFlightSimSession(
   };
   const diagnosticsSection = createDiagnosticsSection(diagnosticsSource, { document, reportOnlyHref: reportOnlyAddress(window.location.href) });
   const bugReportPanel = createBugReportPanel(diagnosticsSource, { document, now: () => new Date(), downloads: browserReportDownloads(URL), issueReporter: issueReporterFromBuild() });
+  const testFeedback = createTestFeedbackPanel({ document, href: window.location.href, now: () => new Date(),
+    downloads: browserReportDownloads(URL), secrets: () => reportSecrets(settings), providers: {
+      diagnostics: diagnosticsSource.report,
+      flight: () => createPanelSnapshot(),
+    } });
   const diagnosticsParameters = ui.section(settings, { tab: "settings", section: "diagnostics", footer: diagnosticsSection.element });
   const interfaceParameterSections = (["position", "log"] as const)
     .map(section => ({ section, handle: ui.section(settings, { tab: "interface", section }) }));
@@ -2487,9 +2654,11 @@ async function createFlightSimSession(
     timeTab: timePanel.element,
     settingsSections,
     nativeSections: native.sections,
+    headsetTab: headsetPanel?.element,
     aboutTab: about.element,
     browserDataTab: browserData.element,
     bugReportTab: bugReportPanel.element,
+    testFeedbackTab: testFeedback?.element,
     onBugReportShow: () => bugReportPanel.show(),
     interfaceSections,
     initialWeather: weather,
@@ -2592,6 +2761,8 @@ async function createFlightSimSession(
     onUseAsRemote: () => window.location.assign(appHref("rc", new URL(window.location.origin))),
   });
   audioPanelReady = true;
+  // On a headset's browser the VR tab opens once, to show the way in.
+  if (headset) stopWatching.push(offerHeadsetTab(headset, () => controlPanel?.openOrSelectTab("vr"), preferenceStorage()));
   hudBar = createFlightHudBar(shellRoot, {
     renderActivity: runtime,
     rendererMode: runtime.renderer.mode,
@@ -2677,6 +2848,10 @@ async function createFlightSimSession(
     // Paced playout draws over several frames; a paused view renders only on request.
     if (phoneSession?.hasPendingCameraAim()) runtime.requestRender();
     recenterOrbit(deltaSeconds);
+    // Before this frame draws: entering the cockpit looks ahead in it at once.
+    cockpitLook.sync();
+    cockpitLook.step();
+    cockpitScreen.update();
 
     fpsSampleFrames += 1;
     const frameNow = performance.now();
@@ -2741,7 +2916,7 @@ async function createFlightSimSession(
       // This computer's levers continue from where the two pilots left them.
       if (controlBlend && phoneSession?.isBlending()) inputManager.adoptLevers(blended);
       // A pilot who has passed out lets go of the stick, the pedals and the brakes.
-      const selected = pilotOut() ? { ...blended, elevator: 0, aileron: 0, rudder: 0, brake: 0 } : blended;
+      const selected = pilot.isOut() ? { ...blended, elevator: 0, aileron: 0, rudder: 0, brake: 0 } : blended;
       if (collisionReset) { resetWheelSpin("reset"); return "reset"; }
       if (phoneSession?.getSnapshot().owner === "phone") noticeRemoteFlaps(selected.flaps);
       else noticeLocalFlaps();
@@ -2773,7 +2948,7 @@ async function createFlightSimSession(
         const pusher = getFdmProfile(aircraftId).sf50VariantId
           ? jsbsim.sdk.getPropertyValue("fcs/pusher-cmd-norm") : 0;
         const pitched = stepPitchAutoTrim(pitchAutoTrim, {
-          dt: FIXED_DT,
+          dt: physicsDt,
           pitchAccelRad: jsbsim.sdk.getPropertyValue("accelerations/qdot-rad_sec2"),
           pitchRateRad: jsbsim.sdk.getPropertyValue("velocities/q-rad_sec"),
           elevator: selected.elevator + (Number.isFinite(pusher) ? pusher : 0),
@@ -2791,7 +2966,7 @@ async function createFlightSimSession(
         if (rollAutoTrim.trim !== null) rollAutoTrim = createAutoTrimState(rollAutoTrim.enabled);
       } else if (!engineTest && ap.owners.roll === "pilot") {
         const rolled = stepRollAutoTrim(rollAutoTrim, {
-          dt: FIXED_DT,
+          dt: physicsDt,
           rollAccelRad: jsbsim.sdk.getPropertyValue("accelerations/pdot-rad_sec2"),
           rollRateRad: jsbsim.sdk.getPropertyValue("velocities/p-rad_sec"),
           aileron: selected.aileron,
@@ -2944,7 +3119,7 @@ async function createFlightSimSession(
     }
     flightHud.update(
       displayState,
-      phoneOwned || lastApResult.engaged || pilotOut() ? appliedControls : controls,
+      phoneOwned || lastApResult.engaged || pilot.isOut() ? appliedControls : controls,
       lastApResult.engaged ? lastApResult.gearDownNorm > 0 : inputManager.getGearDownNorm() > 0,
       { pitch: pitchAutoTrim.enabled, roll: rollAutoTrim.enabled },
       hudMasterAp(),
@@ -2963,22 +3138,9 @@ async function createFlightSimSession(
     sectionStarted = frameProfiler.clock();
     flightRecorder.sample(jsbsim.sdk);
     evaluationInstruments.update(jsbsim.sdk);
-    if (gIndicatorShown || gVisionEnabled || passOutSettings) {
-      const pilotG = readPilotG(jsbsim.sdk);
-      if (gIndicatorShown) gMeter.update(pilotG);
-      if (gVisionEnabled || passOutSettings) {
-        const wasOut = pilotOut();
-        pilot = stepPilot(pilot, pilotG, gVisionStepSeconds, gVisionSettings, passOutSettings);
-        if (!wasOut && pilotOut()) {
-          flightLog.info("pilot", "Pilot passed out", {
-            loadG: Number(pilotG.toFixed(1)), secondsOut: Number(pilot.secondsOut.toFixed(1)),
-          });
-        } else if (wasOut && !pilotOut()) {
-          flightLog.info("pilot", "Pilot came to", { loadG: Number(pilotG.toFixed(1)) });
-        }
-      }
-    }
-    gVisionStepSeconds = 0;
+    // The pilot has followed each step already; the indicator shows the last.
+    if (gIndicatorShown) gMeter.update(steppedPilotG ?? readPilotG(jsbsim.sdk));
+    steppedPilotG = null;
     // Every frame: a change of camera view changes what is drawn without a step.
     showGVision();
     engineMonitor.update(jsbsim.sdk, feedbackHeld || worldLoading);
@@ -3073,6 +3235,8 @@ async function createFlightSimSession(
       flightGamepadRuntime.dispose();
       flightGamepadSource.dispose();
       detachCameraInput();
+      cockpitLook.dispose();
+      cockpitScreen.dispose();
       detachInput();
       if (flightPerformance) setActiveFlightPerformanceCapture(null);
       if (benchmarkRouteRun && window.osfsFlightRoute === benchmarkRouteRun) delete window.osfsFlightRoute;
@@ -3095,6 +3259,7 @@ async function createFlightSimSession(
       for (const handle of nativeParameters) handle.destroy();
       diagnosticsSection.destroy();
       bugReportPanel.destroy();
+      testFeedback?.destroy();
       diagnostics.destroy();
       about.dispose();
       browserData.destroy();
@@ -3230,7 +3395,7 @@ async function createFlightSimSession(
       const recordedSettings = Object.fromEntries(settings.list()
         .filter(spec => !spec.sensitive && !/key|token|password|secret/i.test(spec.id))
         .map(spec => [spec.id, settings.get(spec.id)]));
-      benchmarkRouteRun = createBenchmarkRouteController(benchmarkRoute, state, terrain.groundHeightMeters, FIXED_DT, recordedSettings);
+      benchmarkRouteRun = createBenchmarkRouteController(benchmarkRoute, state, terrain.groundHeightMeters, physicsDt, recordedSettings);
       window.osfsFlightRoute = benchmarkRouteRun;
       frameProfile.configure({ windowFrames: 65_536 });
       frameProfiler.reset();
