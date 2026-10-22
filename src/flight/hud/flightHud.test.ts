@@ -304,6 +304,34 @@ describe("flight HUD gear button", () => {
     t.hud.destroy();
   });
 
+  it("leaves the page untouched while nothing it shows changes", () => {
+    let flaps = 0.25;
+    const t = mount({ flapAutomation: {
+      getEnabled: () => true, onEnabledChange: vi.fn(), getPositionNorm: () => flaps, minPositionNorm: -0.05,
+    } });
+    const controls = { ...CONTROLS, pitchTrim: 0.12, rudder: -0.3 };
+    const state = { ...STATE, airspeedKts: 141.2, verticalSpeedFps: 3.4, headingRad: 1 };
+    t.hud.update(state, controls, true, AUTO_OFF);
+    const observer = new MutationObserver(() => undefined);
+    observer.observe(t.host, { subtree: true, childList: true, attributes: true, characterData: true });
+    t.hud.update({ ...state, airspeedKts: 141.4 }, controls, true, AUTO_OFF);
+    expect(observer.takeRecords()).toEqual([]);
+    flaps = 0.5;
+    t.hud.update({ ...state, verticalSpeedFps: 3.5 }, controls, true, AUTO_OFF);
+    const vs = t.host.querySelector<HTMLElement>('[data-metric="vs"]')!;
+    const records = observer.takeRecords();
+    const changed = records.map(record => record.attributeName ?? (record.target as Element).getAttribute?.("data-metric")
+      ?? (record.target as Element).getAttribute?.("data-output") ?? record.target.parentElement?.dataset.metric);
+    expect(new Set(changed)).toEqual(new Set(["vs", "flaps", "aria-valuetext"]));
+    // The readout's text node is kept and its text changed, rather than replaced.
+    expect(records.find(record => record.target.parentElement === vs)?.type).toBe("characterData");
+    expect(vs.textContent).toBe("+ 210");
+    expect(vs.childNodes.length).toBe(1);
+    expect(t.host.querySelector<HTMLOutputElement>('[data-output="flaps"]')!.value).toBe("50%");
+    observer.disconnect();
+    t.hud.destroy();
+  });
+
   it("stops answering clicks once destroyed", () => {
     const t = mount();
     const gear = t.gear;

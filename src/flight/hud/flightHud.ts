@@ -147,6 +147,26 @@ function controlsToStickDisplay(aileron: number, elevator: number): { x: number;
   );
 }
 
+// The HUD refreshes every frame, and a write puts style or layout out of date,
+// so the next read of the canvas's size restyles or lays out the page again.
+// Each of these writes only what differs from the page. A readout's text is
+// changed in its text node: replacing the node, as textContent does, restyles
+// as well as laying out.
+function setText(element: HTMLElement, text: string): void {
+  const node = element.firstChild;
+  if (node?.nodeType === 3 && node === element.lastChild && text !== "") {
+    if ((node as Text).data !== text) (node as Text).data = text;
+  } else if (element.textContent !== text) element.textContent = text;
+}
+
+function setValue(element: HTMLInputElement | HTMLOutputElement, value: string): void {
+  if (element.value !== value) element.value = value;
+}
+
+function setAttr(element: Element, name: string, value: string): void {
+  if (element.getAttribute(name) !== value) element.setAttribute(name, value);
+}
+
 export function createFlightHud(root: HTMLElement, options: FlightHudOptions): FlightHudHandle {
   root.innerHTML = `
     <div class="flight-hud" aria-label="Flight instruments">
@@ -282,23 +302,24 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
     const automation = options.flapAutomation;
     const enabled = automation?.getEnabled() === true;
     if (enabled) flapsKeyboardEditing = false;
-    autoFlapsButton?.setAttribute("aria-pressed", String(enabled));
+    if (autoFlapsButton) setAttr(autoFlapsButton, "aria-pressed", String(enabled));
     autoFlapsButton?.classList.toggle("is-on", enabled && !masterAp.ownsFlaps);
     if (autoFlapsButton) {
-      autoFlapsButton.title = masterAp.ownsFlaps
+      const title = masterAp.ownsFlaps
         ? `Flaps are owned by Autopilot. Automatic flap assist is ${enabled ? "requested" : "off"}; move the slider to take over manually.`
         : enabled ? "Automatic flaps on. Move the slider to take over manually."
           : "Automatic flaps off. Click to resume automatic control.";
-      autoFlapsButton.setAttribute("aria-label", autoFlapsButton.title);
+      setAttr(autoFlapsButton, "title", title);
+      setAttr(autoFlapsButton, "aria-label", title);
     }
     const actual = automation?.getPositionNorm();
     const known = actual !== undefined && Number.isFinite(actual);
     const editingCommand = flapsDragging || (flapsKeyboardEditing && !enabled);
     const displayed = known && !editingCommand ? actual : flapCommand;
-    flapsInput.min = String(enabled ? automation?.minPositionNorm ?? 0 : 0);
-    if (!flapsDragging) flapsInput.value = String(displayed);
-    flapsOutput.value = known ? `${Math.round(actual * 100)}%` : `${Math.round(flapCommand * 100)}%`;
-    flapsInput.setAttribute("aria-valuetext", `${Math.round(displayed * 100)}% ${known && !editingCommand ? "actual" : "commanded"}${masterAp.ownsFlaps ? ", autopilot owns flaps" : enabled ? ", automatic flaps" : ""}`);
+    setAttr(flapsInput, "min", String(enabled ? automation?.minPositionNorm ?? 0 : 0));
+    if (!flapsDragging) setValue(flapsInput, String(displayed));
+    setValue(flapsOutput, known ? `${Math.round(actual * 100)}%` : `${Math.round(flapCommand * 100)}%`);
+    setAttr(flapsInput, "aria-valuetext", `${Math.round(displayed * 100)}% ${known && !editingCommand ? "actual" : "commanded"}${masterAp.ownsFlaps ? ", autopilot owns flaps" : enabled ? ", automatic flaps" : ""}`);
   };
   const onAutoFlapsClick = (): void => {
     flapsKeyboardEditing = false;
@@ -393,10 +414,10 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
     const physical = lever.getPositionNorm?.();
     const actual = physical !== undefined && Number.isFinite(physical)
       ? `; ${Math.round(Math.min(1, Math.max(0, physical)) * 100)}% actual conversion` : "";
-    vtolInput.value = String(command);
-    vtolOutput.value = `${percent}%`;
-    vtolInput.setAttribute("aria-valuetext", `${percent}% commanded${actual}`);
-    vtolInput.title = `0% conventional flight; 100% vertical lift. ${percent}% commanded${actual}.`;
+    setValue(vtolInput, String(command));
+    setValue(vtolOutput, `${percent}%`);
+    setAttr(vtolInput, "aria-valuetext", `${percent}% commanded${actual}`);
+    setAttr(vtolInput, "title", `0% conventional flight; 100% vertical lift. ${percent}% commanded${actual}.`);
   };
   const onVtolInput = (): void => {
     if (!options.vtolConversion || !vtolInput) return;
@@ -604,28 +625,28 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
         || Math.hypot(controls.aileron, controls.elevator) > 0.001;
       attitude.draw(state, { x: displayX, y: displayY, active: displayActive }, attitudeView);
 
-      iasEl.textContent = Math.round(state.airspeedKts).toString().padStart(3, "0");
-      hdgEl.textContent = Math.round(headingDegFromRad(state.headingRad)).toString().padStart(3, "0");
+      setText(iasEl, Math.round(state.airspeedKts).toString().padStart(3, "0"));
+      setText(hdgEl, Math.round(headingDegFromRad(state.headingRad)).toString().padStart(3, "0"));
 
       // Sign then magnitude, each fixed width: signing the padded number gave
       // "+ 738" against "-738", so the chip changed width across zero. The
       // instrument row is left-anchored now, and that shunts everything after
       // it sideways.
       const vsFpm = Math.round(state.verticalSpeedFps * 60);
-      vsEl.textContent = `${vsFpm < 0 ? "-" : "+"}${Math.abs(vsFpm).toString().padStart(4, " ")}`;
-      pitchTrimInput.value = String(controls.pitchTrim);
-      rollTrimInput.value = String(controls.rollTrim);
+      setText(vsEl, `${vsFpm < 0 ? "-" : "+"}${Math.abs(vsFpm).toString().padStart(4, " ")}`);
+      setValue(pitchTrimInput, String(controls.pitchTrim));
+      setValue(rollTrimInput, String(controls.rollTrim));
       if (!flapsKeyboardEditing) flapCommand = controls.flaps;
       refreshFlaps();
-      if (!rudderDragging) rudderInput.value = String(controls.rudder);
+      if (!rudderDragging) setValue(rudderInput, String(controls.rudder));
       throttle.update({
         throttle: state.throttleNorm,
         engine: options.engine?.getReading() ?? null,
         afterburner: options.afterburner?.getActive() ?? null,
       });
-      pitchTrimOutput.value = `${Math.round(controls.pitchTrim * 100)}%`;
-      rollTrimOutput.value = `${Math.round(controls.rollTrim * 100)}%`;
-      rudderOutput.value = `${Math.round((rudderDragging ? Number(rudderInput.value) : controls.rudder) * 100)}%`;
+      setValue(pitchTrimOutput, `${Math.round(controls.pitchTrim * 100)}%`);
+      setValue(rollTrimOutput, `${Math.round(controls.rollTrim * 100)}%`);
+      setValue(rudderOutput, `${Math.round((rudderDragging ? Number(rudderInput.value) : controls.rudder) * 100)}%`);
     },
     destroy(): void {
       attitude.destroy();

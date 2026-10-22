@@ -41,7 +41,8 @@ export function createEvaluationInstruments(root: HTMLElement): EvaluationInstru
     if (!el) throw new Error(`Evaluation instruments markup is missing ${selector}.`);
     return el;
   };
-  const aoaValue = query('[data-value="aoa"]');
+  // Edit the readout's own text node: replacing it forces a page restyle every frame.
+  const aoaText = query('[data-value="aoa"]').firstChild as Text;
   const cas = query(".flight-eval__cas");
 
   let available: Record<"aoa" | "stallWarning" | "stickPusher", boolean> | null = null;
@@ -58,7 +59,10 @@ export function createEvaluationInstruments(root: HTMLElement): EvaluationInstru
         };
         aoa.hidden = !available.aoa;
       }
-      if (available.aoa) aoaValue.textContent = reader.getPropertyValue(ALPHA).toFixed(1).padStart(5, " ");
+      if (available.aoa) {
+        const text = reader.getPropertyValue(ALPHA).toFixed(1).padStart(5, " ");
+        if (aoaText.data !== text) aoaText.data = text;
+      }
 
       // STICK PUSHER outranks STALL WARNING; both are red CAS warnings in the AFM.
       const next = available.stickPusher && reader.getPropertyValue(STICK_PUSHER) > 0.5 ? "STICK PUSHER"

@@ -44,6 +44,22 @@ describe("evaluation instruments", () => {
     expect(root.querySelector(".flight-eval__cas")?.classList.contains("is-active")).toBe(false);
   });
 
+  it("edits the AoA text in place and only when the shown value changes", () => {
+    const handle = mount();
+    handle.update(reader(SF50));
+    const value = root.querySelector('[data-value="aoa"]')!;
+    const node = value.firstChild;
+    const observer = new MutationObserver(() => {});
+    observer.observe(root, { subtree: true, childList: true, characterData: true, attributes: true });
+    handle.update(reader({ ...SF50, "aero/alpha-deg": 3.12 }));
+    expect(observer.takeRecords()).toEqual([]);
+    handle.update(reader({ ...SF50, "aero/alpha-deg": -12.5 }));
+    expect(observer.takeRecords().map((record) => record.type)).toEqual(["characterData"]);
+    expect(value.firstChild).toBe(node);
+    expect(value.textContent).toBe("-12.5");
+    observer.disconnect();
+  });
+
   it("hides AoA and never shows a CAS warning on an aircraft without them", () => {
     const handle = mount();
     handle.update(reader({ "propulsion/engine[0]/n1": 40 }));
