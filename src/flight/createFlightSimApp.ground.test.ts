@@ -55,6 +55,7 @@ vi.mock("foss-earth/runtime", () => ({
 vi.mock("./jsbsim/createJsbsimRuntime", () => ({ createJsbsimRuntime: async () => ({ sdk: { setPropertyValue: vi.fn(), getPropertyValue: vi.fn(() => 0) }, dispose: vi.fn() }) }));
 vi.mock("@0sfs/ground-contact/ecefBridge", () => ({ readFlightState: () => mocks.state }));
 vi.mock("./bridge/floatingOrigin", () => ({ createFloatingOrigin: () => ({ aircraftRoot: { setEnabled: vi.fn() }, apply: vi.fn(), dispose: vi.fn() }) }));
+vi.mock("./hud/flightCompass", () => ({ createFlightCompass: () => ({ update: vi.fn(), destroy: vi.fn() }) }));
 vi.mock("@0sfs/aircraft/createPlaceholderAircraft", () => ({ createPlaceholderAircraft: () => mocks.aircraft }));
 vi.mock("@0sfs/ground-contact/createCollisionDebugOverlay", () => ({ createCollisionDebugOverlay: vi.fn(() => ({ setEnabled: vi.fn(), update: vi.fn(), dispose: vi.fn() })) }));
 vi.mock("@0sfs/ground-contact/createWheelSpinDebugOverlay", () => ({ createWheelSpinDebugOverlay: vi.fn(() => ({ setEnabled: vi.fn(), update: vi.fn(), dispose: vi.fn() })) }));

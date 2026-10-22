@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("./hud/flightCompass", () => ({ createFlightCompass: () => ({ update: vi.fn(), destroy: vi.fn() }) }));
 import type { PhoneControlSessionOptions } from "@0sfs/rc/createPhoneControlSession";
 import type { ControlSurfaceState } from "@0sfs/controls/flightInputManager";
 import type { FlightControlPanelOptions } from "./hud/FlightControlPanel";

@@ -206,6 +206,7 @@ import { createAircraftEngineVisuals } from "@0sfs/aircraft/createAircraftEngine
 import { createFixedStepPhysicsLoop, FIXED_DT } from "./physics/fixedStepLoop";
 import { ALERT_PILOT, readPilotG, stepPilot, type GVisionSettings, type PassOutSettings } from "@0sfs/g-forces/gForce";
 import { cameraAttitudeView } from "./hud/cameraAttitudeView";
+import { createFlightCompass } from "./hud/flightCompass";
 import type { AttitudeView } from "./hud/attitudeIndicator";
 import { createFlightLoadingScreen, type FlightLoadingScreen } from "../loading/createFlightLoadingScreen";
 import {
@@ -1338,6 +1339,7 @@ async function createFlightSimSession(
   }));
 
   let floatingOrigin: FloatingOriginHandle | null = null;
+  let flightCompass: ReturnType<typeof createFlightCompass> | null = null;
   // Map → Detail can load the ground around the aircraft, so that turning the
   // chase camera loads nothing new. The floating origin is the aircraft.
   stopWatching.push(runtime.registerFocusPoint({
@@ -1792,6 +1794,7 @@ async function createFlightSimSession(
     if (!worldRoot || floatingOrigin) return;
 
     floatingOrigin = createFloatingOrigin(runtime.scene, worldRoot);
+    flightCompass = createFlightCompass(runtime.scene, floatingOrigin, document, () => runtime.requestRender());
     floatingOrigin.aircraftRoot.setEnabled(false);
     const definition = getAircraftDefinition(aircraftId);
     aircraft = createPlaceholderAircraft(runtime.scene, floatingOrigin.aircraftRoot, parameters, {
@@ -2907,6 +2910,7 @@ async function createFlightSimSession(
     externalTankVisuals?.update(externalTankStepSeconds);
     externalTankStepSeconds = 0;
     applyChaseFrame(displayState);
+    flightCompass?.update(runtime.scene.activeCamera);
     const audioCamera = runtime.scene.activeCamera;
     if (aircraft && audioCamera && flightAudio.isEngineActive()) {
       flightAudio.updateView({
@@ -3108,6 +3112,7 @@ async function createFlightSimSession(
       gVisionOverlay.destroy();
       engineMonitor.destroy();
       flightHud.destroy();
+      flightCompass?.destroy();
       collisionDebugOverlay?.dispose();
       wheelSpinDebugOverlay?.dispose();
       forcesDebugOverlay?.dispose();
