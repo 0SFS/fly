@@ -279,6 +279,38 @@ versions were detected.
 
 Frames/s did not change beyond noise. The inclusive function ranges are not additive.
 
+## Shipped: classify imagery cells without repeating region work
+
+`measureLoadedImageryDistribution` in `imageryBinding.ts` classified every table cell by repeating
+its region's footprint validity checks and logarithm, writing an existing image group back to its
+Map, and looking up each slot twice. Engine `b7a0bbb` computes the region values once, creates a
+group only on first use, uses one slot lookup, and computes the cell-area fraction once per table
+intersection. Every cell still contributes in the original order. In particular,
+`logarithm + level - referenceLevel` keeps the original floating-point operation order.
+
+All 34 binding and selector identity tests pass, as do engine lint/typecheck and the flight's
+typecheck. The new regression counts every table cell but needs one logarithm for the region;
+the previous implementation needs four. A separate harness compared every output with the old
+function for 1,000 varied distributions, including missing identities, empty cells, direct
+bindings, invalid footprints, infinities and fractional values. Every result matched exactly.
+
+An interleaved dense-table microbenchmark took 101.5 ms before and 68.9 ms after, about 32% less.
+The actual pinned flight comparison (`distq`, 2 + 2 interleaved runs) is smaller:
+
+| | Before | After |
+| --- | ---: | ---: |
+| `measureLoadedImageryDistribution`, 1× | 6.1–7.0 ms/s | 5.4–5.6 ms/s |
+| `measureLoadedImageryDistribution`, 4× | 24.1–25.5 ms/s | 17.5–19.2 ms/s |
+| Frames/s, 1× | 58.6–58.7 | 58.7 |
+| Frames/s, 4× | 25.4–27.8 | 28.1–29.1 |
+| p95 frame, 4× | 50 ms | 50 ms |
+
+Two pairs do not establish how much of the FPS movement comes from this edit. Other unchanged
+work varied substantially: `patchTableDepth` cost 39.5 ms/s in the first baseline 4× profile but
+18.8–19.9 in the other three. The function-cost reduction and exact differential results support
+the change; the whole-flight FPS range is context. Distribution cadence, feedback and publication
+remain unchanged, so the distribution-throttle decision below still stands.
+
 ## Waiting on your decision: ring packing after layout
 
 The prepared `engines/src/engineSummary.ts` change uses a ResizeObserver instead of measuring the
@@ -511,15 +543,17 @@ motion/visibility boundaries and visual review needed before such a change.
 ## Remaining exact-output candidates and stopping point
 
 - Selector allocations: `evaluateView` still creates point, hull and measurement arrays and
-  closures. Delaying arrays until clip culling succeeds is a candidate, provided point order,
-  floating-point arithmetic, surface calls and reentrancy remain unchanged. Keep the fixed and
-  400-random-case identity digests, and the moving-view comparison, as acceptance gates.
+  closures. Delaying the combined hull and hull-point arrays until clip culling succeeds took
+  402.1 ms against the reference's 399.6 ms in 12 interleaved moving-view benchmark rounds.
+  It preserved the benchmark's drag result but gave no measurable benefit and was reverted.
+  More invasive reuse would need to preserve point order, surface calls and reentrancy; there
+  is no measured reason to ship it yet.
 - The screen-area experiment removed `slice`, `map`, clamp closures and repeated clamps. Its
   moving-view benchmark was 388 ms versus the reference's 382 ms (12 interleaved rounds;
   unchanged-source baseline 392 versus 387 ms). There was no measured gain, so it was reverted.
-- Review repeated binding-table and distribution work while preserving every publication and
-  diagnostic update. Skipping `publishManaged` on staged revisions was already rejected because
-  it changes behavior.
+- The measured cell-classification improvement above is shipped. Further binding-table work must
+  preserve every publication and diagnostic update. Skipping `publishManaged` on staged revisions
+  was already rejected because it changes behavior.
 - The canvas-size read is where other DOM writers' pending restyles are paid. Caching it would
   delay resize handling by a frame; it was rejected. `Math.hypot` to `sqrt` was rejected because
   the results differ in their bits.
