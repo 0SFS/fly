@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { evaluateEngineGasOptics, integrateGasSegment, interpolateGasBlackbody, engineGasSupportLength,
+import { evaluateEngineGasOptics, integrateGasSegment, interpolateGasBlackbody, interpolateAbsoluteEmission, engineGasSupportLength,
   sampleEngineGasField, gasFieldVolumeWeights, gasFlowFieldVolumeWeights, validateEngineGasOpticalData,
   DEFAULT_ENGINE_GAS_AXIAL_SAMPLES, DEFAULT_ENGINE_GAS_RADIAL_SAMPLES, type EngineGasOpticalData, type EngineGasFlowDomain } from "@0sfs/exhaust/engineGasOptics";
 import { f135ExhaustOpticalData as profile } from "@0sfs/f135/generated/f135ExhaustOpticalData";
@@ -9,6 +9,32 @@ const input = { temperatureKelvin: 1800, ambientTemperatureKelvin: 288.15, augme
   afterburnerBurnedFuelFlowKgPerSecond: 1, radiusMeters: 0.6, lengthMeters: 6 };
 const legacyProfile = JSON.parse(readFileSync(new URL("../../../../F135/validation/evidence/aircraft/f35b/plume-spatial-2026-10-06/spatial-optics/source-0-f135-exhaust-lut.manifest.json.txt", import.meta.url), "utf8")).profile;
 describe("dimensional gas optical transfer", () => {
+  it("retains exact log-linear interpolation, zero-channel fallback and authored endpoints across updates", () => {
+    const table: EngineGasOpticalData["blackbody"] = { temperatureKelvinRange: [200, 800], unit: "cd/m2",
+      samples: [[0, 1e-80, 1], [2e-60, 3e-40, 4], [8e-30, 6e-20, 16]] };
+    for (const kelvin of [275, 550, 350, 611.13, 500, 275]) {
+      const position = (kelvin - 200) / 600 * 2;
+      const lo = Math.floor(position), hi = Math.min(lo + 1, 2), f = position - lo;
+      const reference = table.samples[lo].map((a, c) => {
+        const b = table.samples[hi][c];
+        return a > 0 && b > 0 ? Math.exp(Math.log(a) + (Math.log(b) - Math.log(a)) * f) : a + (b - a) * f;
+      });
+      expect(interpolateAbsoluteEmission(table, kelvin)).toEqual(reference);
+    }
+    expect(interpolateAbsoluteEmission(table, 200)).toBe(table.samples[0]);
+    expect(interpolateAbsoluteEmission(table, 800)).toBe(table.samples[2]);
+    for (const kelvin of [199, 801, NaN, Infinity, -Infinity]) expect(interpolateAbsoluteEmission(table, kelvin)).toBeNull();
+  });
+  it("keeps complete returned fields independent while reusing interpolation scratch storage", () => {
+    const first = evaluateEngineGasOptics(profile, input);
+    const saved = structuredClone(first);
+    for (const temperatureKelvin of [150, 300, 3200, 1800]) {
+      const next = evaluateEngineGasOptics(profile, { ...input, temperatureKelvin });
+      expect(next.valid).toBe(true);
+      expect(next.field!.rgba).not.toBe(first.field!.rgba);
+    }
+    expect(first).toEqual(saved);
+  });
   it("uses the measured-form particle spectrum without changing temperatures, loading or dry chemistry", () => {
     const data: EngineGasOpticalData = profile.gasEmission;
     expect(data.particleSpectrum?.model).toBe("power-law-soot-v1");

@@ -22,6 +22,7 @@ interface GearFrame {
 interface GearHitchReport {
   backend: "webgpu" | "webgl";
   warmed: boolean;
+  observedCompiles: number;
   warmupPipelines: number;
   firstCanvasPipelines: number;
   settled: GearFrame[];
@@ -210,15 +211,18 @@ it("does not stall the frame that shows or hides stowed F-35B gear", async () =>
     const baselineMs = quantile(settledTail.map(frame => frame.ms), 0.95);
     const limitMs = Math.max(250, baselineMs * 6);
     const summary = [
-      `backend ${report.backend}, warmed ${report.warmed}, warmup compiles ${report.warmupPipelines}, first canvas compiles ${report.firstCanvasPipelines}, quiet-frame limit ${limitMs.toFixed(0)} ms`,
+      `backend ${report.backend}, warmed ${report.warmed}, observed compiles ${report.observedCompiles}, warmup compiles ${report.warmupPipelines}, first canvas compiles ${report.firstCanvasPipelines}, quiet-frame limit ${limitMs.toFixed(0)} ms`,
       describeFrames("settled", settledTail),
       describeFrames("extend", report.show),
       describeFrames("retract", report.hide),
       describeFrames("extend again", report.showAgain),
     ].join("\n");
-    writeFileSync("/tmp/stowed-gear-hitch.json", JSON.stringify(report, null, 2));
+    writeFileSync(path.resolve("build/stowed-gear-hitch.json"), JSON.stringify(report, null, 2));
     console.log(summary);
-    expect(report.warmupPipelines + report.firstCanvasPipelines, summary).toBeGreaterThan(0);
+    // Preparation can finish during model loading or an asynchronous readiness
+    // poll, before either of these render frames. Verify the observer saw real
+    // compiles without requiring redundant compilation at a particular phase.
+    expect(report.observedCompiles, summary).toBeGreaterThan(0);
     expect(report.warmed, summary).toBe(true);
     expect(report.show[0]?.activeGear, summary).toBeGreaterThan(0);
     expect(report.settled.slice(-3).every(frame => frame.pipelines === 0), summary).toBe(true);

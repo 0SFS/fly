@@ -1038,7 +1038,10 @@ it("observes native engine visuals with sound off and releases its model-bound r
   } })]]);
   const runtime = await vi.mocked(createJsbsimRuntime).mock.results.at(-1)!.value;
   const createBatch = vi.mocked(runtime.sdk.createPropertyBatch);
-  const batch = createBatch.mock.results.at(-1)!.value;
+  const visualBatches = () => createBatch.mock.calls.flatMap(([paths], index) =>
+    paths.includes("propulsion/engine[0]/augmentation") ? [createBatch.mock.results[index].value] : []);
+  expect(visualBatches()).toHaveLength(1);
+  const batch = visualBatches()[0];
   try {
     expect(createBatch).toHaveBeenCalledWith([
       "propulsion/engine[0]/augmentation", "propulsion/engine[0]/nozzle-pos-norm",
@@ -1062,7 +1065,7 @@ it("observes native engine visuals with sound off and releases its model-bound r
       expect(lever.dataset.afterburner).toBe(active ? "active" : "inactive");
       expect(mocks.readControlSurfaceState).toHaveBeenLastCalledWith(runtime.sdk, "f-35b", { nozzlePositionNorm: 0.72 });
     }
-    expect(createBatch).toHaveBeenCalledOnce();
+    expect(visualBatches()).toHaveLength(1);
     expect(batch.read).toHaveBeenCalledTimes(4);
     expect(runtime.sdk.setPropertyValue).not.toHaveBeenCalledWith("propulsion/engine[0]/augmentation", expect.anything());
     expect(runtime.sdk.setPropertyValue).not.toHaveBeenCalledWith("propulsion/engine[0]/nozzle-pos-norm", expect.anything());

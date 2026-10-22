@@ -380,8 +380,10 @@ describe("0SFS phone integration", () => {
         tick(1 / 60);
         expect(options.getStatus().engine?.afterburnerColor).toBe(observed === 1 ? accent : undefined);
       }
-      expect(mocks.sdk.createPropertyBatch).toHaveBeenCalledOnce();
-      expect(mocks.sdk.createPropertyBatch.mock.results[0].value.read).toHaveBeenCalledTimes(4);
+      const visualBatches = mocks.sdk.createPropertyBatch.mock.calls.flatMap(([paths], index) =>
+        paths.includes("propulsion/engine[0]/augmentation") ? [mocks.sdk.createPropertyBatch.mock.results[index].value] : []);
+      expect(visualBatches).toHaveLength(1);
+      expect(visualBatches[0].read).toHaveBeenCalledTimes(4);
       expect(mocks.sdk.getPropertyValue).not.toHaveBeenCalledWith("propulsion/engine[0]/augmentation");
     } finally {
       app?.destroy(); app = null;

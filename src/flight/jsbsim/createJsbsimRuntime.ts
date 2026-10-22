@@ -5,6 +5,8 @@ import { type AircraftId, isAircraftId } from "@0sfs/aircraft/aircraftIds";
 import { downloadJsbsimData, type JsbsimLoadProgress } from "./hydrateJsbsimData";
 import { readJsbsimBuildIdentity, type JsbsimBuildIdentity } from "./jsbsimBuildIdentity";
 import { getFdmProfile, resolveEngineModel, type EngineModelId } from "./fdmProfiles";
+import { releaseFlightStateReads } from "@0sfs/ground-contact/ecefBridge";
+import { releaseSimulationCapture } from "@0sfs/ground-contact/safeFlightState";
 
 export interface JsbsimRuntimeIdentity {
   aircraftId: AircraftId;
@@ -70,7 +72,13 @@ export async function createJsbsimRuntime(options: JsbsimRuntimeOptions = {}): P
     sdk.off("stdout", stdout);
     sdk.off("stderr", stderr);
     if (typeof window !== "undefined" && window.osfsJsbsimBuild === identity) delete window.osfsJsbsimBuild;
-    sdk.destroy();
+    // Model views own native handles; release them while their executive lives.
+    // Always destroy the SDK even when a view's cleanup fails.
+    try { releaseFlightStateReads(sdk); }
+    finally {
+      try { releaseSimulationCapture(sdk); }
+      finally { sdk.destroy(); }
+    }
   };
   try {
     options.onProgress?.({ message: "Preparing flight physics", progress: null });

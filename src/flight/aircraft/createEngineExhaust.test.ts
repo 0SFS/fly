@@ -286,6 +286,24 @@ describe("shared engine exhaust renderer", () => {
     expect(t.scene.lights).toHaveLength(0);
   });
 
+  it("updates live light emission without rescanning scene membership", async () => {
+    const config = { ...settings, lightEnabled: true, lightGain: 1, lightRangeMeters: 12 };
+    const t = fixture({ settings: config });
+    const scenery = MeshBuilder.CreateBox("scenery", {}, t.scene);
+    t.handle.update(running);
+    await t.handle.ready;
+    const light = t.scene.lights[0] as PointLight;
+    expect(light.isEnabled()).toBe(true);
+    const initialIntensity = light.intensity;
+    const resync = vi.spyOn(scenery, "_resyncLightSource");
+    t.handle.update({ ...running, gasTemperatureKelvin: 1200 });
+    expect(t.scene.lights[0]).toBe(light);
+    expect(light.isEnabled()).toBe(true);
+    expect(light.intensity).toBeGreaterThan(initialIntensity);
+    expect(resync).not.toHaveBeenCalled();
+    t.handle.dispose();
+  });
+
   it("converts nearby light with the gas white reference once and leaves it independent of exposure", async () => {
     const t = thermalFixture();
     const config = { ...settings, lightEnabled: true, lightGain: 2, lightRangeMeters: 12,

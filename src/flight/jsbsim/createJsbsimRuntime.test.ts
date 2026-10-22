@@ -11,6 +11,8 @@ import { buildIdentity, JSBSimSdk } from "@felipegalind0/jsbsim";
 import { downloadJsbsimData } from "./hydrateJsbsimData";
 import { AIRCRAFT_IDS } from "@0sfs/aircraft/aircraftIds";
 import { getFdmProfile } from "./fdmProfiles";
+import { readFlightState } from "@0sfs/ground-contact/ecefBridge";
+import { captureSimulation } from "@0sfs/ground-contact/safeFlightState";
 
 const createMockSdk = () => ({
   configurePaths: vi.fn(), loadModel: vi.fn(() => true), runIc: vi.fn(() => true),
@@ -38,6 +40,28 @@ describe("createJsbsimRuntime", () => {
     expect(sdk.off).toHaveBeenCalledTimes(2);
     expect(sdk.destroy).toHaveBeenCalledOnce();
     expect(sdk.delete).not.toHaveBeenCalled();
+  });
+
+  it("releases both native property readers before destroying their executive", async () => {
+    const sdk = createMockSdk();
+    sdk.getPropertyValue.mockReturnValue(0);
+    const batches: { dispose: ReturnType<typeof vi.fn> }[] = [];
+    Object.assign(sdk, { createPropertyBatch: vi.fn((paths: readonly string[]) => {
+      const batch = { missing: [], read: (target: Float64Array) => { target.fill(0); return target; },
+        dispose: vi.fn(() => { expect(sdk.destroy).not.toHaveBeenCalled(); }) };
+      expect(paths.length).toBeGreaterThan(0);
+      batches.push(batch);
+      return batch;
+    }) });
+    vi.mocked(JSBSimSdk.create).mockResolvedValue(sdk as never);
+    const runtime = await createJsbsimRuntime();
+    readFlightState(runtime.sdk);
+    captureSimulation(runtime.sdk);
+    expect(batches).toHaveLength(2);
+    runtime.dispose();
+    runtime.dispose();
+    for (const batch of batches) expect(batch.dispose).toHaveBeenCalledOnce();
+    expect(sdk.destroy).toHaveBeenCalledOnce();
   });
 
   it.each(AIRCRAFT_IDS)(

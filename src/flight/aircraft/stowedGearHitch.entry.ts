@@ -23,6 +23,8 @@ interface GearFrame {
 interface GearHitchReport {
   backend: "webgpu" | "webgl";
   warmed: boolean;
+  /** Positive control includes preparation outside the timed render frames. */
+  observedCompiles: number;
   /** Gear drawn before any warmup target was allowed to compile it. */
   cold: GearFrame[];
   /** Compiles while the hidden gear was drawn into its warmup targets. */
@@ -44,16 +46,22 @@ declare global {
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-function watchGpuCompiles(): { arm(on: boolean): void; read(): number; reset(): void } {
+function watchGpuCompiles(): { arm(on: boolean): void; read(): number; total(): number; reset(): void } {
   let armed = false;
   let pipelines = 0;
-  const note = () => { if (armed) pipelines += 1; };
+  let observed = 0;
+  const note = () => { observed += 1; if (armed) pipelines += 1; };
   const device = GPUDevice.prototype;
   const createRenderPipeline = device.createRenderPipeline;
   const createShaderModule = device.createShaderModule;
   device.createRenderPipeline = function (this: GPUDevice, descriptor: GPURenderPipelineDescriptor) {
     note();
     return createRenderPipeline.call(this, descriptor);
+  };
+  const createRenderPipelineAsync = device.createRenderPipelineAsync;
+  device.createRenderPipelineAsync = function (this: GPUDevice, descriptor: GPURenderPipelineDescriptor) {
+    note();
+    return createRenderPipelineAsync.call(this, descriptor);
   };
   device.createShaderModule = function (this: GPUDevice, descriptor: GPUShaderModuleDescriptor) {
     note();
@@ -73,6 +81,7 @@ function watchGpuCompiles(): { arm(on: boolean): void; read(): number; reset(): 
   return {
     arm(on: boolean) { armed = on; },
     read: () => pipelines,
+    total: () => observed,
     reset() { pipelines = 0; },
   };
 }
@@ -207,7 +216,7 @@ async function measureStowedGearHitch(): Promise<GearHitchReport> {
   scene.dispose();
   engine.dispose();
   RenderTargetTexture.prototype.render = renderTarget;
-  return { backend, warmed, cold, warmupPipelines, firstCanvasPipelines: firstCanvas.pipelines, settled, show, hide, showAgain };
+  return { backend, warmed, observedCompiles: compiles.total(), cold, warmupPipelines, firstCanvasPipelines: firstCanvas.pipelines, settled, show, hide, showAgain };
 }
 
 window.measureStowedGearHitch = measureStowedGearHitch;
