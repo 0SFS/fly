@@ -7,6 +7,14 @@ reproduction material without copying logs, browser state, credentials or tile a
 
 ## State at this checkpoint
 
+- Resumption update: engine `b13bab3` now stops `patchTableDepth` after both return values reach
+  their bounds. Two browser pairs reduced its 4× cost from 18.9–21.3 to 14.3–15.3 ms/s; 1× and
+  FPS ranges overlap. All 35 focused tests, lint/typecheck and 2,460 differential cases passed.
+  Read `foss-earth/engine/docs/performance/2026-10-22/binding.md` before starting Agent 2.
+  Binding source ownership and the shared measurement slot have been released.
+- Engine `52c6881` retains height-packing hypotheses in its adjacent `heights-candidates.md`.
+  The compact-unique scratch experiment in `engine/build/perf-heights/` is prepared but unrun;
+  the independent height agent should take it from here with its own scratch and baseline.
 - The overnight queue completed `ring`, `aoa`, `c11m` and `nimg`; `queue.txt` is empty.
   The later `distq` comparison also completed. Chrome clone cleanup ran after browser work.
 - The measured exact optimizations are committed locally. Nothing was pushed or deployed.
@@ -32,6 +40,7 @@ must not be summed. Full methods, tests, cohorts and limitations are in the repo
 | aircraft `ab43a16`, fly `b92eb7b` | Read gear position alone for landing lights | Isolated gear arm at 1×: 12.7–17.4 → 3.7–4.8; at 4×: 17.3–24.7 → 6.9–8.7 |
 | FOSS Earth engine `18e3850` | Sort each residency demand once | Pump at 1×: 14.9–18.5 → 4.4 in two clean new-arm runs; at 4×: 28.6–29.7 → 6.2–9.2 |
 | FOSS Earth engine `b7a0bbb` | Reuse region calculations while classifying cells | Distribution at 1×: 6.1–7.0 → 5.4–5.6; at 4×: 24.1–25.5 → 17.5–19.2 |
+| FOSS Earth engine `b13bab3` | Stop depth traversal when both bounds are known | Depth at 4×: 18.9–21.3 → 14.3–15.3; 1× ranges overlap, no demonstrated FPS gain |
 | fly `a44f245`, `12ccb9c`, `b0d1295` | Measurements, decisions and integration review | Documentation only |
 
 The previous tour pass already accelerated the imagery selector about 30% in engine `497e013`.

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "captured_utc": "2026-10-22T18:16:02.480845+00:00",
+  "captured_utc": "2026-10-22T18:29:25.995983+00:00",
   "purpose": "Local evidence identity index for the 2026-10-22 performance handoff; not an artifact backup.",
   "limits": [
     "File contents are not embedded. Raw files remain in ignored build directories and can be lost to cleanup.",
@@ -30,7 +30,7 @@
   "repositories": [
     {
       "path": "/Users/felg/gh/0sfs/fly",
-      "head": "b0d1295fee58bd5fd0d3fa5e7d88756fd2d89277",
+      "head": "203ff3616c989916b723b2eac67925de36449f13",
       "branch": "main",
       "status_at_capture": [
         " M README.md",
@@ -39,7 +39,9 @@
         " M docs/development.md",
         " M docs/foss-earth-relationship.md",
         " M docs/jsbsim.md",
+        " M docs/performance/2026-10-22/agent-prompts.md",
         " M docs/performance/2026-10-22/flight-frame.md",
+        " M docs/performance/2026-10-22/session-handoff.md",
         " M docs/proposals/flight-settings.md",
         " M scripts/dev-lan.mjs",
         " M scripts/validation/ci/jsbsim-fixture.probe.ts",
@@ -103,9 +105,6 @@
         "?? docs/performance/2026-10-21/f35-model-lod.md",
         "?? docs/performance/2026-10-21/retained-evidence.tar.gz",
         "?? docs/performance/2026-10-21/session-handoff.md",
-        "?? docs/performance/2026-10-22/agent-prompts.md",
-        "?? docs/performance/2026-10-22/evidence-index.json",
-        "?? docs/performance/2026-10-22/session-handoff.md",
         "?? docs/proposals/cockpit-screen.md",
         "?? docs/proposals/g-vision-response-curves.md",
         "?? src/flight/cockpit/",
@@ -158,7 +157,7 @@
     },
     {
       "path": "/Users/felg/gh/foss-earth/engine",
-      "head": "b7a0bbb0734f4fb3e67eb200617a19bfd2a29990",
+      "head": "52c6881b45dbe1a1031f59578ad84ab762f92458",
       "branch": "main",
       "status_at_capture": [
         " M AGENTS.md",
@@ -484,6 +483,50 @@
       "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-gas/2026-10-22_103045",
       "exists": true,
       "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-gas",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "depthq",
+      "arm": "osfs-depthq0",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depthq-osfs-depthq0/2026-10-22_132127",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-depthq0",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "depthq",
+      "arm": "osfs-depthq1",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depthq-osfs-depthq1/2026-10-22_132236",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-depthq1",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "depthq",
+      "arm": "osfs-depthq0",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depthq-osfs-depthq0/2026-10-22_132347",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-depthq0",
+      "cpu_rates_in_summary": [
+        1,
+        4
+      ]
+    },
+    {
+      "label": "depthq",
+      "arm": "osfs-depthq1",
+      "directory": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depthq-osfs-depthq1/2026-10-22_132457",
+      "exists": true,
+      "dist_root": "/Users/felg/gh/0sfs/fly/build/perf/osfs-depthq1",
       "cpu_rates_in_summary": [
         1,
         4
@@ -1493,6 +1536,11 @@
       "sha256": "46e78245ba2d679ece28acc7916bada5ab780393ae7835a6a778a7f03fd24d6f"
     },
     {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/ab-depthq.sh",
+      "bytes": 1037,
+      "sha256": "3dab41055246f99255c313ff35c466d5ad5582179cdf7a204ca1b3cba1ad7bf1"
+    },
+    {
       "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/ab.sh",
       "bytes": 1115,
       "sha256": "bc88dd344325a07fbb6e3632b08e4da944a1ab59e5e4dbee5461520febdb727c"
@@ -1588,6 +1636,16 @@
       "sha256": "ee764068df3792583f59203aa9a608654058eb4d4274b429bccb0552027850b3"
     },
     {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/arms/imageryBinding.depthq-after.ts",
+      "bytes": 21227,
+      "sha256": "4801b18480af821929ea4e320f40f3af1971b8ec7a11e28d8c6c42759c6fe903"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/arms/imageryBinding.depthq-before.ts",
+      "bytes": 21017,
+      "sha256": "83a882749375588148a1ae39a7631e93ae7ed521155ecf3a9af9402b7c6b4648"
+    },
+    {
       "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/arms/imageryResidency.resq.ts",
       "bytes": 35179,
       "sha256": "e34d0854d822f3a362d69f3aa6ca91b4adf7889a3320390541a3e1b399d17cff"
@@ -1638,6 +1696,11 @@
       "sha256": "2dfe0be8b24c8cf940452f225d9cbe526099427b6334734de6abeefb323d51be"
     },
     {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/cmp-depthq.txt",
+      "bytes": 12830,
+      "sha256": "38e40e8654acd2063624e1ccbb42235c1377a5a5f8413fab70eaa2a48e1d0ea3"
+    },
+    {
       "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/cmp-distq.txt",
       "bytes": 10602,
       "sha256": "6815ff360621363924c028dbc627e45523d07011b0803b37066b352a0dc429a4"
@@ -1661,6 +1724,21 @@
       "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/depth.runs",
       "bytes": 852,
       "sha256": "feae2e5f52f6a43fd33330f63b5df015483e43f7b0eb4cc1fed990b8f0b6a0f2"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/depthq.runs",
+      "bytes": 516,
+      "sha256": "67372aa0a5ce1515e448825cd5c730cf61ccea363d8e5d149e01479f4541dfc5"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/depthq0.json",
+      "bytes": 1055,
+      "sha256": "bd4f58d8ddb7d6b9dc2717f238e3bcd7d66d09b2507fb9a4b12afefdadab7eb2"
+    },
+    {
+      "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/depthq1.json",
+      "bytes": 1054,
+      "sha256": "6c6629f9f74abdd6961231365efd1e34d7076ebf791ea1735a46092016d965ba"
     },
     {
       "path": "/Users/felg/gh/0sfs/fly/build/osfs-night/distq.json",
@@ -1991,6 +2069,56 @@
       "path": "/Users/felg/gh/foss-earth/engine/build/evq/vitest.config.ts",
       "bytes": 194,
       "sha256": "5fb4392d9f2814463b1f2d1d23e3379ae642b9eb4f59b4931bf8a8bd8ddb15c4"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/engine/build/perf-binding/bench.log",
+      "bytes": 727,
+      "sha256": "c1308561a3155cd13388e7d251fec0419a9d72bf2c437c4f98fdc1ed5ea7989f"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/engine/build/perf-binding/depth.test.ts",
+      "bytes": 2382,
+      "sha256": "ff6ea15e784a950be25e8b1bbbefdca14f2236af2feb285894c53cf87706bfcd"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/engine/build/perf-binding/imageryBinding.before.ts",
+      "bytes": 21065,
+      "sha256": "600d3b030e689ca6da8e25e65288cfd8b2436cad52800bca994ec39e74fc2c8f"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/engine/build/perf-binding/imageryBinding.original.ts",
+      "bytes": 21017,
+      "sha256": "83a882749375588148a1ae39a7631e93ae7ed521155ecf3a9af9402b7c6b4648"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/engine/build/perf-binding/tests.log",
+      "bytes": 218,
+      "sha256": "d8ac2e3f3e88a253528c4b9f0bef90aa8ac3fc142c05eb08a9cb14480b7eb4b5"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/engine/build/perf-binding/vitest.config.ts",
+      "bytes": 158,
+      "sha256": "68e93c46417033ce7cac8eb47d3a2fccca30c7e2b44d953f6976dc5cc57c9ab7"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/engine/build/perf-heights/before.ts",
+      "bytes": 10537,
+      "sha256": "a13c806040b6ea265ed533e52951f900e936026a4d73aeb4c4a022e49be04730"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/engine/build/perf-heights/compact.ts",
+      "bytes": 10528,
+      "sha256": "c18125f3bfad4e6e14fad1af303b27e0bf5fd19d199105924bd74035f594a6fb"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/engine/build/perf-heights/packing.test.ts",
+      "bytes": 2201,
+      "sha256": "13ffeb407fa785d8e01df2a8ca0892f244955f5c32798e8c962a9ae3ebd48a02"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/engine/build/perf-heights/vitest.config.ts",
+      "bytes": 192,
+      "sha256": "add4a52322c8cd58dded59c8ca4347cacb52316e5b0d6127fa79b2ceca62417c"
     },
     {
       "path": "/Users/felg/gh/foss-earth/engine/build/resq/imageryResidency.head.ts",
@@ -2426,6 +2554,66 @@
       "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depth-osfs-gas/2026-10-22_103045/summary.md",
       "bytes": 22771,
       "sha256": "2123d90bd716a1f2c426c6cdfba77d138ab8fc305ad641dd68137f5ed0f47857"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depthq-osfs-depthq0/2026-10-22_132127/fly-still-1x.cpuprofile",
+      "bytes": 891782,
+      "sha256": "84679bf1fe649c97fc0d82bc883dafaff43df81abbe011f9c06e611c7a79edbf"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depthq-osfs-depthq0/2026-10-22_132127/fly-still-4x.cpuprofile",
+      "bytes": 934361,
+      "sha256": "3c0db51290523fb9d7c7e032cb79e375882939e4c4c93ea1ef86d74462667a6c"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depthq-osfs-depthq0/2026-10-22_132127/summary.md",
+      "bytes": 23352,
+      "sha256": "e81118a9ebd3958dad62b2357264e51a1e5e87bb45f57897887132755cdb64d6"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depthq-osfs-depthq0/2026-10-22_132347/fly-still-1x.cpuprofile",
+      "bytes": 884504,
+      "sha256": "5f7f77adc151a99013247fbdb4ae0b82f33a5067632f66d7d5858e3ada19b0d7"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depthq-osfs-depthq0/2026-10-22_132347/fly-still-4x.cpuprofile",
+      "bytes": 908684,
+      "sha256": "c200d41a42e94af083fc179a8eabf3a2ebb95b849d28a2cada5571c524b62b26"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depthq-osfs-depthq0/2026-10-22_132347/summary.md",
+      "bytes": 23571,
+      "sha256": "8d68480cd9fef64ba26f5ced34ef91787095b4f6ec40afdefb7105d66dc29608"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depthq-osfs-depthq1/2026-10-22_132236/fly-still-1x.cpuprofile",
+      "bytes": 881386,
+      "sha256": "dbd7a321389edc37ac6e0a1dd31c0df78d7520eb1480132fc39b20f499db8d30"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depthq-osfs-depthq1/2026-10-22_132236/fly-still-4x.cpuprofile",
+      "bytes": 915875,
+      "sha256": "34ded6c030beeb0e6bf9d453d7f67154daabf8d3c7a55e6a819d5d394bec020f"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depthq-osfs-depthq1/2026-10-22_132236/summary.md",
+      "bytes": 23444,
+      "sha256": "2a48f0ad96c0479836b69fc210f6312c91beda720674b0c357f985e0f3023a43"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depthq-osfs-depthq1/2026-10-22_132457/fly-still-1x.cpuprofile",
+      "bytes": 888632,
+      "sha256": "a649b4d91a1ada222880c7141c840d02f785a4617623223a5aebf2960de7a4b4"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depthq-osfs-depthq1/2026-10-22_132457/fly-still-4x.cpuprofile",
+      "bytes": 942309,
+      "sha256": "15f914f57cc6ee0f738558b07ac0b8378d9f0a9862290ebc34be14388a52bd25"
+    },
+    {
+      "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-depthq-osfs-depthq1/2026-10-22_132457/summary.md",
+      "bytes": 23470,
+      "sha256": "91d99a050d25329b6737c6d0cc9b5a8cdbb3eb13c4fe4154d6b35421ab8ca8d7"
     },
     {
       "path": "/Users/felg/gh/foss-earth/research/build/benchmarks/startup-audit/profile-fly-distq-osfs-distq/2026-10-22_115521/fly-still-1x.cpuprofile",

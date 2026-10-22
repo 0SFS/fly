@@ -84,6 +84,11 @@ Target: `/Users/felg/gh/foss-earth/engine`.
 Own `src/terrain/imagery/imageryBinding.ts`, `tests/imageryBinding.test.ts`, and new binding-only
 tests. Read selector, geometry and runtime code as needed; do not edit them or change cadence.
 
+The primary agent's resumed depth experiment is complete and committed as `b13bab3`; source
+ownership and the measurement slot are released. Read the engine's
+`docs/performance/2026-10-22/binding.md` and start from that change, not the older `b7a0bbb` alone.
+The bounds early exit reduced 4× depth cost from 18.9–21.3 to 14.3–15.3 ms/s with no FPS claim.
+
 Investigate table construction, `patchTableDepth`, traversal/key/allocation work, fill/comparison
 work and repeated classification beyond committed `b7a0bbb`. Historical binding self time is
 about 28 ms/s at 1×. The shipped region-log/slot-lookup optimization already reduced distribution
@@ -103,6 +108,9 @@ claims would be misleading. No distribution throttling in this scope.
 ## Agent 3 — terrain height packing and transport (`heights`)
 
 Target: `/Users/felg/gh/foss-earth/engine`.
+
+Read `docs/performance/2026-10-22/heights-candidates.md` (engine `52c6881`). The existing
+`build/perf-heights/` compaction experiment is prepared but unrun; use your own scratch copy.
 
 Own `src/browser/terrainHeightPixels.ts`, `src/browser/terrainHeightBatches.ts`, their existing
 tests (`terrainHeightPixels.test.ts`, `terrainHeightBatches.test.ts`,

@@ -352,6 +352,29 @@ work varied substantially: `patchTableDepth` cost 39.5 ms/s in the first baselin
 the change; the whole-flight FPS range is context. Distribution cadence, feedback and publication
 remain unchanged, so the distribution-throttle decision below still stands.
 
+## Shipped after resumption: stop depth traversal when both bounds are known
+
+Engine `b13bab3` stops `patchTableDepth` once a displayed page reaches the table's maximum
+addressable depth and a deeper descendant establishes capping. Neither returned value can then
+change. It also reuses each visited tile key across the page and ancestor lookups. Table bytes,
+publication and cadence are unchanged. All 35 binding/selector identity tests, lint/typecheck,
+and 2,460 frozen-reference depth/table comparisons pass.
+
+`depthq`, two interleaved browser pairs, baseline and candidate frozen from the same source:
+
+| | Before | After |
+| --- | ---: | ---: |
+| `patchTableDepth`, 1× | 3.1–3.4 ms/s | 2.8–3.3 ms/s |
+| `patchTableDepth`, 4× | 18.9–21.3 ms/s | 14.3–15.3 ms/s |
+| Frames/s, 4× | 28.2–28.6 | 28.3–28.7 |
+| p95 frame, 4× | 50 ms | 50 ms |
+
+The function saving at 4× repeats in both pairs; 1× and FPS ranges overlap. A synthetic workload
+that often reaches both bounds early took 548.5 → 54.1 ms, but that reduction is not representative
+of the whole flight. The full evidence and limits are recorded in
+`foss-earth/engine/docs/performance/2026-10-22/binding.md`. No competing benchmark/build ran during
+Chrome, and every run was followed by clone cleanup.
+
 ## Waiting on your decision: ring packing after layout
 
 The prepared `engines/src/engineSummary.ts` change uses a ResizeObserver instead of measuring the
