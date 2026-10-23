@@ -8,6 +8,7 @@ import { getFdmProfile } from "../jsbsim/fdmProfiles";
 import { resolveAircraftDataFiles } from "../jsbsim/hydrateJsbsimData";
 import { createJsbsimAudioAdapter } from "@0sfs/sound/jsbsimAudioAdapter";
 import { getAircraftAudioInstallation, resolveAircraftAudioInstallation } from "@0sfs/sound/aircraftAudioProfiles";
+import { LEGACY_PHYSICS_HZ_120 } from "../physics/physicsRate";
 
 const aircraftId = "cirrus-vision-jet" as const;
 
@@ -21,7 +22,7 @@ it("keeps SF50 audio telemetry monotonic through repeated contact restores", asy
     for (const path of resolveAircraftDataFiles(manifest, aircraftId)) {
       sdk.writeDataFile(path, readFileSync("public/jsbsim-data/" + path, "utf8"));
     }
-    await bootstrapAircraft(sdk, aircraftId, {});
+    await bootstrapAircraft(sdk, aircraftId, LEGACY_PHYSICS_HZ_120, {});
     const audio = resolveAircraftAudioInstallation(getAircraftAudioInstallation(aircraftId));
     if (!audio.supported) throw new Error(audio.reason);
     const adapter = createJsbsimAudioAdapter(sdk, {

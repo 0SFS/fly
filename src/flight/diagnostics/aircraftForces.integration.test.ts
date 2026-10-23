@@ -12,6 +12,7 @@ import {
   createAircraftForceReader, POUND_FOOT_TO_NEWTON_METERS, POUND_FORCE_TO_NEWTONS, structuralPointToDisplay, windForceToBody,
   type ForceVector,
 } from "@0sfs/aircraft/aircraftForces";
+import { LEGACY_PHYSICS_HZ_120 } from "../physics/physicsRate";
 
 const instances: JSBSimSdk[] = [];
 afterEach(() => { for (const sdk of instances.splice(0)) sdk.destroy(); });
@@ -22,7 +23,7 @@ async function createAircraft(aircraftId: AircraftId) {
   instances.push(sdk);
   const manifest: unknown = JSON.parse(readFileSync("public/jsbsim-data/manifest.json", "utf8"));
   for (const file of resolveAircraftDataFiles(manifest, aircraftId)) sdk.writeDataFile(file, readFileSync("public/jsbsim-data/" + file, "utf8"));
-  await bootstrapAircraft(sdk, aircraftId);
+  await bootstrapAircraft(sdk, aircraftId, LEGACY_PHYSICS_HZ_120);
   for (let step = 0; step < 120; step++) expect(sdk.run()).toBe(true);
   return sdk;
 }

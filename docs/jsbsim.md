@@ -221,7 +221,7 @@ flowchart LR
   Runtime --> WASM[Browser WebAssembly / FGFDMExec]
   Runtime --> Data[Selected aircraft XML in MEMFS]
   Data --> WASM
-  WASM --> Loop[120 Hz fixed-step loop]
+  WASM --> Loop[Fixed-step loop, 60 Hz by default]
   Loop --> Bridge[ECEF/ENU visual bridge]
   Bridge --> Earth[FOSS Earth / Babylon]
 ```
@@ -728,7 +728,7 @@ documented in [its FDM proposal](https://github.com/0SFS/F-35B/blob/main/docs/pr
 qualifies development control limits rather than real F-35 handling.
 
 `bootstrapAircraft` configures paths, loads the selected model, sets and checks
-native `setDt(1 / 120)`, and initializes geodetic `ic/lat-geod-deg`. Gear/flap
+native `setDt(1 / physicsHz)`, and initializes geodetic `ic/lat-geod-deg`. Gear/flap
 commands and physical positions agree before initial `runIc()`. Engine startup
 via `propulsion/set-running` internally evaluates a full-power steady state.
 Bootstrap, location reset and snapshot restoration therefore reapply requested
@@ -738,6 +738,20 @@ write those engine properties. Location/reset recovery reapplies preserved
 physical actuator positions after RunIC because that evaluation also visits
 rate-limited actuator nodes. Saved fuel, controls, wind and partial gear remain
 part of the restoration contract.
+
+The physics rate is the Aircraft → Start setting **Physics [30 / 60 / 120 Hz]**
+(`osfs.physics.rate`, [physicsRate.ts](../src/flight/physics/physicsRate.ts)).
+It is 60 Hz unless the pilot saved another rate; nothing selects 120 Hz on its
+own. 30 Hz is not validated: a C172 resting on its gear keeps bouncing at 30 Hz
+in [the rate comparison](../src/flight/physics/physicsRate.integration.test.ts).
+One rate holds for a whole flight. The runtime initializes the native model
+with it, and the loop, controls, autopilot, auto-trim, wheel and G effects and
+the benchmark route all take its one step, `1 / physicsHz`; a change waits for
+Apply & reload or the next aircraft change. The loop catches up at most 50 ms
+of backlog in whole steps (2 steps, 66.7 ms, at 30 Hz; 3 at 60 Hz; 6 at
+120 Hz) and counts what it drops in `getTimeAccounting()`. Dropped time never
+reaches anything as simulated time. Fixtures and evidence recorded at 120 Hz
+stay at 120 Hz and say so (`LEGACY_PHYSICS_HZ_120`).
 
 Diagnostic-only tests on SDK attempt `dd81bae46e74-F96sOJ` reproduced returned
 N1 100 at throttle 0.35 in all three old sequences; re-evaluation gave 54.5.
@@ -749,7 +763,7 @@ and actuator regressions in its 97-test run. The current in-tree artifact passed
 them again in the 144-test installed-app run described above.
 
 The engine runs locally in browser WebAssembly. The app's coordinate/terrain
-bridge, ground contact handling and 120 Hz fixed-step scheduling remain
+bridge, ground contact handling and fixed-step scheduling remain
 separate from streamed map data and optional phone pairing. Hydration derives
 its base from Vite `BASE_URL`; verify the deployed manifest and XML request
 paths before release, including non-root deployments.

@@ -17,7 +17,7 @@ import { expect, it } from "vitest";
 import { bootstrapAircraft } from "../../../src/flight/jsbsim/bootstrapC172.ts";
 import { getFdmProfile, type EngineModelId } from "../../../src/flight/jsbsim/fdmProfiles.ts";
 import { resolveAircraftDataFiles } from "../../../src/flight/jsbsim/hydrateJsbsimData.ts";
-import { FIXED_DT } from "../../../src/flight/physics/fixedStepLoop.ts";
+import { LEGACY_FIXED_DT_120, LEGACY_PHYSICS_HZ_120 } from "../../../src/flight/physics/physicsRate.ts";
 import { newOutputDirectory } from "../../outputDirectory.mjs";
 
 const CASES = [
@@ -61,7 +61,7 @@ it("measures each part of a JSBSim test fixture", async () => {
     cores: os.cpus().length,
     loadAverageAtStart: os.loadavg(),
     memoryPressureLevelAtStart: shell("sysctl -n kern.memorystatus_vm_pressure_level"),
-    physicsHz: Math.round(1 / FIXED_DT),
+    physicsHz: Math.round(1 / LEGACY_FIXED_DT_120),
   };
   const cases: Record<string, unknown> = {};
 
@@ -71,7 +71,7 @@ it("measures each part of a JSBSim test fixture", async () => {
     for (let round = 0; round < ROUNDS; round++) {
       const { sdk, createMs, dataMs } = await createSdk(testCase);
       const start = performance.now();
-      await bootstrapAircraft(sdk, testCase.aircraftId, { engineModel: testCase.engineModel });
+      await bootstrapAircraft(sdk, testCase.aircraftId, LEGACY_PHYSICS_HZ_120, { engineModel: testCase.engineModel });
       fixtures.push({ createMs, dataMs, bootstrapMs: since(start) });
       sdk.destroy();
     }
@@ -81,7 +81,7 @@ it("measures each part of a JSBSim test fixture", async () => {
     // with the engine stopped comes first.
     const stopped = await createSdk(testCase);
     let start = performance.now();
-    await bootstrapAircraft(stopped.sdk, testCase.aircraftId, { engineModel: testCase.engineModel, engineRunning: false });
+    await bootstrapAircraft(stopped.sdk, testCase.aircraftId, LEGACY_PHYSICS_HZ_120, { engineModel: testCase.engineModel, engineRunning: false });
     const bootstrapEngineStoppedMs = since(start);
     start = performance.now();
     stopped.sdk.setPropertyValue("propulsion/set-running", -1);
@@ -94,7 +94,7 @@ it("measures each part of a JSBSim test fixture", async () => {
 
     // Where the two starts end: the bootstrap's own, and the one after the stopped RunIC.
     const { sdk: started } = await createSdk(testCase);
-    await bootstrapAircraft(started, testCase.aircraftId, { engineModel: testCase.engineModel });
+    await bootstrapAircraft(started, testCase.aircraftId, LEGACY_PHYSICS_HZ_120, { engineModel: testCase.engineModel });
     const engine = [started, stopped.sdk].map(each => {
       const batch = each.createPropertyBatch(ENGINE);
       const values = Object.fromEntries(ENGINE.map((name, index) => [name, batch.read()[index]])
@@ -109,7 +109,7 @@ it("measures each part of a JSBSim test fixture", async () => {
 
     // Ten seconds of steps: bare, with the F-35B tests' harness around each, and with one batched read.
     const { sdk } = await createSdk(testCase);
-    await bootstrapAircraft(sdk, testCase.aircraftId, { engineModel: testCase.engineModel });
+    await bootstrapAircraft(sdk, testCase.aircraftId, LEGACY_PHYSICS_HZ_120, { engineModel: testCase.engineModel });
     start = performance.now();
     for (let step = 0; step < STEPS; step++) if (!sdk.run()) throw new Error("JSBSim run failed");
     const bareMs = since(start);
@@ -148,7 +148,7 @@ it("measures each part of a JSBSim test fixture", async () => {
 
   // The harness primitives on their own.
   const { sdk } = await createSdk(CASES[0]);
-  await bootstrapAircraft(sdk, "f-35b");
+  await bootstrapAircraft(sdk, "f-35b", LEGACY_PHYSICS_HZ_120);
   let sum = 0;
   let start = performance.now();
   for (let call = 0; call < CALLS; call++) sum += sdk.getPropertyValue(READS[0]);

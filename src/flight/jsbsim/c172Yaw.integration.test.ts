@@ -10,6 +10,7 @@ import { createFlightInputManager } from "@0sfs/controls/flightInputManager";
 import { bootstrapC172p } from "./bootstrapC172";
 import { resolveAircraftDataFiles } from "./hydrateJsbsimData";
 import { flightAttitudeToQuaternion, readFlightState } from "@0sfs/ground-contact/ecefBridge";
+import { LEGACY_PHYSICS_HZ_120 } from "../physics/physicsRate";
 
 const instances: JSBSimSdk[] = [];
 afterEach(() => { for (const sdk of instances.splice(0)) sdk.destroy(); });
@@ -28,7 +29,7 @@ describe("C172 yaw direction", () => {
     for (const relativePath of resolveAircraftDataFiles(manifest, "cessna-172")) {
       sdk.writeDataFile(relativePath, readFileSync(resolve(dataRoot, relativePath), "utf8"));
     }
-    await bootstrapC172p(sdk);
+    await bootstrapC172p(sdk, LEGACY_PHYSICS_HZ_120);
     Object.defineProperty(navigator, "getGamepads", { configurable: true, value: vi.fn(() => []) });
     const initialHeading = readFlightState(sdk).headingRad;
     const input = createFlightInputManager();

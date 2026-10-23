@@ -1,7 +1,8 @@
 import type { JSBSimSdk } from '@felipegalind0/jsbsim';
 import type { SurfaceHit } from 'foss-earth/runtime';
 import { createTerrainContact } from '@0sfs/ground-contact/terrainContact';
-import { createFixedStepPhysicsLoop, FIXED_DT } from '../physics/fixedStepLoop';
+import { createFixedStepPhysicsLoop } from '../physics/fixedStepLoop';
+import { LEGACY_FIXED_DT_120, LEGACY_PHYSICS_HZ_120 } from '../physics/physicsRate';
 import { getFdmProfile } from '../jsbsim/fdmProfiles';
 import { createJsbsimAudioAdapter } from '@0sfs/sound/jsbsimAudioAdapter';
 import { getAircraftAudioInstallation, resolveAircraftAudioInstallation } from '@0sfs/sound/aircraftAudioProfiles';
@@ -18,7 +19,8 @@ export function runSf50Rollout(sdk: JSBSimSdk, surfaceMode: RolloutSurface) {
   const set = (values: Record<string, number>) => {
     for (const [path, value] of Object.entries(values)) sdk.setPropertyValue(path, value);
   };
-  sdk.setDt(FIXED_DT);
+  // Recorded evidence from the 120 Hz era: it stays at 120 Hz to remain comparable.
+  sdk.setDt(LEGACY_FIXED_DT_120);
   set({ 'ic/lat-geod-deg': 34, 'ic/long-gc-deg': -118, 'ic/h-sl-ft': 50,
     'ic/terrain-elevation-ft': 0, 'ic/psi-true-deg': 0, 'ic/theta-deg': 3,
     'ic/vc-kts': 100, 'ic/gamma-deg': -3,
@@ -41,13 +43,13 @@ export function runSf50Rollout(sdk: JSBSimSdk, surfaceMode: RolloutSurface) {
   const surface = { raycast: () => null,
     sample: () => ({ heightMeters: height, revision, quality: 15 } as SurfaceHit) };
   const terrain = createTerrainContact(sdk, surface, profile.stance);
-  const loop = createFixedStepPhysicsLoop(sdk);
+  const loop = createFixedStepPhysicsLoop(sdk, undefined, { physicsHz: LEGACY_PHYSICS_HZ_120 });
   const pilot = new Sf50LandingPilot(SF50_DEFAULT_PILOT_PROFILE.landing);
   const pitch = new Sf50PitchController(SF50_DEFAULT_PILOT_PROFILE.landingPitch);
   const read = (stage: string) => {
     const engine = readEngineSample(sdk, available);
     return {
-      step, elapsedSec: step * FIXED_DT, stage, simTimeSec: get('simulation/sim-time-sec'),
+      step, elapsedSec: step * LEGACY_FIXED_DT_120, stage, simTimeSec: get('simulation/sim-time-sec'),
       dtSec: sdk.getDeltaT(), terrainHeightMeters: height,
       adoptedTerrainMeters: get('position/terrain-elevation-asl-ft') * 0.3048,
       revision, resetCount, runIcCount,
@@ -83,15 +85,15 @@ export function runSf50Rollout(sdk: JSBSimSdk, surfaceMode: RolloutSurface) {
           revision++;
         }
       }
-      const command = pilot.step({ simTimeSec: step * FIXED_DT,
+      const command = pilot.step({ simTimeSec: step * LEGACY_FIXED_DT_120,
         pitchDeg: get('attitude/theta-deg'), flightPathAngleDeg: get('flight-path/gamma-deg'),
         northVelocityFps: get('velocities/v-north-fps'), eastVelocityFps: get('velocities/v-east-fps'),
         groundSpeedFps: get('velocities/vg-fps'), downVelocityFps: get('velocities/v-down-fps'),
         calibratedAirspeedKts: get('velocities/vc-kts'), weightOnWheels: bothMains,
       }, Math.max(0, get('position/h-agl-ft') - profile.stance.staticMeters / 0.3048),
-      bothMains, touchdownStep !== null, FIXED_DT);
+      bothMains, touchdownStep !== null, LEGACY_FIXED_DT_120);
       const elevator = pitch.step(command.targetPitchDeg, get('attitude/theta-deg'),
-        get('velocities/q-rad_sec'), FIXED_DT).elevatorNorm;
+        get('velocities/q-rad_sec'), LEGACY_FIXED_DT_120).elevatorNorm;
       const updateTerrain = () => {
         const result = terrain.update();
         if (result === 'reset') { resetCount++; frames.push(read('terrain-reset')); }
@@ -99,7 +101,7 @@ export function runSf50Rollout(sdk: JSBSimSdk, surfaceMode: RolloutSurface) {
       };
       // The app samples once before rendering and again before each physics step.
       updateTerrain();
-      loop.update(FIXED_DT, () => {
+      loop.update(LEGACY_FIXED_DT_120, () => {
         const result = updateTerrain();
         set({ 'fcs/elevator-cmd-norm': elevator,
           'fcs/throttle-cmd-norm': 0, 'fcs/left-brake-cmd-norm': command.brakeNorm,

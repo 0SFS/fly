@@ -13,6 +13,7 @@ import { getAircraftAudioInstallation, resolveAircraftAudioInstallation, type Re
 import { FJ33_DEFINITION } from "@0sfs/sound/engineAcousticDefinitions";
 import { createDspHarness, rms, TIER } from "@0sfs/sound/dspHarness";
 import { createJsbsimAudioAdapter, decideCombustion, toSnapshot } from "@0sfs/sound/jsbsimAudioAdapter";
+import { LEGACY_PHYSICS_HZ_120 } from "../physics/physicsRate";
 
 /**
  * The adapter against the REAL packaged JSBSim and the shipped aircraft data:
@@ -34,7 +35,7 @@ async function boot(aircraftId: AircraftId, transformModel?: (xml: string) => st
     sdk.writeDataFile(path, transformModel && text.includes("<fdm_config")
       ? transformModel(text) : text);
   }
-  await bootstrapAircraft(sdk, aircraftId, {});
+  await bootstrapAircraft(sdk, aircraftId, LEGACY_PHYSICS_HZ_120, {});
   return sdk;
 }
 

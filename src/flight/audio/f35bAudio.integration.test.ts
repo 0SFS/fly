@@ -14,6 +14,7 @@ import { AVAILABILITY } from "@0sfs/sound/audioSnapshot";
 import { computeListenerPose, createListenerPose } from "@0sfs/sound/audioPose";
 import { createDspHarness, peak, rms, TIER } from "@0sfs/sound/dspHarness";
 import { createJsbsimAudioAdapter, toSnapshot, type AudioAdapter, type AudioAdapterReading } from "@0sfs/sound/jsbsimAudioAdapter";
+import { LEGACY_PHYSICS_HZ_120 } from "../physics/physicsRate";
 
 const profile = getAircraftAudioProfile("f-35b")!;
 const admission = resolveAircraftAudioInstallation(getAircraftAudioInstallation("f-35b"));
@@ -37,7 +38,7 @@ async function boot(throttleNorm = 0.48, engineRunning = true) {
   instances.push(sdk);
   const manifest: unknown = JSON.parse(readFileSync("public/jsbsim-data/manifest.json", "utf8"));
   for (const file of resolveAircraftDataFiles(manifest, "f-35b")) sdk.writeDataFile(file, readFileSync("public/jsbsim-data/" + file, "utf8"));
-  await bootstrapAircraft(sdk, "f-35b", { throttleNorm, engineRunning,
+  await bootstrapAircraft(sdk, "f-35b", LEGACY_PHYSICS_HZ_120, { throttleNorm, engineRunning,
     ...(engineRunning ? {} : { airspeedKts: 0, altFt: 1000 }) });
   const adapter = createJsbsimAudioAdapter(sdk, { gearHeightMetres: stance, source });
   adapters.push(adapter);

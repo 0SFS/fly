@@ -1,6 +1,6 @@
 import type { JSBSimSdk } from "@felipegalind0/jsbsim";
 import type { AircraftId } from "@0sfs/aircraft/aircraftIds";
-import { FIXED_DT } from "../physics/fixedStepLoop";
+import { physicsStepSeconds, type PhysicsHz } from "../physics/physicsRate";
 import { flightParameterDefaults } from "../settings/flightParameters";
 import { getFdmProfile, type EngineModelId } from "./fdmProfiles";
 
@@ -58,9 +58,15 @@ function applyFixedDeltaT(sdk: JSBSimSdk, deltaSeconds: number): void {
   }
 }
 
+/**
+ * Load an aircraft and evaluate its initial conditions. `physicsHz` sets the
+ * native step, 1 / physicsHz, which the flight's loop and consumers share; it
+ * has no default, so a fixture recorded at 120 Hz says so.
+ */
 export async function bootstrapAircraft(
   sdk: JSBSimSdk,
   aircraftId: AircraftId,
+  physicsHz: PhysicsHz,
   options: C172BootstrapOptions = {},
 ): Promise<void> {
   const opts = { ...DEFAULT_OPTIONS, ...options };
@@ -94,7 +100,7 @@ export async function bootstrapAircraft(
     }
   }
 
-  applyFixedDeltaT(sdk, FIXED_DT);
+  applyFixedDeltaT(sdk, physicsStepSeconds(physicsHz));
   sdk.setPropertyValue("ic/lat-geod-deg", opts.latDeg);
   sdk.setPropertyValue("ic/long-gc-deg", opts.lonDeg);
   sdk.setPropertyValue("ic/h-sl-ft", opts.altFt);
@@ -142,6 +148,6 @@ export async function bootstrapAircraft(
   }
 }
 
-export async function bootstrapC172p(sdk: JSBSimSdk, options: C172BootstrapOptions = {}): Promise<void> {
-  return bootstrapAircraft(sdk, "cessna-172", options);
+export async function bootstrapC172p(sdk: JSBSimSdk, physicsHz: PhysicsHz, options: C172BootstrapOptions = {}): Promise<void> {
+  return bootstrapAircraft(sdk, "cessna-172", physicsHz, options);
 }

@@ -14,9 +14,10 @@ import { createFlightInputManager } from "@0sfs/controls/flightInputManager";
 import { applyFlightControls } from "@0sfs/controls/applyFlightControls";
 import { createAutoTrimState, readAutoTrimTuning, stepPitchAutoTrim, type AutoTrimState } from "@0sfs/controls/autoTrim";
 import { flightParameterDefaults } from "../settings/flightParameters";
-import { createFixedStepPhysicsLoop, FIXED_DT } from "../physics/fixedStepLoop";
+import { createFixedStepPhysicsLoop } from "../physics/fixedStepLoop";
 import { groundContactClearanceMeters } from "@0sfs/ground-contact/groundContactClearance";
 import { captureSimulation, restoreSimulation, validFlightState } from "@0sfs/ground-contact/safeFlightState";
+import { LEGACY_FIXED_DT_120, LEGACY_PHYSICS_HZ_120 } from "../physics/physicsRate";
 
 const aircraftId = "cirrus-vision-jet";
 const profile = getFdmProfile(aircraftId);
@@ -46,7 +47,7 @@ async function createSf50(options: C172BootstrapOptions = {}) {
   for (const path of resolveAircraftDataFiles(manifest, aircraftId)) {
     sdk.writeDataFile(path, readFileSync("public/jsbsim-data/" + path, "utf8"));
   }
-  await bootstrapAircraft(sdk, aircraftId, options);
+  await bootstrapAircraft(sdk, aircraftId, LEGACY_PHYSICS_HZ_120, options);
   return sdk;
 }
 
@@ -61,7 +62,7 @@ describe("SF50 runtime contracts (not performance calibration)", () => {
     expect(sdk.module.FS.analyzePath("/runtime/engine/direct.xml").exists).toBe(true);
     expect(sdk.module.FS.analyzePath("/runtime/aircraft/c172p/c172p.xml").exists).toBe(false);
     expect(sdk.getPropertyValue("gear/num-units")).toBe(3);
-    expect(sdk.getDeltaT()).toBeCloseTo(FIXED_DT, 12);
+    expect(sdk.getDeltaT()).toBeCloseTo(LEGACY_FIXED_DT_120, 12);
     const state = readFlightState(sdk);
     expect(state.latDeg).toBeCloseTo(46.7867, 8);
     expect(state.lonDeg).toBeCloseTo(-92.1005, 8);
@@ -99,7 +100,7 @@ describe("SF50 runtime contracts (not performance calibration)", () => {
       initialGearDown: sdk.getPropertyValue("gear/gear-cmd-norm") > 0.5,
       rudderSign: profile.rudderSign,
     });
-    input.apply(sdk, input.poll(FIXED_DT));
+    input.apply(sdk, input.poll(LEGACY_FIXED_DT_120));
     advance(sdk, 1);
     expect(sdk.getPropertyValue("fcs/throttle-cmd-norm")).toBe(profile.initialThrottleNorm);
     expect(sdk.getPropertyValue("gear/gear-cmd-norm")).toBe(0);
@@ -166,7 +167,7 @@ describe("SF50 runtime contracts (not performance calibration)", () => {
     expect(sdk.getPropertyValue("gear/gear-pos-norm")).toBeCloseTo(position, 10);
     expect(sdk.getPropertyValue("simulation/sim-time-sec"))
       .toBeCloseTo(operation === "snapshot restore" ? 2 : 0, 10);
-    expect(sdk.getDeltaT()).toBeCloseTo(FIXED_DT, 12);
+    expect(sdk.getDeltaT()).toBeCloseTo(LEGACY_FIXED_DT_120, 12);
     advance(sdk, 1);
     expect(sdk.getPropertyValue("gear/gear-pos-norm")).toBeGreaterThan(position);
   });
@@ -224,8 +225,8 @@ describe("SF50 runtime contracts (not performance calibration)", () => {
     })) sdk.setPropertyValue(property, value);
     expect(sdk.runIc()).toBe(true);
     const run = vi.spyOn(sdk, "run");
-    const loop = createFixedStepPhysicsLoop(sdk);
-    loop.update(FIXED_DT, () => true);
+    const loop = createFixedStepPhysicsLoop(sdk, undefined, { physicsHz: LEGACY_PHYSICS_HZ_120 });
+    loop.update(LEGACY_FIXED_DT_120, () => true);
     expect(loop.getFault()).toContain("Hard ground impact");
     expect(run).not.toHaveBeenCalled();
   });
@@ -235,7 +236,7 @@ describe("SF50 runtime contracts (not performance calibration)", () => {
     for (const fps of [120, 60, 30, 10]) {
       const sdk = await createSf50({ engineRunning: false });
       let accepted = 0;
-      const loop = createFixedStepPhysicsLoop(sdk, () => { accepted += 1; });
+      const loop = createFixedStepPhysicsLoop(sdk, () => { accepted += 1; }, { physicsHz: LEGACY_PHYSICS_HZ_120 });
       for (let frame = 0; frame < 500 && accepted < 240; frame += 1) {
         loop.update(1 / fps, () => { sdk.setPropertyValue("fcs/aileron-cmd-norm", 0.1); });
       }
@@ -262,7 +263,7 @@ describe("SF50 runtime contracts (not performance calibration)", () => {
     });
     const stepAssist = (elevator: number, trim: number, state: AutoTrimState) => {
       const next = stepPitchAutoTrim(state, {
-        dt: FIXED_DT, elevator, pitchTrim: trim, onGround: false, ...sensors(),
+        dt: LEGACY_FIXED_DT_120, elevator, pitchTrim: trim, onGround: false, ...sensors(),
       }, readAutoTrimTuning(flightParameterDefaults()));
       applyFlightControls(sdk, { ...idle, elevator, pitchTrim: next.pitchTrim }, 0, profile.rudderSign);
       expect(sdk.run()).toBe(true);

@@ -7,6 +7,7 @@ import { readJsbsimBuildIdentity, type JsbsimBuildIdentity } from "./jsbsimBuild
 import { getFdmProfile, resolveEngineModel, type EngineModelId } from "./fdmProfiles";
 import { releaseFlightStateReads } from "@0sfs/ground-contact/ecefBridge";
 import { releaseSimulationCapture } from "@0sfs/ground-contact/safeFlightState";
+import { DEFAULT_PHYSICS_HZ, isPhysicsHz, type PhysicsHz } from "../physics/physicsRate";
 
 export interface JsbsimRuntimeIdentity {
   aircraftId: AircraftId;
@@ -29,14 +30,24 @@ export interface JsbsimRuntimeOptions {
   /** For an aircraft that offers a choice; default its first. */
   engineModel?: EngineModelId;
   bootstrap?: Omit<C172BootstrapOptions, "engineModel">;
+  /** Native steps per simulated second; the flight's loop and consumers use the same. Default 60 Hz, never 120 unless asked. */
+  physicsHz?: PhysicsHz;
   onProgress?: (progress: JsbsimLoadProgress) => void;
   onLog?: (stream: "stdout" | "stderr", message: string) => void;
 }
 
-export interface JsbsimRuntime { sdk: JSBSimSdk; identity: JsbsimRuntimeIdentity; dispose(): void }
+export interface JsbsimRuntime {
+  sdk: JSBSimSdk;
+  identity: JsbsimRuntimeIdentity;
+  /** The rate the native model was initialized to step at: one step is 1 / physicsHz seconds. */
+  physicsHz: PhysicsHz;
+  dispose(): void;
+}
 
 export async function createJsbsimRuntime(options: JsbsimRuntimeOptions = {}): Promise<JsbsimRuntime> {
   const aircraftId = options.aircraftId ?? "cessna-172";
+  const physicsHz = options.physicsHz ?? DEFAULT_PHYSICS_HZ;
+  if (!isPhysicsHz(physicsHz)) throw new Error("Unsupported physics rate: " + String(physicsHz) + " Hz");
   if (!isAircraftId(aircraftId)) throw new Error("Unsupported aircraft: " + aircraftId);
   const engineModel = resolveEngineModel(aircraftId, options.engineModel)?.id ?? null;
   const identity: JsbsimRuntimeIdentity = {
@@ -83,9 +94,9 @@ export async function createJsbsimRuntime(options: JsbsimRuntimeOptions = {}): P
   try {
     options.onProgress?.({ message: "Preparing flight physics", progress: null });
     for (const file of files) sdk.writeDataFile(file.path, file.contents);
-    await bootstrapAircraft(sdk, aircraftId, { ...options.bootstrap, engineModel: engineModel ?? undefined });
+    await bootstrapAircraft(sdk, aircraftId, physicsHz, { ...options.bootstrap, engineModel: engineModel ?? undefined });
     if (typeof window !== "undefined") window.osfsJsbsimBuild = identity;
-    return { sdk, identity, dispose };
+    return { sdk, identity, physicsHz, dispose };
   } catch (error) {
     dispose();
     throw error;

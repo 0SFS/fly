@@ -4,8 +4,9 @@ import { wasmBinaryUrl, wasmModuleUrl } from "@felipegalind0/jsbsim/wasm";
 import { afterEach, describe, expect, it } from "vitest";
 import type { SurfaceHit, SurfaceQuery } from "foss-earth/runtime";
 import { createTerrainContact } from "@0sfs/ground-contact/terrainContact";
-import { createFixedStepPhysicsLoop, FIXED_DT } from "./fixedStepLoop";
+import { createFixedStepPhysicsLoop } from "./fixedStepLoop";
 import { getFdmProfile } from "../jsbsim/fdmProfiles";
+import { LEGACY_FIXED_DT_120, LEGACY_PHYSICS_HZ_120 } from "./physicsRate";
 
 const METERS_PER_FOOT = 0.3048;
 const INITIAL_GROUND_METERS = 300;
@@ -21,7 +22,7 @@ async function setup(altitude = INITIAL_GROUND_METERS + C172_STATIC_METERS, spee
   for (const file of manifest.files) sdk.writeDataFile(file, readFileSync(`public/jsbsim-data/${file}`, "utf8"));
   sdk.configurePaths({ rootDir: "/runtime", aircraftPath: "aircraft", enginePath: "engine", systemsPath: "systems" });
   sdk.loadModel("c172p");
-  sdk.setDt(FIXED_DT);
+  sdk.setDt(LEGACY_FIXED_DT_120);
   for (const [property, value] of Object.entries({ "ic/lat-geod-deg": 34,
     "ic/long-gc-deg": -118.3, "ic/h-sl-ft": altitude / METERS_PER_FOOT,
     "ic/terrain-elevation-ft": INITIAL_GROUND_METERS / METERS_PER_FOOT,
@@ -53,7 +54,7 @@ function advance(sdk: JSBSimSdk, loop: ReturnType<typeof createFixedStepPhysicsL
   contact: ReturnType<typeof createTerrainContact>, steps: number, ground = INITIAL_GROUND_METERS) {
   let maxUp = -Infinity, maxSpeed = 0, maxEnergy = -Infinity, maxCompression = 0;
   for (let step = 0; step < steps; step++) {
-    loop.update(FIXED_DT, contact.update);
+    loop.update(LEGACY_FIXED_DT_120, contact.update);
     const state = telemetry(sdk, ground);
     maxUp = Math.max(maxUp, state.up);
     maxSpeed = Math.max(maxSpeed, state.speed);
@@ -69,7 +70,7 @@ describe("ground contact energy regressions with real JSBSim", () => {
     const sdk = await setup(INITIAL_GROUND_METERS + C172_STATIC_METERS, speedKts);
     const { state, surface } = terrain();
     const contact = createTerrainContact(sdk, surface, getFdmProfile("cessna-172").stance);
-    const loop = createFixedStepPhysicsLoop(sdk);
+    const loop = createFixedStepPhysicsLoop(sdk, undefined, { physicsHz: LEGACY_PHYSICS_HZ_120 });
     // At 150kt a one-second roll lifts the aircraft over a 5m barrier. Establish
     // contact immediately for fast-impact cases so the fixture actually hits it.
     advance(sdk, loop, contact, speedKts >= 100 ? 1 : 120);
@@ -88,7 +89,7 @@ describe("ground contact energy regressions with real JSBSim", () => {
     const sdk = await setup();
     const { state, surface } = terrain();
     const contact = createTerrainContact(sdk, surface, getFdmProfile("cessna-172").stance);
-    const loop = createFixedStepPhysicsLoop(sdk, undefined, { getArcadeGroundLaunches: () => true });
+    const loop = createFixedStepPhysicsLoop(sdk, undefined, { physicsHz: LEGACY_PHYSICS_HZ_120, getArcadeGroundLaunches: () => true });
     advance(sdk, loop, contact, 120);
     state.height += 5;
     const result = advance(sdk, loop, contact, 360);
@@ -104,7 +105,7 @@ describe("ground contact energy regressions with real JSBSim", () => {
     const sdk = await setup();
     const { state, surface } = terrain();
     const contact = createTerrainContact(sdk, surface, getFdmProfile("cessna-172").stance);
-    const loop = createFixedStepPhysicsLoop(sdk);
+    const loop = createFixedStepPhysicsLoop(sdk, undefined, { physicsHz: LEGACY_PHYSICS_HZ_120 });
     advance(sdk, loop, contact, 120);
     const before = telemetry(sdk);
     expect(before.rpm).toBe(0);
@@ -128,7 +129,7 @@ describe("ground contact energy regressions with real JSBSim", () => {
     const sdk = await setup(301.6, speedKts, 5);
     const { surface } = terrain();
     const contact = createTerrainContact(sdk, surface, getFdmProfile("cessna-172").stance);
-    const loop = createFixedStepPhysicsLoop(sdk);
+    const loop = createFixedStepPhysicsLoop(sdk, undefined, { physicsHz: LEGACY_PHYSICS_HZ_120 });
     const before = telemetry(sdk);
     const result = advance(sdk, loop, contact, 1200);
     const after = telemetry(sdk);
@@ -148,7 +149,7 @@ describe("ground contact energy regressions with real JSBSim", () => {
     sdk.setPropertyValue("propulsion/set-running", -1);
     const { state, surface } = terrain();
     const contact = createTerrainContact(sdk, surface, getFdmProfile("cessna-172").stance);
-    const loop = createFixedStepPhysicsLoop(sdk);
+    const loop = createFixedStepPhysicsLoop(sdk, undefined, { physicsHz: LEGACY_PHYSICS_HZ_120 });
     advance(sdk, loop, contact, 120);
     const before = telemetry(sdk);
     expect(before.rpm).toBeGreaterThan(1000);
@@ -169,7 +170,7 @@ describe("ground contact energy regressions with real JSBSim", () => {
     const sdk = await setup(303, 100, descentFps);
     const { surface } = terrain();
     const contact = createTerrainContact(sdk, surface, getFdmProfile("cessna-172").stance);
-    const loop = createFixedStepPhysicsLoop(sdk);
+    const loop = createFixedStepPhysicsLoop(sdk, undefined, { physicsHz: LEGACY_PHYSICS_HZ_120 });
     const before = telemetry(sdk);
     const result = advance(sdk, loop, contact, 600);
     expect(result.maxCompression).toBeGreaterThan(0.1);

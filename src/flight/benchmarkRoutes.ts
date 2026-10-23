@@ -53,8 +53,12 @@ export interface BenchmarkRouteSnapshot {
   aircraft: "cessna-172";
   status: "running" | "complete" | "failed";
   failure: string | null;
+  /** acceptedSteps × fixedDtSeconds: simulated time, never wall time or discarded catch-up time. */
   elapsedSeconds: number;
   acceptedSteps: number;
+  /** The flight's physics step; routes run at different rates are not comparable step for step. */
+  fixedDtSeconds: number;
+  physicsHz: number;
   /** Epoch-aligned monotonic wall clock at the first accepted step; null before flight advances. */
   startedAtEpochMs: number | null;
   /** Epoch-aligned monotonic wall clock at completion or failure, including failure before the first step. */
@@ -130,7 +134,8 @@ export function createBenchmarkRouteController(
   return {
     get status() { return status; },
     snapshot: () => ({ route: { ...route }, aircraft: "cessna-172", status, failure,
-      elapsedSeconds: Math.min(route.durationSeconds, acceptedSteps * fixedDtSeconds), acceptedSteps, startedAtEpochMs, completedAtEpochMs,
+      elapsedSeconds: Math.min(route.durationSeconds, acceptedSteps * fixedDtSeconds), acceptedSteps,
+      fixedDtSeconds, physicsHz: Math.round(1 / fixedDtSeconds), startedAtEpochMs, completedAtEpochMs,
       targetAltitudeMslMeters, altitudeReference: "initial-ground-plus-requested-clearance", settings: { ...settings },
       coverageValidation: "unverified", samples: samples.map(value => ({ ...value })), maxAltitudeErrorMeters, maxHeadingErrorDeg }),
     targets(state) {

@@ -3,8 +3,8 @@ import { JSBSimSdk } from "@felipegalind0/jsbsim";
 import { wasmBinaryUrl, wasmModuleUrl } from "@felipegalind0/jsbsim/wasm";
 import { afterEach, describe, expect, it } from "vitest";
 import { readFlightState } from "@0sfs/ground-contact/ecefBridge";
-import { FIXED_DT } from "./fixedStepLoop";
 import { createWheelSpinExperiment } from "@0sfs/ground-contact/createWheelSpinExperiment";
+import { LEGACY_FIXED_DT_120 } from "./physicsRate";
 
 const METERS_PER_FOOT = 0.3048;
 const instances: JSBSimSdk[] = [];
@@ -18,7 +18,7 @@ async function setup() {
   for (const file of manifest.files) sdk.writeDataFile(file, readFileSync(`public/jsbsim-data/${file}`, "utf8"));
   sdk.configurePaths({ rootDir: "/runtime", aircraftPath: "aircraft", enginePath: "engine", systemsPath: "systems" });
   expect(sdk.loadModel("c172p")).toBe(true);
-  sdk.setDt(FIXED_DT);
+  sdk.setDt(LEGACY_FIXED_DT_120);
   for (const [property, value] of Object.entries({ "ic/lat-geod-deg": 34,
     "ic/long-gc-deg": -118.3, "ic/h-sl-ft": 301.6 / METERS_PER_FOOT,
     "ic/terrain-elevation-ft": 300 / METERS_PER_FOOT, "ic/psi-true-deg": 0,
@@ -35,7 +35,7 @@ async function touchdown(mode: "off" | "instant" | "inertia") {
   const samples = [];
   for (let step = 0; step < 480; step++) {
     expect(sdk.run()).toBe(true);
-    if (mode !== "off") experiment!.step(FIXED_DT, mode);
+    if (mode !== "off") experiment!.step(LEGACY_FIXED_DT_120, mode);
     samples.push({
       flight: readFlightState(sdk),
       // Include motion and controls beyond the presentation snapshot to catch

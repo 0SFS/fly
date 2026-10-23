@@ -14,8 +14,8 @@ import { getExternalTankDefinitions } from "@0sfs/fuel/externalTankDefinitions";
 import { windForceToBody } from "@0sfs/aircraft/aircraftForces";
 import { getFdmProfile } from "./fdmProfiles";
 import { applySavedControls, captureSavedFlight, parseSavedFlight, restoreSavedFlight } from "./savedFlight";
-import { FIXED_DT } from "../physics/fixedStepLoop";
 import { captureSimulation, restoreSimulation } from "@0sfs/ground-contact/safeFlightState";
+import { LEGACY_FIXED_DT_120, LEGACY_PHYSICS_HZ_120 } from "../physics/physicsRate";
 
 const instances: JSBSimSdk[] = [];
 
@@ -31,7 +31,7 @@ async function boot(aircraftId: AircraftId) {
   instances.push(sdk);
   const manifest: unknown = JSON.parse(readFileSync("public/jsbsim-data/manifest.json", "utf8"));
   for (const file of resolveAircraftDataFiles(manifest, aircraftId)) sdk.writeDataFile(file, readFileSync("public/jsbsim-data/" + file, "utf8"));
-  await bootstrapAircraft(sdk, aircraftId, { altFt: 3000, airspeedKts: 120 });
+  await bootstrapAircraft(sdk, aircraftId, LEGACY_PHYSICS_HZ_120, { altFt: 3000, airspeedKts: 120 });
   return sdk;
 }
 
@@ -66,7 +66,7 @@ describe("fuel tanks in JSBSim", () => {
       flightPreset: { mode: "departure", headingDeg: 90, groundElevationMeters: 300, flightPathDeg: 0 },
     }, 300, "f-35b");
     expect(readFuelTanks(sdk).map(tank => tank.contentsLbs)).toEqual(loaded);
-    for (let step = 0; step < 1 / FIXED_DT; step++) expect(sdk.run()).toBe(true);
+    for (let step = 0; step < 1 / LEGACY_FIXED_DT_120; step++) expect(sdk.run()).toBe(true);
     expect(readFuelTanks(sdk).every((tank, i) => tank.contentsLbs <= loaded[i]!)).toBe(true);
   });
 
@@ -120,7 +120,7 @@ describe("fuel tanks in JSBSim", () => {
   it("feeds the running engine from an attached external tank", async () => {
     const sdk = await boot("f-35b");
     writeFuelTanks(sdk, new Map([[0, 0], [1, 0], [2, 1000], [3, 0]]));
-    for (let step = 0; step < 1 / FIXED_DT; step++) expect(sdk.run()).toBe(true);
+    for (let step = 0; step < 1 / LEGACY_FIXED_DT_120; step++) expect(sdk.run()).toBe(true);
     expect(readFuelTanks(sdk)[2]!.contentsLbs).toBeLessThan(1000);
     expect(sdk.getPropertyValue("propulsion/engine[0]/thrust-lbs")).toBeGreaterThan(0);
   });

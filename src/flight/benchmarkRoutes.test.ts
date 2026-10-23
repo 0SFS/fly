@@ -53,6 +53,17 @@ describe("W0 benchmark routes", () => {
     expect(controller.snapshot().acceptedSteps).toBe(21_600);
   });
 
+  it.each([30, 60, 120])("counts the same 180 simulated seconds and 1 Hz samples at %i Hz physics", physicsHz => {
+    const controller = createBenchmarkRouteController(BENCHMARK_ROUTES.low, initial, 10, 1 / physicsHz, {});
+    const ground = vi.fn(() => 10);
+    let steps = 0;
+    while (!controller.acceptStep(initial, ground)) steps += 1;
+    const result = controller.snapshot();
+    expect(steps + 1).toBe(180 * physicsHz);
+    expect(result).toMatchObject({ status: "complete", elapsedSeconds: 180, acceptedSteps: 180 * physicsHz, physicsHz, fixedDtSeconds: 1 / physicsHz });
+    expect(result.samples.map(sample => sample.elapsedSeconds)).toEqual(Array.from({ length: 181 }, (_, second) => expect.closeTo(second, 9)));
+  });
+
   it.each([-1, 1])("does not accumulate pitch integral into a saturated %s altitude correction", sign => {
     const controller = createBenchmarkRouteController(BENCHMARK_ROUTES.low, initial, 10, 1 / 120, {});
     const displaced = { ...initial, altMeters: initial.altMeters - sign * 500 };

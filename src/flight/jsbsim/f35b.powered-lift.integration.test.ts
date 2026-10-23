@@ -5,6 +5,7 @@ import { wasmBinaryUrl, wasmModuleUrl } from "@felipegalind0/jsbsim/wasm";
 import { describe, expect, it } from "vitest";
 import { bootstrapAircraft } from "./bootstrapC172";
 import { resolveAircraftDataFiles } from "./hydrateJsbsimData";
+import { LEGACY_PHYSICS_HZ_120 } from "../physics/physicsRate";
 
 const P = "propulsion/engine/plant/";
 
@@ -22,7 +23,7 @@ describe("F135 sustained powered lift at the actual full lever demand", () => {
       const manifest: unknown = JSON.parse(readFileSync("public/jsbsim-data/manifest.json", "utf8"));
       for (const file of resolveAircraftDataFiles(manifest, "f-35b"))
         sdk.writeDataFile(file, readFileSync("public/jsbsim-data/" + file, "utf8"));
-      await bootstrapAircraft(sdk, "f-35b", { altFt, airspeedKts: 0, throttleNorm: entry ? 0 : throttle,
+      await bootstrapAircraft(sdk, "f-35b", LEGACY_PHYSICS_HZ_120, { altFt, airspeedKts: 0, throttleNorm: entry ? 0 : throttle,
         holdDown: true, latDeg: 0, lonDeg: 0, headingDeg: 0 });
       for (const index of [0, 1]) sdk.setPropertyValue(`stores/external-tank[${index}]/attached`, 0);
       for (const name of ["theta", "alpha", "gamma"]) sdk.setPropertyValue(`ic/${name}-deg`, 0);

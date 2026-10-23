@@ -4,10 +4,11 @@ import { wasmBinaryUrl, wasmModuleUrl } from "@felipegalind0/jsbsim/wasm";
 import { describe, expect, it } from "vitest";
 import type { SurfaceHit, SurfaceQuery } from "foss-earth/runtime";
 import { createTerrainContact } from "@0sfs/ground-contact/terrainContact";
-import { createFixedStepPhysicsLoop, FIXED_DT } from "./fixedStepLoop";
+import { createFixedStepPhysicsLoop } from "./fixedStepLoop";
 import { readFlightState } from "@0sfs/ground-contact/ecefBridge";
 import { resetFlightLocation } from "../jsbsim/resetFlightLocation";
 import { getFdmProfile } from "../jsbsim/fdmProfiles";
+import { LEGACY_FIXED_DT_120, LEGACY_PHYSICS_HZ_120 } from "./physicsRate";
 
 const C172_STATIC_METERS = getFdmProfile("cessna-172").stance.staticMeters;
 
@@ -18,7 +19,7 @@ async function setup(altitude = 400, terrain = 300) {
   for (const file of manifest.files) sdk.writeDataFile(file, readFileSync(`public/jsbsim-data/${file}`, "utf8"));
   sdk.configurePaths({ rootDir: "/runtime", aircraftPath: "aircraft", enginePath: "engine", systemsPath: "systems" });
   sdk.loadModel("c172p");
-  sdk.setDt(FIXED_DT);
+  sdk.setDt(LEGACY_FIXED_DT_120);
   for (const [property, value] of Object.entries({ "ic/lat-geod-deg": 34,
     "ic/long-gc-deg": -118.3, "ic/h-sl-ft": altitude / 0.3048, "ic/terrain-elevation-ft": terrain / 0.3048,
     "ic/psi-true-deg": 45, "ic/vc-kts": 100 })) sdk.setPropertyValue(property, value);
@@ -45,8 +46,8 @@ describe("terrain refinement physics regressions", () => {
     expect(sdk.getPropertyValue("velocities/v-east-fps")).toBeCloseTo(east, 3);
     expect(sdk.getPropertyValue("attitude/psi-deg")).toBeCloseTo(45, 3);
     expect(sdk.getPropertyValue("fcs/throttle-cmd-norm")).toBe(0.6);
-    const loop = createFixedStepPhysicsLoop(sdk);
-    for (let step = 0; step < 240; step++) loop.update(FIXED_DT, contact.update);
+    const loop = createFixedStepPhysicsLoop(sdk, undefined, { physicsHz: LEGACY_PHYSICS_HZ_120 });
+    for (let step = 0; step < 240; step++) loop.update(LEGACY_FIXED_DT_120, contact.update);
     expect(loop.getFault()).toBeNull();
     expect(readFlightState(sdk).altMeters).toBeLessThan(1000);
   });
@@ -59,8 +60,8 @@ describe("terrain refinement physics regressions", () => {
     revision++;
     expect(contact.update()).toBe(true);
     expect(readFlightState(sdk).altMeters).toBeCloseTo(400, 2);
-    const loop = createFixedStepPhysicsLoop(sdk);
-    for (let step = 0; step < 120; step++) loop.update(FIXED_DT, contact.update);
+    const loop = createFixedStepPhysicsLoop(sdk, undefined, { physicsHz: LEGACY_PHYSICS_HZ_120 });
+    for (let step = 0; step < 120; step++) loop.update(LEGACY_FIXED_DT_120, contact.update);
     expect(loop.getFault()).not.toBeNull();
     expect(Object.values(loop.getLatestState()!).every(Number.isFinite)).toBe(true);
     expect(loop.getLatestState()!.altMeters).toBeLessThan(10000);
@@ -84,19 +85,19 @@ describe("terrain refinement physics regressions", () => {
     const sdk = await setup(2000, 1500);
     resetFlightLocation(sdk, { latDeg: 34.1, lonDeg: -118.2, altMeters: 500 }, 30);
     const contact = createTerrainContact(sdk, surfaceAt(() => 30, () => 0), getFdmProfile("cessna-172").stance);
-    const loop = createFixedStepPhysicsLoop(sdk);
-    for (let step = 0; step < 240; step++) loop.update(FIXED_DT, contact.update);
+    const loop = createFixedStepPhysicsLoop(sdk, undefined, { physicsHz: LEGACY_PHYSICS_HZ_120 });
+    for (let step = 0; step < 240; step++) loop.update(LEGACY_FIXED_DT_120, contact.update);
     expect(loop.getFault()).toBeNull();
     expect(readFlightState(sdk).altMeters).toBeGreaterThan(400);
     expect(readFlightState(sdk).altMeters).toBeLessThan(600);
   });
   it("a fault latches and never publishes invalid output even if Run returns true", async () => {
     const sdk = await setup();
-    const loop = createFixedStepPhysicsLoop(sdk);
+    const loop = createFixedStepPhysicsLoop(sdk, undefined, { physicsHz: LEGACY_PHYSICS_HZ_120 });
     loop.reset();
     const run = sdk.run.bind(sdk);
     sdk.run = () => { sdk.setPropertyValue("position/h-sl-ft", 1e44); return true; };
-    const state = loop.update(FIXED_DT, () => true);
+    const state = loop.update(LEGACY_FIXED_DT_120, () => true);
     expect(loop.getFault()).not.toBeNull();
     expect(state.altMeters).toBeCloseTo(400, 3);
     sdk.run = run;

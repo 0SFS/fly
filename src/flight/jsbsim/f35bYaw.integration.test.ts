@@ -9,9 +9,9 @@ import { getFdmProfile } from "./fdmProfiles";
 import { setExternalFuelTankAttached } from "@0sfs/fuel/externalFuelTanks";
 import { resolveAircraftDataFiles } from "./hydrateJsbsimData";
 import { applyFlightControls } from "@0sfs/controls/applyFlightControls";
-import { FIXED_DT } from "../physics/fixedStepLoop";
 import { captureSimulation, restoreSimulation } from "@0sfs/ground-contact/safeFlightState";
 import { resetFlightLocation } from "./resetFlightLocation";
+import { LEGACY_FIXED_DT_120, LEGACY_PHYSICS_HZ_120 } from "../physics/physicsRate";
 
 const profile = getFdmProfile("f-35b");
 const instances: JSBSimSdk[] = [];
@@ -25,7 +25,7 @@ async function boot(speed: number, conversion: number, disturbance: "rate" | "re
   instances.push(sdk);
   const manifest: unknown = JSON.parse(readFileSync("public/jsbsim-data/manifest.json", "utf8"));
   for (const file of resolveAircraftDataFiles(manifest, "f-35b")) sdk.writeDataFile(file, readFileSync("public/jsbsim-data/" + file, "utf8"));
-  await bootstrapAircraft(sdk, "f-35b", { airspeedKts: speed, altFt: conversion === 1 ? 1000 : 5000 });
+  await bootstrapAircraft(sdk, "f-35b", LEGACY_PHYSICS_HZ_120, { airspeedKts: speed, altFt: conversion === 1 ? 1000 : 5000 });
   // Preserve the clean-aircraft yaw fixtures; attached stores have their own checks.
   for (const index of [2, 3]) setExternalFuelTankAttached(sdk, "f-35b", index, false);
   const controls = {
@@ -71,8 +71,8 @@ describe("F-35B native yaw damping after disturbance/control release", () => {
     let lateSquares = 0;
     let lateSamples = 0;
     let lateSaturations = 0;
-    for (let step = 0; step < 24 / FIXED_DT; step++) {
-      const time = step * FIXED_DT;
+    for (let step = 0; step < 24 / LEGACY_FIXED_DT_120; step++) {
+      const time = step * LEGACY_FIXED_DT_120;
       apply(configuration.disturbance === "release" && time >= 1.5 && time < 2 ? 0.5 : 0);
       expect(sdk.run()).toBe(true);
       const rate = sdk.getPropertyValue("velocities/r-rad_sec");
@@ -107,7 +107,7 @@ describe("F-35B native yaw damping after disturbance/control release", () => {
     expect(Math.abs(sdk.getPropertyValue("fcs/yaw-scheduler"))).toBeGreaterThan(0.01);
     expect(Math.abs(sdk.getPropertyValue("fcs/rudder-cmd-norm"))).toBe(0);
     select("manual");
-    for (let step = 0; step < 0.7 / FIXED_DT; step++) expect(sdk.run()).toBe(true);
+    for (let step = 0; step < 0.7 / LEGACY_FIXED_DT_120; step++) expect(sdk.run()).toBe(true);
     expect(sdk.getPropertyValue("fcs/fbw-enabled")).toBe(0);
     expect(Math.abs(sdk.getPropertyValue("fcs/yaw-scheduler"))).toBe(0);
     expect(sdk.getPropertyValue("fcs/rudder-pos-rad")).toBeCloseTo(0, 3);
@@ -117,7 +117,7 @@ describe("F-35B native yaw damping after disturbance/control release", () => {
     expect(Math.abs(sdk.getPropertyValue("fcs/g-load-i"))).toBe(0);
     select("fly-by-wire");
     let peak = 0;
-    for (let step = 0; step < 8 / FIXED_DT; step++) {
+    for (let step = 0; step < 8 / LEGACY_FIXED_DT_120; step++) {
       expect(sdk.run()).toBe(true);
       peak = Math.max(peak, Math.abs(sdk.getPropertyValue("velocities/r-rad_sec")));
     }
@@ -141,7 +141,7 @@ describe("F-35B native yaw damping after disturbance/control release", () => {
     expect(Math.abs(sdk.getPropertyValue("fcs/stovl-pitch-control"))).toBe(0);
     expect(Math.abs(sdk.getPropertyValue("fcs/stovl-roll-control"))).toBe(0);
     sdk.setPropertyValue("fcs/stovl-cmd-norm", 0.5);
-    for (let step = 0; step < 0.5 / FIXED_DT; step++) expect(sdk.run()).toBe(true);
+    for (let step = 0; step < 0.5 / LEGACY_FIXED_DT_120; step++) expect(sdk.run()).toBe(true);
     expect(sdk.getPropertyValue("fcs/stovl-pos-norm")).toBeCloseTo(0.8, 8);
     expect(sdk.getPropertyValue("fcs/fbw-enabled")).toBe(0);
     expect(sdk.getPropertyValue("fcs/control-law-mode")).toBe(1);
@@ -171,7 +171,7 @@ describe("F-35B native yaw damping after disturbance/control release", () => {
       pitchTrim: -0.05, rollTrim: 0.1, flaps: 0.4, brake: 0,
     }, 0, profile.rudderSign, { commandProperty: profile.stovl!.commandProperty, commandNorm: 0 },
     { commandProperty: profile.controlLaw!.commandProperty, mode: "manual" });
-    for (let step = 0; step < 0.7 / FIXED_DT; step++) expect(sdk.run()).toBe(true);
+    for (let step = 0; step < 0.7 / LEGACY_FIXED_DT_120; step++) expect(sdk.run()).toBe(true);
     expect(sdk.getPropertyValue("fcs/elevator-pos-norm")).toBeCloseTo(0.15, 8);
     expect(sdk.getPropertyValue("fcs/left-aileron-pos-rad")).toBeCloseTo(0.3 * 0.4, 8);
     expect(sdk.getPropertyValue("fcs/rudder-pos-rad")).toBeCloseTo((-0.2 + 0.05) * 0.524, 3);

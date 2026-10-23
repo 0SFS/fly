@@ -12,6 +12,7 @@ import { readFlightState } from "@0sfs/ground-contact/ecefBridge";
 import { createAircraftForceReader } from "@0sfs/aircraft/aircraftForces";
 import { discoverReadableProperties, ENGINE_SECTIONS } from "@0sfs/engines/engineMonitorModel";
 import { validFlightState } from "@0sfs/ground-contact/safeFlightState";
+import { LEGACY_PHYSICS_HZ_120 } from "../physics/physicsRate";
 
 // The F-35B's two engine models, each through the app's own consumers of it.
 const instances: JSBSimSdk[] = [];
@@ -27,7 +28,7 @@ async function boot(engineModel: EngineModelId, options: Parameters<typeof boots
   for (const file of resolveAircraftDataFiles(manifest, profile.dataPackage ?? "f-35b")) {
     sdk.writeDataFile(file, readFileSync("public/jsbsim-data/" + file, "utf8"));
   }
-  await bootstrapAircraft(sdk, "f-35b", { ...options, engineModel });
+  await bootstrapAircraft(sdk, "f-35b", LEGACY_PHYSICS_HZ_120, { ...options, engineModel });
   return { sdk, profile };
 }
 

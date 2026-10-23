@@ -8,6 +8,7 @@ import { resolveAircraftDataFiles } from "./hydrateJsbsimData";
 import { readFlightState } from "@0sfs/ground-contact/ecefBridge";
 import { validFlightState } from "@0sfs/ground-contact/safeFlightState";
 import { applySavedControls, captureSavedFlight, parseSavedFlight, restoreSavedFlight } from "./savedFlight";
+import { LEGACY_PHYSICS_HZ_120 } from "../physics/physicsRate";
 
 const FT = 0.3048;
 const instances: JSBSimSdk[] = [];
@@ -26,7 +27,7 @@ async function createC172(options: Parameters<typeof bootstrapC172p>[1] = {}): P
   for (const relativePath of resolveAircraftDataFiles(manifest, "cessna-172")) {
     sdk.writeDataFile(relativePath, readFileSync(resolve(dataRoot, relativePath), "utf8"));
   }
-  await bootstrapC172p(sdk, options);
+  await bootstrapC172p(sdk, LEGACY_PHYSICS_HZ_120, options);
   return sdk;
 }
 

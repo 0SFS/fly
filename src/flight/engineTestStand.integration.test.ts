@@ -11,7 +11,7 @@ import { createEngineControl, type EngineControl } from "@0sfs/engines/engineCon
 import { getFdmProfile } from "./jsbsim/fdmProfiles";
 import { resolveAircraftDataFiles } from "./jsbsim/hydrateJsbsimData";
 import { resetFlightLocation } from "./jsbsim/resetFlightLocation";
-import { FIXED_DT } from "./physics/fixedStepLoop";
+import { LEGACY_FIXED_DT_120, LEGACY_PHYSICS_HZ_120 } from "./physics/physicsRate";
 
 const instances: JSBSimSdk[] = [];
 afterEach(() => {
@@ -28,12 +28,12 @@ async function boot(aircraftId: AircraftId, initialState: EngineTestStandInitial
   for (const file of resolveAircraftDataFiles(manifest, aircraftId)) {
     sdk.writeDataFile(file, readFileSync("public/jsbsim-data/" + file, "utf8"));
   }
-  await bootstrapAircraft(sdk, aircraftId, engineTestStandBootstrapOptions(initialState));
+  await bootstrapAircraft(sdk, aircraftId, LEGACY_PHYSICS_HZ_120, engineTestStandBootstrapOptions(initialState));
   return sdk;
 }
 
 function advance(sdk: JSBSimSdk, seconds: number, control?: EngineControl): void {
-  for (let step = 0; step < Math.round(seconds / FIXED_DT); step++) {
+  for (let step = 0; step < Math.round(seconds / LEGACY_FIXED_DT_120); step++) {
     control?.step(false);
     expect(sdk.run()).toBe(true);
   }
@@ -58,7 +58,7 @@ describe("engine test stand on the installed JSBSim SDK", () => {
     for (const prefix of ["thermal/", "thermal/core/"]) {
       expect(sdk.getPropertyValue(`propulsion/engine/${prefix}metal-temperature-k`)).toBeCloseTo(ambient, 6);
     }
-    for (let step = 0; step < 60 / FIXED_DT; step++) { control.step(true); expect(sdk.run()).toBe(true); }
+    for (let step = 0; step < 60 / LEGACY_FIXED_DT_120; step++) { control.step(true); expect(sdk.run()).toBe(true); }
     expect(sdk.getPropertyValue("propulsion/engine/set-running")).toBe(1);
     expect(sdk.getPropertyValue("forces/hold-down")).toBe(1);
     expect(sdk.getPropertyValue("propulsion/engine/thermal/core/metal-temperature-k")).toBeGreaterThan(ambient);
@@ -108,7 +108,7 @@ describe("engine test stand on the installed JSBSim SDK", () => {
     "advances %s engine dynamics and fuel at zero airspeed without moving the aircraft", async aircraftId => {
       const sdk = await boot(aircraftId);
       expect(sdk.getPropertyValue("forces/hold-down")).toBe(1);
-      expect(sdk.getDeltaT()).toBe(FIXED_DT);
+      expect(sdk.getDeltaT()).toBe(LEGACY_FIXED_DT_120);
       expect(sdk.getPropertyValue("fcs/throttle-cmd-norm")).toBe(0);
       const start = position(sdk);
       const startTime = sdk.getPropertyValue("simulation/sim-time-sec");

@@ -7,6 +7,7 @@ import { createTerrainContact, syncTerrainContact } from "@0sfs/ground-contact/t
 import { createFixedStepPhysicsLoop } from "./fixedStepLoop";
 import { bootstrapC172p } from "../jsbsim/bootstrapC172";
 import { getFdmProfile } from "../jsbsim/fdmProfiles";
+import { LEGACY_PHYSICS_HZ_120 } from "./physicsRate";
 
 const C172_STATIC_METERS = getFdmProfile("cessna-172").stance.staticMeters;
 
@@ -113,7 +114,7 @@ describe("displayed terrain contact", () => {
       persistence: { enabled: false }, log: { console: false } });
     const manifest = JSON.parse(readFileSync("public/jsbsim-data/manifest.json", "utf8")) as { files: string[] };
     for (const file of manifest.files) sdk.writeDataFile(file, readFileSync(`public/jsbsim-data/${file}`, "utf8"));
-    await bootstrapC172p(sdk);
+    await bootstrapC172p(sdk, LEGACY_PHYSICS_HZ_120);
     const surface: SurfaceQuery = { raycast: () => null, sample: () => ({ heightMeters: 251.9 } as SurfaceHit) };
     expect(syncTerrainContact(sdk, surface)).toBe(true);
     sdk.run();
@@ -125,7 +126,7 @@ describe("displayed terrain contact", () => {
   it("does not advance physics through missing terrain or accumulate a catch-up jump", () => {
     const sdk = { getPropertyValue: vi.fn((key: string) => key === "position/lat-geod-deg" ? 34
       : key === "position/h-sl-ft" ? 1000 : 0), setPropertyValue: vi.fn(), run: vi.fn(() => true) };
-    const loop = createFixedStepPhysicsLoop(sdk as unknown as JSBSimSdk);
+    const loop = createFixedStepPhysicsLoop(sdk as unknown as JSBSimSdk, undefined, { physicsHz: LEGACY_PHYSICS_HZ_120 });
     const surface: SurfaceQuery = { raycast: () => null, sample: () => null };
     for (let i = 0; i < 10; i++) loop.update(0.1, () => syncTerrainContact(sdk as unknown as JSBSimSdk, surface));
     expect(sdk.run).not.toHaveBeenCalled();

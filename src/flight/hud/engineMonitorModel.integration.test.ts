@@ -8,6 +8,7 @@ import { bootstrapAircraft } from "../jsbsim/bootstrapC172";
 import type { AircraftId } from "@0sfs/aircraft/aircraftIds";
 import { resolveAircraftDataFiles } from "../jsbsim/hydrateJsbsimData";
 import { deriveEnginePhase, discoverReadableProperties, ENGINE_PATHS, readEngineSample } from "@0sfs/engines/engineMonitorModel";
+import { LEGACY_PHYSICS_HZ_120 } from "../physics/physicsRate";
 
 /**
  * The monitor's derived phase against the REAL packaged JSBSim SF50: the
@@ -29,7 +30,7 @@ async function bootAircraft(
   for (const path of resolveAircraftDataFiles(manifest, aircraftId)) {
     sdk.writeDataFile(path, readFileSync(`public/jsbsim-data/${path}`, "utf8"));
   }
-  await bootstrapAircraft(sdk, aircraftId, {});
+  await bootstrapAircraft(sdk, aircraftId, LEGACY_PHYSICS_HZ_120, {});
   return sdk;
 }
 

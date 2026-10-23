@@ -11,6 +11,7 @@ import { BENCHMARK_ROUTES, createBenchmarkRouteController, type BenchmarkRouteId
 import { bootstrapC172p } from "./jsbsim/bootstrapC172";
 import { resetFlightLocation } from "./jsbsim/resetFlightLocation";
 import { resolveAircraftDataFiles } from "./jsbsim/hydrateJsbsimData";
+import { LEGACY_PHYSICS_HZ_120 } from "./physics/physicsRate";
 
 // Real installed JSBSim and the public AP/control boundary, with fixed terrain
 // and no renderer, network, wall-clock pacing or performance assertions.
@@ -22,7 +23,7 @@ async function simulate(id: BenchmarkRouteId, initialAirspeedKts = 110) {
     const dataRoot = resolve(process.cwd(), "public/jsbsim-data");
     const manifest = JSON.parse(readFileSync(resolve(dataRoot, "manifest.json"), "utf8")) as { files: string[] };
     for (const file of resolveAircraftDataFiles(manifest, "cessna-172")) sdk.writeDataFile(file, readFileSync(resolve(dataRoot, file), "utf8"));
-    await bootstrapC172p(sdk, { latDeg: route.latDeg, lonDeg: route.lonDeg,
+    await bootstrapC172p(sdk, LEGACY_PHYSICS_HZ_120, { latDeg: route.latDeg, lonDeg: route.lonDeg,
       airspeedKts: initialAirspeedKts, headingDeg: route.headingDeg, throttleNorm: 0.65 });
     const initial = resetFlightLocation(sdk, { latDeg: route.latDeg, lonDeg: route.lonDeg,
       altMeters: ground + route.heightAboveGroundMeters }, ground);

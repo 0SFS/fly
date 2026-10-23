@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { bootstrapC172p } from "./bootstrapC172";
 import { resolveAircraftDataFiles } from "./hydrateJsbsimData";
 import { flightAttitudeToQuaternion, readFlightState } from "@0sfs/ground-contact/ecefBridge";
+import { LEGACY_PHYSICS_HZ_120 } from "../physics/physicsRate";
 
 const instances: JSBSimSdk[] = [];
 afterEach(() => { for (const sdk of instances.splice(0)) sdk.destroy(); });
@@ -25,7 +26,7 @@ describe("C172 roll direction", () => {
     for (const relativePath of resolveAircraftDataFiles(manifest, "cessna-172")) {
       sdk.writeDataFile(relativePath, readFileSync(resolve(dataRoot, relativePath), "utf8"));
     }
-    await bootstrapC172p(sdk);
+    await bootstrapC172p(sdk, LEGACY_PHYSICS_HZ_120);
     sdk.setPropertyValue("fcs/aileron-cmd-norm", aileron);
     for (let step = 0; step < 60; step += 1) expect(sdk.run()).toBe(true);
     const state = readFlightState(sdk);

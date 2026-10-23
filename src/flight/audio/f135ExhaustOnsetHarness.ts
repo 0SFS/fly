@@ -17,6 +17,7 @@ import { resolveAircraftDataFiles } from "../jsbsim/hydrateJsbsimData";
 import { getAircraftAudioInstallation, getAircraftAudioProfile, resolveAircraftAudioInstallation } from "@0sfs/sound/aircraftAudioProfiles";
 import { createDspHarness, difference, rms, type DspHarness } from "@0sfs/sound/dspHarness";
 import { createJsbsimAudioAdapter, toSnapshot, type AudioAdapterReading } from "@0sfs/sound/jsbsimAudioAdapter";
+import { LEGACY_PHYSICS_HZ_120 } from "../physics/physicsRate";
 
 export interface F135OnsetObservation {
   timeSeconds: number;
@@ -74,7 +75,8 @@ async function captureF135Run(name: F135OnsetTrace["name"], command: number) {
     for (const file of resolveAircraftDataFiles(manifest, "f-35b"))
       sdk.writeDataFile(file, readFileSync("public/jsbsim-data/" + file, "utf8"));
     const cold = name !== "warm-running-shortcut";
-    await bootstrapAircraft(sdk, "f-35b", { engineRunning: !cold, holdDown: true,
+    // The onset evidence was captured at 120 Hz; it stays there to remain comparable.
+    await bootstrapAircraft(sdk, "f-35b", LEGACY_PHYSICS_HZ_120, { engineRunning: !cold, holdDown: true,
       latDeg: 0, lonDeg: 0, altFt: 0, airspeedKts: 0, throttleNorm: .99 });
     const step = (): void => { if (!sdk.run()) throw new Error("Native F135 step failed"); };
     if (cold) {

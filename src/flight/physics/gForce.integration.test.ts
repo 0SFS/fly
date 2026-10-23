@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { bootstrapC172p } from "../jsbsim/bootstrapC172";
 import { resolveAircraftDataFiles } from "../jsbsim/hydrateJsbsimData";
 import { readPilotG } from "@0sfs/g-forces/gForce";
+import { LEGACY_PHYSICS_HZ_120 } from "./physicsRate";
 
 const instances: JSBSimSdk[] = [];
 afterEach(() => { for (const sdk of instances.splice(0)) sdk.destroy(); });
@@ -24,7 +25,7 @@ describe("the load at the pilot's seat, from the native flight model", () => {
     for (const relativePath of resolveAircraftDataFiles(manifest, "cessna-172")) {
       sdk.writeDataFile(relativePath, readFileSync(resolve(dataRoot, relativePath), "utf8"));
     }
-    await bootstrapC172p(sdk);
+    await bootstrapC172p(sdk, LEGACY_PHYSICS_HZ_120);
     const fly = (steps: number, elevator: number): number[] => {
       sdk.setPropertyValue("fcs/elevator-cmd-norm", elevator);
       const loads: number[] = [];

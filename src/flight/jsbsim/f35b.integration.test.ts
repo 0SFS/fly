@@ -13,9 +13,9 @@ import { readFlightState } from "@0sfs/ground-contact/ecefBridge";
 import { applyFlightControls } from "@0sfs/controls/applyFlightControls";
 import { createFlightInputManager, type ControlSurfaceState } from "@0sfs/controls/flightInputManager";
 import { createAutoTrimState, readAutoTrimTuning, stepPitchAutoTrim, stepRollAutoTrim } from "@0sfs/controls/autoTrim";
-import { FIXED_DT } from "../physics/fixedStepLoop";
 import { captureSimulation, restoreSimulation, validFlightState } from "@0sfs/ground-contact/safeFlightState";
 import { flightParameterDefaults } from "../settings/flightParameters";
+import { LEGACY_FIXED_DT_120, LEGACY_PHYSICS_HZ_120 } from "../physics/physicsRate";
 
 const aircraftId = "f-35b";
 const profile = getFdmProfile(aircraftId);
@@ -42,7 +42,7 @@ async function createF35(options: C172BootstrapOptions = {}) {
   instances.push(sdk);
   const manifest: unknown = JSON.parse(readFileSync("public/jsbsim-data/manifest.json", "utf8"));
   for (const file of resolveAircraftDataFiles(manifest, aircraftId)) sdk.writeDataFile(file, readFileSync("public/jsbsim-data/" + file, "utf8"));
-  await bootstrapAircraft(sdk, aircraftId, options);
+  await bootstrapAircraft(sdk, aircraftId, LEGACY_PHYSICS_HZ_120, options);
   // Existing handling fixtures qualify the clean aircraft, with both stores removed.
   for (const index of [2, 3]) setExternalFuelTankAttached(sdk, aircraftId, index, false);
   return sdk;
@@ -55,7 +55,7 @@ function apply(sdk: JSBSimSdk, controls = neutral, conversion = 0) {
 }
 
 function advance(sdk: JSBSimSdk, seconds: number) {
-  for (let step = 0; step < seconds / FIXED_DT; step++) expect(sdk.run()).toBe(true);
+  for (let step = 0; step < seconds / LEGACY_FIXED_DT_120; step++) expect(sdk.run()).toBe(true);
   expect(validFlightState(readFlightState(sdk))).toBe(true);
 }
 
@@ -126,12 +126,12 @@ describe("F-35B LiftSystem as outlets of the coupled F135 plant, not LiftSystem 
       return Math.abs(liftFan / main / sdk.getPropertyValue("fcs/lift-split-cmd") - 1);
     };
     let worstSplit = 0;
-    for (let step = 0; step < 4 / FIXED_DT; step++) {
+    for (let step = 0; step < 4 / LEGACY_FIXED_DT_120; step++) {
       expect(sdk.run()).toBe(true);
       // The engaged clutch turns the fan with the LP spool through its gear.
       expect(Math.abs(sdk.getPropertyValue(PLANT + "lift-fan/speed-percent") - sdk.getPropertyValue("propulsion/engine[0]/n1")))
         .toBeLessThan(1);
-      if (step * FIXED_DT > 2) worstSplit = Math.max(worstSplit, splitError());
+      if (step * LEGACY_FIXED_DT_120 > 2) worstSplit = Math.max(worstSplit, splitError());
     }
     expect(sdk.getPropertyValue("propulsion/engine[0]/n2")).toBeGreaterThan(early);
     expect(liftSystemThrust(sdk).liftFan).toBeGreaterThan(before.liftFan * 1.3);
@@ -157,7 +157,7 @@ describe("F-35B LiftSystem as outlets of the coupled F135 plant, not LiftSystem 
     expect(sdk.getPropertyValue(PLANT + "fuel/core-burned-kg-sec")).toBe(0);
     let previous = liftSystemThrust(sdk).liftFan;
     expect(previous).toBeLessThan(powered);
-    for (let step = 0; step < 10 / FIXED_DT; step++) {
+    for (let step = 0; step < 10 / LEGACY_FIXED_DT_120; step++) {
       expect(sdk.run()).toBe(true);
       // Nothing burns and the rotors only give up energy: the fan runs down on what the spools had.
       expect(sdk.getPropertyValue(PLANT + "ledger/chemical-j")).toBe(0);
@@ -173,7 +173,7 @@ describe("F-35B LiftSystem as outlets of the coupled F135 plant, not LiftSystem 
     expect(sdk.runIc()).toBe(true);
     expect(spools()).toEqual(before);
     expect(liftSystemThrust(sdk).liftFan).toBeCloseTo(previous, 6);
-    await bootstrapAircraft(sdk, aircraftId);
+    await bootstrapAircraft(sdk, aircraftId, LEGACY_PHYSICS_HZ_120);
     expect(sdk.getPropertyValue("fcs/stovl-pos-norm")).toBe(0);
     const reloaded = liftSystemThrust(sdk);
     expect(reloaded.main).toBeGreaterThan(1000);
@@ -183,7 +183,7 @@ describe("F-35B LiftSystem as outlets of the coupled F135 plant, not LiftSystem 
   it("enters full conversion from the 60 kt development fixture without a pitch departure", async () => {
     const { sdk, controls } = await createHover({ conversion: 0, airspeedKts: 60, altFt: 5000 });
     apply(sdk, controls, 1);
-    for (let step = 0; step < 10 / FIXED_DT; step++) {
+    for (let step = 0; step < 10 / LEGACY_FIXED_DT_120; step++) {
       expect(sdk.run()).toBe(true);
       expect(Math.abs(sdk.getPropertyValue("attitude/theta-rad"))).toBeLessThan(0.15);
       expect(Math.abs(sdk.getPropertyValue("attitude/phi-rad"))).toBeLessThan(0.15);
@@ -195,8 +195,8 @@ describe("F-35B LiftSystem as outlets of the coupled F135 plant, not LiftSystem 
   it.each([0.25, 0.5, 0.75].flatMap(conversion => (["aileron", "elevator", "rudder"] as const).map(axis => ({ conversion, axis }))))(
     "recovers after a $axis pulse at conversion=$conversion in the 60 kt fixture", async ({ conversion, axis }) => {
       const { sdk, controls } = await createHover({ conversion, airspeedKts: 60, altFt: 5000 });
-      for (let step = 0; step < 10 / FIXED_DT; step++) {
-        const time = step * FIXED_DT;
+      for (let step = 0; step < 10 / LEGACY_FIXED_DT_120; step++) {
+        const time = step * LEGACY_FIXED_DT_120;
         apply(sdk, { ...controls, [axis]: time >= 1 && time < 2 ? 0.3 : 0 }, conversion);
         expect(sdk.run()).toBe(true);
         expect(Math.abs(sdk.getPropertyValue("attitude/theta-rad"))).toBeLessThan(0.25);
@@ -226,7 +226,7 @@ describe("F-35B roll-rate law", () => {
   }
 
   function hold(sdk: JSBSimSdk, seconds: number, aileron: number, degPerSec: number, mode?: FlightControlLawMode) {
-    for (let step = 0; step < seconds / FIXED_DT; step++) {
+    for (let step = 0; step < seconds / LEGACY_FIXED_DT_120; step++) {
       applyRoll(sdk, aileron, degPerSec, { mode });
       expect(sdk.run()).toBe(true);
     }
@@ -253,7 +253,7 @@ describe("F-35B roll-rate law", () => {
   it("stops and holds bank with the stick centred, where the source loop rolled back", async () => {
     const sdk = await createF35({ airspeedKts: 300, altFt: 10_000 });
     hold(sdk, 0.5, 0, 30);
-    for (let step = 0; step < 5 / FIXED_DT && sdk.getPropertyValue("attitude/phi-deg") < 30; step++) {
+    for (let step = 0; step < 5 / LEGACY_FIXED_DT_120 && sdk.getPropertyValue("attitude/phi-deg") < 30; step++) {
       applyRoll(sdk, 1, 30);
       expect(sdk.run()).toBe(true);
     }
@@ -261,7 +261,7 @@ describe("F-35B roll-rate law", () => {
     const settled = sdk.getPropertyValue("attitude/phi-deg");
     expect(settled).toBeGreaterThan(30);
     expect(settled).toBeLessThan(40);
-    for (let step = 0; step < 5 / FIXED_DT; step++) {
+    for (let step = 0; step < 5 / LEGACY_FIXED_DT_120; step++) {
       applyRoll(sdk, 0, 30);
       expect(sdk.run()).toBe(true);
       expect(Math.abs(sdk.getPropertyValue("velocities/p-rad_sec") * DEG)).toBeLessThan(0.5);
@@ -302,7 +302,7 @@ describe("F-35B roll-rate law", () => {
     const rates: number[] = [];
     for (const range of [1, 0.2]) {
       const sdk = await createF35({ airspeedKts: 300, altFt: 10_000 });
-      for (let step = 0; step < 2.5 / FIXED_DT; step++) {
+      for (let step = 0; step < 2.5 / LEGACY_FIXED_DT_120; step++) {
         applyFlightControls(sdk, { ...neutral, rollTrim: 1 }, 0, profile.rudderSign,
           { commandProperty: profile.stovl!.commandProperty, commandNorm: 0 },
           { commandProperty: profile.controlLaw!.commandProperty, mode: "auto" }, undefined,
@@ -325,7 +325,7 @@ describe("F-35B roll-rate law", () => {
     }, 300, aircraftId);
     // A roll trim is a roll-rate command the parked jet cannot follow; in the air the integrator would chase it.
     const parked = { ...neutral, throttle: 0, brake: 1, rollTrim: 1 };
-    for (let step = 0; step < 2 / FIXED_DT; step++) {
+    for (let step = 0; step < 2 / LEGACY_FIXED_DT_120; step++) {
       applyFlightControls(sdk, parked, 1, profile.rudderSign,
         { commandProperty: profile.stovl!.commandProperty, commandNorm: 0 }, undefined, undefined,
         { property: profile.fullStickRollRate!.property, degPerSec: 30 });
@@ -363,7 +363,7 @@ describe("F-35B augmentation transition interlock", () => {
     advance(sdk, 0.1);
     expect(sdk.getPropertyValue(AUGMENTATION)).toBe(1);
     apply(sdk, { ...neutral, throttle: 1 }, conversion);
-    for (let step = 0; step < BURNOUT_S / FIXED_DT; step++) {
+    for (let step = 0; step < BURNOUT_S / LEGACY_FIXED_DT_120; step++) {
       stepInhibited(sdk, { conversion, step });
       expect(sdk.getPropertyValue("fcs/stovl-pos-norm")).toBeCloseTo(conversion, 9);
     }
@@ -382,7 +382,7 @@ describe("F-35B augmentation transition interlock", () => {
         if (command > 0 || sdk.getPropertyValue("fcs/stovl-pos-norm") > 0) {
           stepInhibited(sdk, { command, step });
           inhibited++;
-          if (inhibited * FIXED_DT >= BURNOUT_S) expect({ command, step, augmentation: sdk.getPropertyValue(AUGMENTATION) }).toMatchObject({ augmentation: 0 });
+          if (inhibited * LEGACY_FIXED_DT_120 >= BURNOUT_S) expect({ command, step, augmentation: sdk.getPropertyValue(AUGMENTATION) }).toMatchObject({ augmentation: 0 });
         } else expect(sdk.run()).toBe(true);
       }
       expect(sdk.getPropertyValue("fcs/stovl-pos-norm")).toBe(command);
@@ -415,7 +415,7 @@ describe("F-35B augmentation transition interlock", () => {
     // Released, reheat is selected at once and burns once it has lit.
     expect(sdk.getPropertyValue(SELECTED)).toBe(1);
     let burning = false;
-    for (let step = 0; step < 2 / FIXED_DT && !burning; step++) {
+    for (let step = 0; step < 2 / LEGACY_FIXED_DT_120 && !burning; step++) {
       expect(sdk.run()).toBe(true);
       burning = sdk.getPropertyValue(AUGMENTATION) === 1;
     }
@@ -444,7 +444,7 @@ describe("F-35B augmentation transition interlock", () => {
     expect(sdk.getPropertyValue(PLANT + "numerics/valid")).toBe(0);
     expect(sdk.runIc()).toBe(true);
     expect(batch.read()[0]).toBe(plantPosition());
-    await bootstrapAircraft(sdk, aircraftId, { throttleNorm: 1 });
+    await bootstrapAircraft(sdk, aircraftId, LEGACY_PHYSICS_HZ_120, { throttleNorm: 1 });
     expect(() => batch.read()).toThrow(/disposed/);
     expect(sdk.getPropertyValue(path)).toBe(plantPosition());
   });
@@ -452,7 +452,7 @@ describe("F-35B augmentation transition interlock", () => {
   it("reloads at full throttle and evaluates a fully converted initialization as dry", async () => {
     const sdk = await createF35({ throttleNorm: 1 });
     for (let reload = 0; reload < 2; reload++) {
-      await bootstrapAircraft(sdk, aircraftId, { throttleNorm: 1 });
+      await bootstrapAircraft(sdk, aircraftId, LEGACY_PHYSICS_HZ_120, { throttleNorm: 1 });
       expect(sdk.getPropertyValue("fcs/stovl-pos-norm")).toBe(0);
       expect({ reload, inhibit: sdk.getPropertyValue("fcs/stovl-augmentation-inhibit"),
         command: sdk.getPropertyValue("fcs/stovl-cmd-norm"), position: sdk.getPropertyValue("fcs/stovl-pos-norm"),
@@ -467,7 +467,7 @@ describe("F-35B augmentation transition interlock", () => {
       expect(sdk.getPropertyValue(PLANT + "numerics/fallback-reason")).toBe(0);
       expect([sdk.getPropertyValue(SELECTED), sdk.getPropertyValue(AUGMENTATION)]).toEqual([0, 0]);
       expect(sdk.getPropertyValue(PLANT + "lift-fan/gross-thrust-lbs")).toBeGreaterThan(10000);
-      for (let step = 0; step < 0.1 / FIXED_DT; step++) stepInhibited(sdk, { reload, step });
+      for (let step = 0; step < 0.1 / LEGACY_FIXED_DT_120; step++) stepInhibited(sdk, { reload, step });
       expect(sdk.getPropertyValue(AUGMENTATION)).toBe(0);
     }
   });
@@ -496,7 +496,7 @@ describe("experimental F-35B installed-SDK contracts, not aircraft calibration",
 
   it.each([false, true])("flies the app bootstrap, terrain relocation and adopted trim for 60 s (auto trim=%s)", async autoTrim => {
     const sdk = await createF35();
-    expect(sdk.getDeltaT()).toBeCloseTo(FIXED_DT, 12);
+    expect(sdk.getDeltaT()).toBeCloseTo(LEGACY_FIXED_DT_120, 12);
     expect(sdk.module.FS.analyzePath("/runtime/aircraft/F-35B-jsbsim/Engines/F135-PW-600.xml").exists).toBe(true);
     expect(sdk.module.FS.analyzePath("/runtime/aircraft/c172p/c172p.xml").exists).toBe(false);
     expect(sdk.getPropertyValue("propulsion/tank[0]/contents-lbs") + sdk.getPropertyValue("propulsion/tank[1]/contents-lbs")).toBe(5000);
@@ -512,9 +512,9 @@ describe("experimental F-35B installed-SDK contracts, not aircraft calibration",
     let roll = createAutoTrimState(autoTrim);
     const tuning = readAutoTrimTuning(flightParameterDefaults());
     let maxExcursion = 0;
-    for (let step = 0; step < 60 / FIXED_DT; step++) {
-      const controls = input.poll(FIXED_DT);
-      const common = { dt: FIXED_DT, qbarPsf: sdk.getPropertyValue("aero/qbar-psf"), vtFps: sdk.getPropertyValue("velocities/vt-fps"), onGround: false };
+    for (let step = 0; step < 60 / LEGACY_FIXED_DT_120; step++) {
+      const controls = input.poll(LEGACY_FIXED_DT_120);
+      const common = { dt: LEGACY_FIXED_DT_120, qbarPsf: sdk.getPropertyValue("aero/qbar-psf"), vtFps: sdk.getPropertyValue("velocities/vt-fps"), onGround: false };
       const pitched = stepPitchAutoTrim(pitch, {
         ...common, pitchAccelRad: sdk.getPropertyValue("accelerations/qdot-rad_sec2"),
         pitchRateRad: sdk.getPropertyValue("velocities/q-rad_sec"), elevator: controls.elevator, pitchTrim: controls.pitchTrim,
@@ -560,7 +560,7 @@ describe("experimental F-35B installed-SDK contracts, not aircraft calibration",
     sdk.setPropertyValue("fcs/rudder-cmd-norm", 1);
     const steps = 30;
     for (let step = 0; step < steps; step++) expect(sdk.run()).toBe(true);
-    const traveled = rate * FIXED_DT * steps;
+    const traveled = rate * LEGACY_FIXED_DT_120 * steps;
     expect(traveled).toBeLessThan(0.4);
     for (const property of surfaces) expect(sdk.getPropertyValue(property)).toBeCloseTo(traveled, 5);
   });
@@ -655,7 +655,7 @@ describe("experimental F-35B installed-SDK contracts, not aircraft calibration",
     const { liftFan, posts } = liftSystemThrust(sdk);
     for (const thrust of [liftFan, ...posts]) expect(Math.abs(thrust)).toBeLessThan(1e-6 * initialFanThrust);
     // The LP spool takes the fan's load back without running away.
-    for (let step = 0; step < 2 / FIXED_DT; step++) {
+    for (let step = 0; step < 2 / LEGACY_FIXED_DT_120; step++) {
       expect(sdk.run()).toBe(true);
       expect(sdk.getPropertyValue("propulsion/engine[0]/n1")).toBeLessThan(106);
     }

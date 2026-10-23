@@ -5,6 +5,7 @@ import { wasmBinaryUrl, wasmModuleUrl } from "@felipegalind0/jsbsim/wasm";
 import { afterEach, describe, expect, it } from "vitest";
 import { bootstrapC172p } from "./bootstrapC172";
 import { resolveAircraftDataFiles } from "./hydrateJsbsimData";
+import { LEGACY_PHYSICS_HZ_120 } from "../physics/physicsRate";
 
 interface DataManifest {
   files: string[];
@@ -28,7 +29,7 @@ describe("C172 propulsion", () => {
       sdk.writeDataFile(relativePath, readFileSync(resolve(dataRoot, relativePath), "utf8"));
     }
 
-    await bootstrapC172p(sdk);
+    await bootstrapC172p(sdk, LEGACY_PHYSICS_HZ_120);
     sdk.setPropertyValue("fcs/throttle-cmd-norm", 1);
     for (let step = 0; step < 120; step += 1) expect(sdk.run()).toBe(true);
 

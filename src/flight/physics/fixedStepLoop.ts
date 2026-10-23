@@ -8,48 +8,116 @@ import {
   captureSimulation, invalidFlightStateReasons, restoreSimulation,
 } from "@0sfs/ground-contact/safeFlightState";
 
-export const PHYSICS_HZ = 120;
-export const FIXED_DT = 1 / PHYSICS_HZ;
-const MAX_ACCUMULATED_SECONDS = FIXED_DT * 6;
+import { maxCatchUpSteps, physicsStepSeconds, type PhysicsHz } from "./physicsRate";
+
 // Beyond normal suspension compression, this is a hard impact. Feeding deep
 // penetration into an unbounded spring turns a cliff into a launch pad.
 const MAX_GROUND_PENETRATION_METERS = 0.5;
 
 export interface FixedStepPhysicsOptions {
+  /**
+   * Steps per simulated second. The native model must already step
+   * `1 / physicsHz` (bootstrapAircraft sets it); the loop checks.
+   */
+  physicsHz: PhysicsHz;
   /** Deliberate arcade mode; numerical/absolute flight-state guards still apply. */
   getArcadeGroundLaunches?: () => boolean;
 }
 
+/**
+ * Where the frame time the loop received while running went. Only accepted
+ * steps reach consumers as simulated time; discarded time never does.
+ * receivedSeconds = simulatedSeconds + discardedSeconds + pendingSeconds.
+ */
+export interface PhysicsTimeAccounting {
+  physicsHz: PhysicsHz;
+  dtSeconds: number;
+  /** Most steps one update takes: the 50 ms catch-up horizon in whole steps. */
+  maxStepsPerUpdate: number;
+  /** Frame time offered to the loop while it was running (not paused or faulted). */
+  receivedSeconds: number;
+  /** Native steps the loop accepted and passed to onStep. */
+  acceptedSteps: number;
+  /** acceptedSteps × dtSeconds. */
+  simulatedSeconds: number;
+  /** Received time that will never be simulated, for any reason below. */
+  discardedSeconds: number;
+  /** Of that, the backlog beyond maxStepsPerUpdate steps: the simulation fell behind real time. */
+  catchUpDiscardedSeconds: number;
+  /** Received time not yet simulated, under one step; it shifts the display's interpolation. */
+  pendingSeconds: number;
+}
+
 export interface FixedStepPhysicsLoop {
+  readonly physicsHz: PhysicsHz;
+  /** One accepted step, in seconds: 1 / physicsHz. */
+  readonly dtSeconds: number;
   update(renderDt: number, applyInputs: () => void | boolean | "reset"): FlightState;
   setPaused(paused: boolean): void;
   reset(): void;
   getLatestState(): FlightState | null;
   getFault(): string | null;
+  getTimeAccounting(): PhysicsTimeAccounting;
+}
+
+/** The native model's step must be the loop's: a 60 Hz label never hides a 120 Hz native loop. */
+function assertNativeStep(sdk: JSBSimSdk, physicsHz: PhysicsHz, dtSeconds: number): void {
+  const getDeltaT = (sdk as { getDeltaT?: () => number }).getDeltaT;
+  if (typeof getDeltaT !== "function") return;
+  const native = getDeltaT.call(sdk);
+  if (Math.abs(native - dtSeconds) > 1e-12) {
+    throw new Error(`The native model steps ${native} s, not the ${physicsHz} Hz loop's ${dtSeconds} s.`);
+  }
 }
 
 export function createFixedStepPhysicsLoop(
   sdk: JSBSimSdk,
-  onStep?: (state: FlightState) => void,
-  options: FixedStepPhysicsOptions = {},
+  /** Once per accepted native step, with that step's simulated duration. Faulted or refused steps never call it. */
+  onStep: ((state: FlightState, dtSeconds: number) => void) | undefined,
+  options: FixedStepPhysicsOptions,
 ): FixedStepPhysicsLoop {
+  const physicsHz = options.physicsHz;
+  const dt = physicsStepSeconds(physicsHz);
+  const maxSteps = maxCatchUpSteps(physicsHz);
+  // A whole number of steps, so the cap never leaves a sliver to interpolate.
+  const maxBacklogSeconds = maxSteps * dt;
+  assertNativeStep(sdk, physicsHz, dt);
   let accumulator = 0;
   let prevState: FlightState | null = null;
   let currState: FlightState | null = null;
   let paused = false;
   let fault: string | null = null;
+  let receivedSeconds = 0;
+  let acceptedSteps = 0;
+  let discardedSeconds = 0;
+  let catchUpDiscardedSeconds = 0;
+  // Pending time that will now never be simulated: a refused step, a fault, a pause or a reset.
+  const discardBacklog = (): void => {
+    discardedSeconds += accumulator;
+    accumulator = 0;
+  };
 
   return {
+    physicsHz,
+    dtSeconds: dt,
     update(renderDt: number, applyInputs: () => void | boolean | "reset"): FlightState {
       if (paused || fault) return currState ?? readFlightState(sdk);
 
-      const clampedDt = Number.isFinite(renderDt) ? Math.min(Math.max(renderDt, 0), 0.1) : 0;
-      accumulator = Math.min(accumulator + clampedDt, MAX_ACCUMULATED_SECONDS);
+      // The backlog cap (at most 66.7 ms) also bounds a long frame, such as
+      // the first after a hidden tab: its excess is counted, not simulated.
+      const frameDt = Number.isFinite(renderDt) ? Math.max(renderDt, 0) : 0;
+      receivedSeconds += frameDt;
+      const offered = accumulator + frameDt;
+      accumulator = Math.min(offered, maxBacklogSeconds);
+      if (offered > accumulator) {
+        catchUpDiscardedSeconds += offered - accumulator;
+        discardedSeconds += offered - accumulator;
+      }
 
-      while (accumulator >= FIXED_DT) {
+      while (accumulator >= dt) {
         const result = applyInputs();
         if (result === false) {
-          accumulator = 0;
+          discardBacklog();
           if (currState) prevState = currState;
           break;
         }
@@ -60,7 +128,7 @@ export function createFixedStepPhysicsLoop(
           flightLog.error("physics", "Faulted before stepping: state is outside the envelope", {
             failed: beforeReasons, state: before,
           });
-          accumulator = 0;
+          discardBacklog();
           break;
         }
         const terrainMeters = sdk.getPropertyValue("position/terrain-elevation-asl-ft") * 0.3048;
@@ -72,7 +140,7 @@ export function createFixedStepPhysicsLoop(
             terrainMeters, state: before,
           });
           prevState = currState = before;
-          accumulator = 0;
+          discardBacklog();
           break;
         }
         currState ??= before;
@@ -86,11 +154,11 @@ export function createFixedStepPhysicsLoop(
         const airspeedJump = Math.abs(candidate.airspeedKts - before.airspeedKts);
         const candidateReasons = invalidFlightStateReasons(candidate);
         // Report which guard tripped, not merely that one did: "moved 4 km in
-        // one 120 Hz step" and "airspeed is NaN" call for different fixes.
+        // one 60 Hz step" and "airspeed is NaN" call for different fixes.
         const tripped: string[] = [];
         if (!success) tripped.push("JSBSim run() returned false");
         if (candidateReasons.length > 0) tripped.push(...candidateReasons);
-        if (distance > 100) tripped.push(`moved ${distance.toFixed(1)} m in one ${(1 / FIXED_DT).toFixed(0)} Hz step (limit 100)`);
+        if (distance > 100) tripped.push(`moved ${distance.toFixed(1)} m in one ${physicsHz} Hz step (limit 100)`);
         if (airspeedJump > 200) tripped.push(`airspeed jumped ${airspeedJump.toFixed(1)} kt in one step (limit 200)`);
         if (tripped.length > 0) {
           // Read the contact state before restoring: the restore rewinds the
@@ -116,22 +184,23 @@ export function createFixedStepPhysicsLoop(
             before, after: candidate, contact,
             ...(restored ? { restoreFailed: restored } : {}),
           });
-          accumulator = 0;
+          discardBacklog();
           break;
         }
         prevState = currState;
         currState = candidate;
-        onStep?.(currState);
-        accumulator -= FIXED_DT;
+        acceptedSteps += 1;
+        onStep?.(currState, dt);
+        accumulator -= dt;
       }
 
-      const alpha = accumulator / FIXED_DT;
+      const alpha = accumulator / dt;
       return currState ? prevState === currState ? currState : interpolateFlightState(prevState, currState, alpha) : readFlightState(sdk);
     },
     setPaused(value: boolean): void {
       if (value === paused) return;
       paused = value;
-      if (paused) accumulator = 0;
+      if (paused) discardBacklog();
     },
     reset(): void {
       const state = readFlightState(sdk);
@@ -142,9 +211,10 @@ export function createFixedStepPhysicsLoop(
         });
         throw new Error(`Cannot reset physics to an invalid state: ${reasons.join("; ")}`);
       }
+      assertNativeStep(sdk, physicsHz, dt);
       if (fault) flightLog.info("physics", "Fault cleared; physics resuming", { clearedFault: fault });
       fault = null;
-      accumulator = 0;
+      discardBacklog();
       currState = state;
       prevState = currState;
     },
@@ -152,5 +222,10 @@ export function createFixedStepPhysicsLoop(
       return currState;
     },
     getFault: () => fault,
+    getTimeAccounting: () => ({
+      physicsHz, dtSeconds: dt, maxStepsPerUpdate: maxSteps, receivedSeconds,
+      acceptedSteps, simulatedSeconds: acceptedSteps * dt,
+      discardedSeconds, catchUpDiscardedSeconds, pendingSeconds: accumulator,
+    }),
   };
 }

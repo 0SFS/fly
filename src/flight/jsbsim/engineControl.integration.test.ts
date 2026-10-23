@@ -9,8 +9,8 @@ import { bootstrapAircraft } from "./bootstrapC172";
 import { createEngineControl, engineIndices, type EngineControl, type EngineControlReading } from "@0sfs/engines/engineControl";
 import { getFdmProfile } from "./fdmProfiles";
 import { resolveAircraftDataFiles } from "./hydrateJsbsimData";
-import { FIXED_DT } from "../physics/fixedStepLoop";
 import { captureSimulation, restoreSimulation } from "@0sfs/ground-contact/safeFlightState";
+import { LEGACY_FIXED_DT_120, LEGACY_PHYSICS_HZ_120 } from "../physics/physicsRate";
 
 const instances: JSBSimSdk[] = [];
 
@@ -26,7 +26,7 @@ async function boot(aircraftId: AircraftId, airspeedKts = 0, altFt = 1000) {
   instances.push(sdk);
   const manifest: unknown = JSON.parse(readFileSync("public/jsbsim-data/manifest.json", "utf8"));
   for (const file of resolveAircraftDataFiles(manifest, aircraftId)) sdk.writeDataFile(file, readFileSync("public/jsbsim-data/" + file, "utf8"));
-  await bootstrapAircraft(sdk, aircraftId, { altFt, airspeedKts });
+  await bootstrapAircraft(sdk, aircraftId, LEGACY_PHYSICS_HZ_120, { altFt, airspeedKts });
   return { sdk, control: createEngineControl(sdk, getFdmProfile(aircraftId)) };
 }
 
@@ -34,10 +34,10 @@ async function boot(aircraftId: AircraftId, airspeedKts = 0, altFt = 1000) {
 function fly(sdk: JSBSimSdk, control: EngineControl, seconds: number, startHeld: boolean,
   until?: (reading: EngineControlReading) => boolean): { seconds: number; readings: EngineControlReading[] } {
   const readings: EngineControlReading[] = [];
-  for (let step = 0; step < Math.round(seconds / FIXED_DT); step++) {
+  for (let step = 0; step < Math.round(seconds / LEGACY_FIXED_DT_120); step++) {
     const reading = control.step(startHeld);
     readings.push(reading);
-    if (until?.(reading)) return { seconds: step * FIXED_DT, readings };
+    if (until?.(reading)) return { seconds: step * LEGACY_FIXED_DT_120, readings };
     sdk.setPropertyValue("fcs/throttle-cmd-norm", 0);
     expect(sdk.run()).toBe(true);
   }
