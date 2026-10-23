@@ -19,6 +19,7 @@
     "check:aircraft-ui": "node ../aircraft/scripts/check-aircraft-selection-headless.mjs",
     "check:aircraft-switch": "node scripts/check-aircraft-switch-headless.mjs",
     "ci": "npm run lint && npm run test && npm run build",
+    "deploy": "node ../0sfs.github.io/scripts/deploy.mjs flight",
     "prebuild": "node scripts/link-packs.mjs",
     "pretest": "node scripts/link-packs.mjs",
     "lint": "node scripts/lint.mjs",

@@ -2,7 +2,7 @@
 
 The 0SFS flight simulator app. It serves the simulator at `/fly/` and the phone controller at `/rc/`.
 
-Aircraft, engines, and features live in the sibling repositories (`aircraft`, `C172`, `SF-50`, `F-35B`, `engines`, `F135`, `FJ33`, `IO320`, `sound`, `rc`, and the others). This app depends on them with `file:` links and runs their tests. Documentation is in the `docs` repository. The site's landing page, its build and its deploy to GitHub Pages are in [0sfs.github.io](https://github.com/0SFS/0SFS.github.io).
+Aircraft, engines, and features live in the sibling repositories (`aircraft`, `C172`, `SF-50`, `F-35B`, `engines`, `F135`, `FJ33`, `IO320`, `sound`, `rc`, and the others). This app depends on them with `file:` links and runs their tests. Documentation is in the `docs` repository. The site's landing page, its build and its deploy to GitHub Pages are in [0sfs.github.io](https://github.com/0SFS/0SFS.github.io). `npm run deploy` here publishes a new flight and phone controller to the site, keeping its landing page; [Deploying](https://github.com/0SFS/0SFS.github.io/blob/main/docs/deploying.md) has the details.
 
 ## Run it locally
 
