@@ -58,9 +58,9 @@ const mocks = vi.hoisted(() => {
     physics: {
       reset: vi.fn(), setPaused: vi.fn(), update: vi.fn(), getLatestState: () => state, getFault: () => null,
     },
-    createHud: vi.fn(() => ({ update: vi.fn(), setGearDown: vi.fn(), refreshFlaps: vi.fn(), destroy: vi.fn() })),
+    createHud: vi.fn(() => ({ update: vi.fn(), setGearDown: vi.fn(), refreshFlaps: vi.fn(), setLayout: vi.fn(), setReadingTints: vi.fn(), destroy: vi.fn() })),
     createPanel: vi.fn(() => ({ update: vi.fn(), openOrSelectTab: vi.fn(), toggleTab: vi.fn(), destroy: vi.fn() })),
-    createHudBar: vi.fn(() => ({ update: vi.fn(), destroy: vi.fn() })),
+    createHudBar: vi.fn(() => ({ update: vi.fn(), setLayout: vi.fn(), destroy: vi.fn() })),
   };
 });
 vi.mock("foss-earth/runtime", () => ({
@@ -85,7 +85,7 @@ vi.mock("foss-earth/input", () => ({
   loadOrbitInvertSettings: () => ({ invertYaw: false, invertPitch: false, recenterMode: "hold" }),
   saveOrbitInvertSettings: vi.fn(),
 }));
-vi.mock("./jsbsim/createJsbsimRuntime", () => ({ createJsbsimRuntime: async () => ({ sdk: mocks.sdk, dispose: mocks.disposeSdk }) }));
+vi.mock("./jsbsim/createJsbsimRuntime", () => ({ createJsbsimRuntime: async () => ({ physicsHz: 60, sdk: mocks.sdk, dispose: mocks.disposeSdk }) }));
 vi.mock("@0sfs/ground-contact/ecefBridge", () => ({ readFlightState: () => mocks.state }));
 vi.mock("./bridge/floatingOrigin", () => ({ createFloatingOrigin: () => ({ aircraftRoot: { setEnabled: vi.fn() }, apply: vi.fn(), dispose: vi.fn() }) }));
 vi.mock("./hud/flightCompass", () => ({ createFlightCompass: () => ({ update: vi.fn(), destroy: vi.fn() }) }));
@@ -93,7 +93,7 @@ vi.mock("@0sfs/aircraft/createPlaceholderAircraft", () => ({ createPlaceholderAi
 vi.mock("@0sfs/aircraft/createAircraftModel", () => ({ createAircraftModel: () => mocks.aircraftModel }));
 vi.mock("@0sfs/aircraft/createAircraftLights", () => ({ createAircraftLights: () => ({ refresh: vi.fn(), dispose: vi.fn() }) }));
 vi.mock("@0sfs/aircraft/aircraftAnimation", () => ({ applyAircraftRig: vi.fn(), readControlSurfaceState: vi.fn(() => ({ gearDownNorm: 1 })) }));
-vi.mock("./physics/fixedStepLoop", () => ({ FIXED_DT: 1 / 120, createFixedStepPhysicsLoop: () => mocks.physics }));
+vi.mock("./physics/fixedStepLoop", () => ({ createFixedStepPhysicsLoop: () => mocks.physics }));
 vi.mock("@0sfs/ground-contact/terrainContact", () => ({ createTerrainContact: () => mocks.terrainContact }));
 vi.mock("@0sfs/ground-contact/visibleMeshCollision", () => ({ createVisibleMeshCollision: () => mocks.visibleMeshCollision }));
 vi.mock("@0sfs/controls/flightCameraInput", () => ({ attachFlightCameraInput: () => vi.fn() }));

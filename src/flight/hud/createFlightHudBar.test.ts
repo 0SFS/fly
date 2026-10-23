@@ -4,7 +4,7 @@ import type { BabylonRuntimeStatus } from "foss-earth/runtime";
 import { getAppSettings, resetAppSettings } from "foss-earth/settings";
 import { privateMapDetailController } from "../mapDetailTesting";
 import { registerFlightSettings } from "../settings/registerFlightSettings";
-import { createFlightHudBar, type FlightHudBarOptions } from "./createFlightHudBar";
+import { compassPoint, createFlightHudBar, type FlightHudBarOptions } from "./createFlightHudBar";
 
 beforeEach(() => {
   const values = new Map<string, string>();
@@ -356,5 +356,61 @@ describe("flight HUD position readout", () => {
     // FOSS Earth's sea level grid is on its way, so no ellipsoid height is passed off as one above sea level.
     expect(status.querySelector('[data-position-part="altitude"]')?.textContent).toBe("—ft ASL");
     hud.destroy();
+  });
+});
+
+describe("flight HUD compact toolbar", () => {
+  const STATUS = { mode: "raster-basemap", terrainSource: { id: "mapterhorn", label: "Mapterhorn Terrain" } } as BabylonRuntimeStatus;
+  // 1000 ft above sea level, over ground 100 m up, heading 300° and 3° nose up.
+  const STATE = { latDeg: 44.9778, lonDeg: -93.265, altMeters: 304.8, headingRad: 300 * Math.PI / 180, pitchRad: 3 * Math.PI / 180 } as never;
+  const chip = (container: HTMLElement, id: string) => {
+    const element = container.querySelector<HTMLButtonElement>(`#${id}`)!;
+    return {
+      element,
+      value: () => element.querySelector(".flight-reading__value")?.textContent,
+      label: () => element.querySelector(".flight-reading__label")?.textContent,
+    };
+  };
+
+  it("splits the position into chips, each with its value over its label, that open Location", () => {
+    registerFlightSettings(getAppSettings());
+    const onStatusClick = vi.fn();
+    const { container, hud } = createTestHud({ onStatusClick });
+    const status = container.querySelector<HTMLButtonElement>("#flightShellStatus")!;
+    const ids = ["flightLatLon", "flightAltitude", "flightHeading", "flightPitch"];
+    expect(ids.map(id => chip(container, id).element.hidden)).toEqual([true, true, true, true]);
+    expect(hud.instrumentSlot.hidden).toBe(true);
+
+    hud.setLayout("compact");
+    hud.update(STATE, STATUS, 60, false, 100);
+    expect(status.hidden).toBe(true);
+    expect(hud.instrumentSlot.hidden).toBe(false);
+    expect(ids.map(id => [chip(container, id).value(), chip(container, id).label()])).toEqual([
+      ["44.9778°N 93.2650°W", "lat, lon"],
+      ["1000", "ft ASL"],
+      // No label: the compass point instead.
+      ["300°", "NW"],
+      ["+3°", "pitch"],
+    ]);
+    expect([chip(container, "flightFps").value(), chip(container, "flightFps").label()]).toEqual(["60", "fps"]);
+    for (const id of ids) chip(container, id).element.click();
+    expect(onStatusClick).toHaveBeenCalledTimes(4);
+
+    getAppSettings().set("interface.position.altitude", "agl");
+    getAppSettings().set("interface.position.altitudeUnit", "m");
+    hud.update(STATE, STATUS, 60, false, 100);
+    expect([chip(container, "flightAltitude").value(), chip(container, "flightAltitude").label()]).toEqual(["205", "m AGL"]);
+    hud.update(STATE, STATUS, 60, false, null);
+    expect(chip(container, "flightAltitude").value()).toBe("—");
+
+    hud.setLayout("classic");
+    expect(status.hidden).toBe(false);
+    expect(container.querySelector("#flightFps")!.textContent).toBe("FPS 60");
+    hud.destroy();
+  });
+
+  it("names the nearest of the eight compass points", () => {
+    expect([0, 22, 23, 90, 157, 180, 248, 315, 338, 359.9].map(compassPoint))
+      .toEqual(["N", "N", "NE", "E", "SE", "S", "W", "NW", "N", "N"]);
   });
 });

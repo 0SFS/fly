@@ -1,5 +1,5 @@
 import type { HudInputMode, InputSensitivitySettings } from "foss-earth/input";
-import { checkChoice, createChoiceGroup, createExternalLinkIcon } from "@foss-earth/ui/browser";
+import { attachParameterReset, checkChoice, createChoiceGroup, createExternalLinkIcon } from "@foss-earth/ui/browser";
 import "foss-earth/shell.css";
 import "foss-earth/input-mode.css";
 
@@ -8,6 +8,7 @@ import type { BabylonRuntimeStatus, RendererMode } from "foss-earth/runtime";
 import { getAppSettings, TOOLBAR_EDIT_PRIORITIES_ID, TOOLBAR_PRIORITIES, toolbarPriorityParameterId, type ToolbarItemId } from "foss-earth/settings";
 import { headingDegFromRad, type FlightState } from "@0sfs/ground-contact/flightState";
 import { LOADING_LIVE_ATTRIBUTE } from "../../loading/createFlightLoadingScreen";
+import type { FlightHudLayout } from "./flightHud";
 
 export interface FlightHudBarOptions {
   renderActivity: RenderActivitySource & TileStreamingSource & MapDownloadSource;
@@ -45,7 +46,51 @@ export interface FlightHudBarHandle {
   mountInputMethod(container: HTMLElement): () => void;
   /** Loading a replacement aircraft keeps pause engaged. */
   setResumeBlocked?(blocked: boolean): void;
+  /**
+   * Classic shows the position as one readout. Compact splits it into
+   * latitude and longitude, altitude, heading and pitch chips, writes the
+   * frame rate over its unit, and shows `instrumentSlot` before the bar's end.
+   */
+  setLayout(layout: FlightHudLayout): void;
+  /** Where the Compact layout puts the load, gear and autopilot. */
+  instrumentSlot: HTMLElement;
   destroy(): void;
+}
+
+// FOSS Earth's Interface → Position readout parameters, which the split chips follow too.
+const ALTITUDE_REFERENCE_ID = "interface.position.altitude";
+const ALTITUDE_UNIT_ID = "interface.position.altitudeUnit";
+const METERS_PER_FOOT = 0.3048;
+const COMPASS_POINTS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"] as const;
+
+/** The eight-point compass direction nearest a heading in degrees. */
+export function compassPoint(headingDeg: number): (typeof COMPASS_POINTS)[number] {
+  return COMPASS_POINTS[((Math.round(headingDeg / 45) % 8) + 8) % 8]!;
+}
+
+/** A chip with its value over its label, as the frame rate's in FOSS Earth. */
+interface ReadingChip {
+  value: HTMLSpanElement;
+  setValue(text: string): void;
+  setLabel(text: string): void;
+}
+
+function setData(text: Text, data: string): void {
+  if (text.data !== data) text.data = data;
+}
+
+function createReadingChip(element: HTMLElement, label: string): ReadingChip {
+  const document = element.ownerDocument;
+  const value = document.createElement("span");
+  value.className = "flight-reading__value";
+  const valueText = document.createTextNode("\u2014");
+  value.append(valueText);
+  const labelElement = document.createElement("span");
+  labelElement.className = "flight-reading__label";
+  const labelText = document.createTextNode(label);
+  labelElement.append(labelText);
+  element.replaceChildren(value, labelElement);
+  return { value, setValue: text => setData(valueText, text), setLabel: text => setData(labelText, text) };
 }
 
 /** What the input method section offers is decided from the pointer and touch the device reports. */
@@ -71,6 +116,11 @@ export function createFlightHudBar(container: HTMLElement, options: FlightHudBar
       { kind: "button", id: "flightLogButton", title: "Show the game log history", ariaLabel: "Show the game log history", className: "flight-log-button", text: "☰" },
       { kind: "button", id: "flightBugReportButton", title: "Show or hide Bug report", ariaLabel: "Show or hide Bug report", text: "🐞" },
       { kind: "button", id: "flightShellStatus", appearance: "chip", className: "hud-chip-button hud-status-text", ariaLive: "polite", ariaLabel: "Aircraft position", title: "Latitude, longitude, altitude and heading. Click to show or hide the Location tab." },
+      { kind: "button", id: "flightLatLon", appearance: "chip", className: "hud-chip-button flight-reading-chip", ariaLabel: "Latitude and longitude. Show or hide Location", title: "Latitude and longitude. Click to show or hide the Location tab." },
+      { kind: "button", id: "flightAltitude", appearance: "chip", className: "hud-chip-button flight-reading-chip", ariaLabel: "Altitude. Show or hide Location", title: "Altitude, above sea level or the ground as Interface → Position readout says. Click to show or hide the Location tab." },
+      { kind: "button", id: "flightHeading", appearance: "chip", className: "hud-chip-button flight-reading-chip", ariaLabel: "Heading. Show or hide Location", title: "Heading, in degrees, over its compass point. Click to show or hide the Location tab." },
+      { kind: "button", id: "flightPitch", appearance: "chip", className: "hud-chip-button flight-reading-chip", ariaLabel: "Pitch. Show or hide Location", title: "Pitch, in degrees: positive nose up. Click to show or hide the Location tab." },
+      { kind: "slot", id: "flightInstrumentSlot", className: "flight-toolbar-instruments", ariaLabel: "Load, gear and autopilot" },
       { kind: "slot", id: "flightMapSourceSlot", className: "hud-bar-end map-source-hud-slot" },
     ],
   });
@@ -82,7 +132,13 @@ export function createFlightHudBar(container: HTMLElement, options: FlightHudBar
   const settingsButton = hudBar.getElement<HTMLButtonElement>("flightSettingsButton");
   const statusElement = hudBar.getElement<HTMLButtonElement>("flightShellStatus");
   const bugReportButton = hudBar.getElement<HTMLButtonElement>("flightBugReportButton");
-  if (!pauseButton || !fpsButton || !rendererButton || !mapSourceSlot || !settingsButton || !statusElement || !bugReportButton) {
+  const latLonButton = hudBar.getElement<HTMLButtonElement>("flightLatLon");
+  const altitudeButton = hudBar.getElement<HTMLButtonElement>("flightAltitude");
+  const headingButton = hudBar.getElement<HTMLButtonElement>("flightHeading");
+  const pitchButton = hudBar.getElement<HTMLButtonElement>("flightPitch");
+  const instrumentSlot = hudBar.getElement("flightInstrumentSlot");
+  if (!pauseButton || !fpsButton || !rendererButton || !mapSourceSlot || !settingsButton || !statusElement || !bugReportButton
+    || !latLonButton || !altitudeButton || !headingButton || !pitchButton || !instrumentSlot) {
     hudBar.destroy();
     throw new Error("Flight HUD bar failed to mount.");
   }
@@ -101,12 +157,28 @@ export function createFlightHudBar(container: HTMLElement, options: FlightHudBar
   const detachRendererActivity = attachRendererActivity(rendererButton, options.renderActivity);
   // FOSS Earth's readout: Interface → Position readout says how it is written.
   const position = createPositionReadout(statusElement, getAppSettings());
+  // Compact's split chips. The latitude and longitude are FOSS Earth's readout
+  // without the altitude, so they are marked as Interface → Position readout says.
+  const positionChips = [latLonButton, altitudeButton, headingButton, pitchButton];
+  const latLonChip = createReadingChip(latLonButton, "lat, lon");
+  const latLon = createPositionReadout(latLonChip.value, getAppSettings());
+  const altitudeChip = createReadingChip(altitudeButton, "ft ASL");
+  const headingChip = createReadingChip(headingButton, "N");
+  const pitchChip = createReadingChip(pitchButton, "pitch");
+  // The frame rate's chip keeps its button; Compact writes it over its unit.
+  const fpsValue = document.createElement("span");
+  fpsValue.className = "flight-reading__value";
+  const fpsLabel = document.createElement("span");
+  fpsLabel.className = "flight-reading__label";
+  fpsLabel.textContent = "fps";
+  let fpsText = "\u2014";
+  let layout: FlightHudLayout = "classic";
   // The device decides what the section offers: Touch on a touchscreen, and the
   // mouse or trackpad choice where there is a pointer; a touch laptop gets both.
   const inputHud = createInputModeHud(container, pauseButton, {
     document,
     settings: getAppSettings(),
-    ui: { checkChoice, createChoiceGroup },
+    ui: { attachParameterReset, checkChoice, createChoiceGroup },
     // The per-event wheel log is for developer pages: FOSS Earth's ?dev=1.
     showDebug: new URLSearchParams(window.location.search).getAll("dev").join() === "1",
     deviceHints: inputDeviceHints(),
@@ -151,6 +223,7 @@ export function createFlightHudBar(container: HTMLElement, options: FlightHudBar
   pauseButton.addEventListener("click", onPauseClick);
   rendererButton.addEventListener("click", options.onRendererClick);
   statusElement.addEventListener("click", options.onStatusClick);
+  for (const chip of positionChips) chip.addEventListener("click", options.onStatusClick);
   settingsButton.addEventListener("click", options.onSettingsClick);
   fpsButton.addEventListener("click", options.onDebugClick);
   bugReportButton.addEventListener("click", options.onBugReportClick);
@@ -170,8 +243,20 @@ export function createFlightHudBar(container: HTMLElement, options: FlightHudBar
       { element: fpsButton, priority: defaultPriority("fps"), keepVisible: true },
       { element: rendererButton, priority: defaultPriority("renderer"), keepVisible: true },
       { element: settingsButton, priority: defaultPriority("settings"), keepVisible: true },
-      { element: statusElement, priority: defaultPriority("position"), keepVisible: true },
     ];
+    if (layout === "classic") {
+      existing.push({ element: statusElement, priority: defaultPriority("position"), keepVisible: true });
+    } else {
+      // Altitude and heading are flown by; latitude, longitude and pitch give way first.
+      existing.push(
+        { element: latLonButton, priority: defaultPriority("position") },
+        { element: altitudeButton, priority: defaultPriority("position"), keepVisible: true },
+        { element: headingButton, priority: defaultPriority("position"), keepVisible: true },
+        { element: pitchButton, priority: defaultPriority("position") },
+        // Last, so it sits against the bar's end.
+        { element: instrumentSlot, priority: Number.MAX_SAFE_INTEGER, keepVisible: true },
+      );
+    }
     const input = hudBar.element.querySelector<HTMLElement>(".input-mode-control");
     if (input) existing.push({ element: input, priority: defaultPriority("inputMode"), keepVisible: true });
     if (fullscreenButton) existing.push({ element: fullscreenButton, priority: defaultPriority("fullscreen"), keepVisible: true });
@@ -190,19 +275,59 @@ export function createFlightHudBar(container: HTMLElement, options: FlightHudBar
     fit.update();
   });
 
+  const setLayout = (next: FlightHudLayout): void => {
+    layout = next;
+    const compact = next === "compact";
+    hudBar.element.dataset.flightLayout = next;
+    statusElement.hidden = compact;
+    for (const chip of positionChips) chip.hidden = !compact;
+    instrumentSlot.hidden = !compact;
+    fpsButton.classList.toggle("flight-reading-chip", compact);
+    fpsValue.textContent = fpsText;
+    if (compact) fpsButton.replaceChildren(fpsValue, fpsLabel);
+    else fpsButton.textContent = `FPS ${fpsText}`;
+    fit.update();
+  };
+  setLayout("classic");
+
+  /** Altitude as Interface → Position readout measures it; a dash while its base is unknown. */
+  const drawAltitude = (altitudeMeters: number, groundHeightMeters: number | null, mode: BabylonRuntimeStatus["mode"]): void => {
+    const reference = settings.get<"asl" | "agl">(ALTITUDE_REFERENCE_ID);
+    const unit = settings.get<"m" | "ft">(ALTITUDE_UNIT_ID);
+    // Over Google 3D Tiles heights are the ellipsoid's, and the flight has no
+    // sea level to take away: the one readout shows a dash there too.
+    const base = reference === "agl" ? groundHeightMeters : surfaceHeightDatum(mode) === "geoid" ? 0 : null;
+    altitudeChip.setValue(base === null ? "\u2014" : String(Math.round((altitudeMeters - base) / (unit === "ft" ? METERS_PER_FOOT : 1))));
+    altitudeChip.setLabel(`${unit} ${reference === "agl" ? "AGL" : "ASL"}`);
+  };
+
   return {
     setResumeBlocked(blocked) { pauseButton.disabled = blocked; },
     mountInputMethod: (host) => inputHud.mountInline(host),
+    setLayout,
+    instrumentSlot,
     update(state, runtimeStatus, fps, nextPaused, groundHeightMeters = null): void {
       updatePauseState(nextPaused);
       mapSource.update(runtimeStatus);
-      const heading = String(Math.round(headingDegFromRad(state.headingRad))).padStart(3, "0");
-      fpsButton.textContent = fps === null ? "FPS —" : `FPS ${Math.round(fps)}`;
-      // Over Google 3D Tiles the aircraft flies at ellipsoid heights; the readout takes sea level's away.
-      position.update({
-        latDeg: state.latDeg, lonDeg: state.lonDeg, altitudeMeters: state.altMeters, groundHeightMeters,
-        heightDatum: surfaceHeightDatum(runtimeStatus.mode), rest: `h${heading}°`,
-      });
+      const headingDeg = Math.round(headingDegFromRad(state.headingRad));
+      const heading = String(headingDeg).padStart(3, "0");
+      fpsText = fps === null ? "\u2014" : String(Math.round(fps));
+      if (layout === "classic") {
+        fpsButton.textContent = `FPS ${fpsText}`;
+        // Over Google 3D Tiles the aircraft flies at ellipsoid heights; the readout takes sea level's away.
+        position.update({
+          latDeg: state.latDeg, lonDeg: state.lonDeg, altitudeMeters: state.altMeters, groundHeightMeters,
+          heightDatum: surfaceHeightDatum(runtimeStatus.mode), rest: `h${heading}°`,
+        });
+        return;
+      }
+      if (fpsValue.textContent !== fpsText) fpsValue.textContent = fpsText;
+      latLon.update({ latDeg: state.latDeg, lonDeg: state.lonDeg });
+      drawAltitude(state.altMeters, groundHeightMeters, runtimeStatus.mode);
+      headingChip.setValue(`${String(headingDeg % 360).padStart(3, "0")}°`);
+      headingChip.setLabel(compassPoint(headingDeg));
+      const pitchDeg = Math.round(state.pitchRad * 180 / Math.PI);
+      pitchChip.setValue(`${pitchDeg < 0 ? "-" : "+"}${Math.abs(pitchDeg)}°`);
     },
     destroy(): void {
       stopWatchingToolbar();
@@ -212,12 +337,14 @@ export function createFlightHudBar(container: HTMLElement, options: FlightHudBar
       pauseButton.removeEventListener("click", onPauseClick);
       rendererButton.removeEventListener("click", options.onRendererClick);
       statusElement.removeEventListener("click", options.onStatusClick);
+      for (const chip of positionChips) chip.removeEventListener("click", options.onStatusClick);
       settingsButton.removeEventListener("click", options.onSettingsClick);
       fpsButton.removeEventListener("click", options.onDebugClick);
       bugReportButton.removeEventListener("click", options.onBugReportClick);
       mapSource.destroy();
       detachRendererActivity();
       position.destroy();
+      latLon.destroy();
       inputHud.destroy();
       hudBar.destroy();
     },

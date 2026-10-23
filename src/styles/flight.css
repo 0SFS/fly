@@ -91,6 +91,147 @@
   display: contents;
 }
 
+/*
+ * Airspeed, angle of attack and load, tinted by their value: green while it is
+ * comfortable, through yellow, to red at the stall or the aircraft's limit
+ * (instrumentBands.ts). The HUD sets `--hud-tint`, 0 to 1, on the chip or on
+ * the slot round it, and both layouts read it.
+ */
+:is(.flight-hud__tape[data-tint], [data-tint] > .flight-hud__tape) {
+  --hud-tint-hue: calc(130 - 130 * var(--hud-tint, 0));
+  border-color: hsl(var(--hud-tint-hue) 85% 52% / 0.9);
+  background: hsl(var(--hud-tint-hue) 75% 15% / 0.75);
+  color: hsl(var(--hud-tint-hue) 90% 68%);
+}
+
+:is(.flight-hud__tape[data-tint], [data-tint] > .flight-hud__tape) .flight-hud__tape-header {
+  color: inherit;
+  opacity: 0.8;
+}
+
+/*
+ * Vertical speed, coloured as the attitude indicator: dark brown descending,
+ * white level, dark blue climbing. The HUD sets `--hud-vs-mix`, 0 level to 1
+ * at the aircraft's full scale, its direction, and dark ink on the pale end.
+ */
+.flight-hud__tape[data-vs-tint] {
+  --hud-vs-end: hsl(218 72% 24%);
+  --hud-vs-fill: color-mix(in oklab, var(--hud-vs-end) calc(var(--hud-vs-mix, 0) * 100%), #f4f6f9);
+  border-color: color-mix(in oklab, var(--hud-vs-fill), #000 35%);
+  background: var(--hud-vs-fill);
+  color: #f4f6f9;
+}
+
+.flight-hud__tape[data-vs-tint][data-vs-direction="down"] {
+  --hud-vs-end: hsl(26 62% 20%);
+}
+
+.flight-hud__tape[data-vs-tint][data-vs-ink="dark"] {
+  color: #111827;
+  text-shadow: none;
+}
+
+.flight-hud__tape[data-vs-tint] .flight-hud__tape-header {
+  color: inherit;
+  opacity: 0.8;
+}
+
+/*
+ * Compact (osfs.hud.layout): both clusters sit against the toolbar in the
+ * bottom corners, on see-through surfaces, with the readings on the attitude
+ * indicator's corners. The text keeps a shadow so it reads over a bright sky.
+ */
+.flight-hud[data-layout="compact"] {
+  --flight-controls-bottom: calc(var(--foss-hud-bottom, 16px) + var(--foss-hud-bar-height, 32px) + 2px);
+  --flight-hud-left: var(--foss-hud-left, env(safe-area-inset-left, 0px));
+  --ctl-surface: rgba(0, 0, 0, 0.16);
+  --ctl-surface-deep: transparent;
+  --ctl-line: rgba(255, 255, 255, 0.1);
+  --ctl-line-bright: rgba(255, 255, 255, 0.1);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+}
+
+.flight-hud[data-layout="compact"] .flight-hud__yaw-throttle {
+  right: var(--foss-hud-right, env(safe-area-inset-right, 0px));
+}
+
+.flight-hud[data-layout="compact"] :is(.flight-hud__yaw, .flight-hud__throttle) {
+  background: transparent;
+  border-color: transparent;
+}
+
+.flight-hud__attitude-readings {
+  display: none;
+}
+
+/* Over the pad, in its grid cell; the pad underneath still takes the stick. */
+.flight-hud[data-layout="compact"] .flight-hud__attitude-readings {
+  display: block;
+  position: relative;
+  grid-column: 2;
+  grid-row: 2;
+  pointer-events: none;
+}
+
+.flight-hud__attitude-readings > * {
+  position: absolute;
+}
+
+.flight-hud__attitude-readings > [data-reading="ias"] {
+  top: 0;
+  left: 0;
+}
+
+.flight-hud__attitude-readings > [data-reading="vs"] {
+  top: 0;
+  right: 0;
+}
+
+.flight-hud__attitude-readings > .flight-hud__aoa {
+  display: block;
+  bottom: 0;
+  left: 0;
+}
+
+/* Heading over the horizon, at the top of the ball. */
+.flight-hud__attitude-readings > [data-reading="hdg"] {
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Value over its label, as the toolbar's readings. */
+.flight-hud__attitude-readings .flight-hud__tape {
+  flex-direction: column-reverse;
+  gap: 0;
+  padding: 2px 5px;
+  border-radius: 6px;
+}
+
+/* The ball shows through a reading with no tint to show. */
+.flight-hud__attitude-readings .flight-hud__tape:not([data-tint], [data-vs-tint], [data-tint] > *) {
+  background: transparent;
+  border-color: transparent;
+}
+
+/* Brighter than the row's muted labels: these sit over the sky. */
+.flight-hud__attitude-readings .flight-hud__tape-header {
+  gap: 2px;
+  color: rgba(232, 237, 245, 0.85);
+}
+
+.flight-hud__attitude-readings :is(.flight-hud__label, .flight-hud__unit) {
+  font-size: 8px;
+}
+
+.flight-hud__attitude-readings .flight-hud__value {
+  font-size: 12px;
+}
+
+.flight-hud__attitude-readings :is(.flight-hud__tape[data-tint], [data-tint] > .flight-hud__tape) {
+  background: hsl(var(--hud-tint-hue) 75% 15% / 0.6);
+}
+
 .flight-hud__yaw-throttle {
   position: absolute;
   right: calc(env(safe-area-inset-right, 0px) + 24px);
@@ -215,6 +356,132 @@
 
 #flightFps {
   font-variant-numeric: tabular-nums;
+}
+
+/* Compact's toolbar readings: the value over its label, as FOSS Earth's FPS chip. */
+.hud-bar .flight-reading-chip {
+  box-sizing: border-box;
+  height: 28px;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 8px;
+}
+
+.flight-reading__value {
+  font-size: 11px;
+  line-height: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: pre;
+}
+
+.flight-reading__value .hud-position__icon {
+  width: 10px;
+  height: 10px;
+}
+
+.flight-reading__label {
+  color: #9ca3af;
+  font-size: 7px;
+  line-height: 8px;
+}
+
+:root[data-theme="light"] .flight-reading__label {
+  color: #6b7280;
+}
+
+/* Room for the widest value, so a changing one does not shift the chips after it. */
+#flightFps .flight-reading__value {
+  min-width: 3ch;
+  text-align: center;
+}
+
+#flightAltitude .flight-reading__value {
+  min-width: 5ch;
+  text-align: center;
+}
+
+#flightPitch .flight-reading__value {
+  min-width: 4ch;
+  text-align: center;
+}
+
+/*
+ * Compact's load, gear and autopilot, against the toolbar's end. They keep
+ * their HUD rules and take the toolbar chips' surface; the gear down and the
+ * autopilot on still light, and the load is tinted.
+ */
+.flight-toolbar-instruments {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 3px;
+  margin-left: auto;
+  color: #e8edf5;
+  font-family: "SF Mono", "Menlo", "Consolas", monospace;
+}
+
+.flight-toolbar-instruments[hidden] {
+  display: none;
+}
+
+.hud-bar[data-flight-layout="compact"] > .hud-bar-end {
+  margin-left: 0;
+}
+
+.flight-toolbar-instruments :where(.flight-hud__tape, .flight-hud__gear, .flight-hud__ap) {
+  box-sizing: border-box;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(10, 14, 22, 0.76);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(8px);
+}
+
+.flight-toolbar-instruments :where(.flight-hud__gear, .flight-hud__ap) {
+  font-size: 11px;
+}
+
+.flight-toolbar-instruments .flight-hud__tape {
+  flex-direction: column-reverse;
+  gap: 1px;
+  min-width: 0;
+  padding: 2px 8px;
+}
+
+.flight-toolbar-instruments .flight-hud__value {
+  font-size: 11px;
+  line-height: 12px;
+}
+
+.flight-toolbar-instruments .flight-hud__label {
+  font-size: 7px;
+  line-height: 8px;
+}
+
+:root[data-theme="light"] .flight-toolbar-instruments {
+  color: rgba(15, 23, 42, 0.88);
+}
+
+/* Not the tinted load, nor the gear or autopilot while lit. */
+:root[data-theme="light"] .flight-toolbar-instruments :where(:not([data-tint]) > .flight-hud__tape, .flight-hud__gear:not(.is-down), .flight-hud__ap:not(.is-on)) {
+  border-color: rgba(15, 23, 42, 0.18);
+  background: rgba(248, 250, 252, 0.82);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.18);
+}
+
+:root[data-theme="light"] .flight-toolbar-instruments :not([data-tint]) > .flight-hud__tape .flight-hud__tape-header {
+  color: #6b7280;
+}
+
+/* Flush: the toolbar's items meet square, so these do too. */
+html[data-world-edges="flush"] .flight-toolbar-instruments {
+  gap: 0;
+}
+
+html[data-world-edges="flush"] .flight-toolbar-instruments :where(.flight-hud__tape, .flight-hud__gear, .flight-hud__ap) {
+  border-bottom-color: transparent;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .flight-shell-root {
@@ -465,6 +732,26 @@
   flex: 1 1 8em;
   min-width: 6em;
   accent-color: var(--flight-panel-accent);
+}
+
+/* A range with a reset sits in the reset's span, which takes the range's place
+   in the row, short of the row's end by the reset's overhang so the panel's edge
+   never clips it. */
+.flight-panel__field > .foss-earth-parameter__widget:has(> input[type="range"]) {
+  flex: 1 1 8em;
+  min-width: 6em;
+  margin-right: 6px;
+}
+
+/* A segmented group with a reset still fills its row from inside the reset's
+   span, short of the end by the reset's overhang. */
+.foss-earth-parameter__widget:has(> .flight-panel__segmented) {
+  display: flex;
+  margin-right: 6px;
+}
+
+.foss-earth-parameter__widget > .flight-panel__segmented {
+  flex: 1;
 }
 
 /* A dropdown is as wide as its own text - its longest option - and never
@@ -936,6 +1223,19 @@
 
   .flight-hud__value {
     font-size: 12px;
+  }
+
+  /* The pad is 130px here: three readings share its top edge. */
+  .flight-hud__attitude-readings .flight-hud__tape {
+    padding: 1px 3px;
+  }
+
+  .flight-hud__attitude-readings :is(.flight-hud__label, .flight-hud__unit) {
+    font-size: 7px;
+  }
+
+  .flight-hud__attitude-readings .flight-hud__value {
+    font-size: 10px;
   }
 }
 

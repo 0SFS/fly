@@ -83,7 +83,7 @@ const mocks = vi.hoisted(() => {
         status: "ready", triangles: 876, error: null,
       }),
       getRig: () => mocks.rig,
-      setAircraft: vi.fn(), setLod: vi.fn(), setRenderStowedGear: vi.fn(), updateGearVisibility: vi.fn(), refreshAutoLod: vi.fn(), dispose: vi.fn(),
+      setAircraft: vi.fn(), setLod: vi.fn(), setRenderStowedGear: vi.fn(), setWindowTint: vi.fn(), updateGearVisibility: vi.fn(), refreshAutoLod: vi.fn(), dispose: vi.fn(),
     },
     rig: { parts: [], propeller: null, propellerAngleRad: 0, bound: [], getNode: () => null },
     surfaceState: { elevatorRad: 0.1, gearDownNorm: 1 },
@@ -95,7 +95,7 @@ const mocks = vi.hoisted(() => {
       setLifetimeSeconds: vi.fn(), setMaxDetachedTanks: vi.fn(), resetDetached: vi.fn(), dispose: vi.fn(),
     },
     useRealFlightHud: false,
-    flightHud: { update: vi.fn(), destroy: vi.fn(), refreshVtolConversion: vi.fn(), refreshFlaps: vi.fn() },
+    flightHud: { update: vi.fn(), destroy: vi.fn(), refreshVtolConversion: vi.fn(), refreshFlaps: vi.fn(), setLayout: vi.fn(), setReadingTints: vi.fn() },
     applyAircraftRig: vi.fn(),
     terrainContact: { reset: vi.fn(), update: vi.fn(() => true) },
     visibleMeshCollision: { reset: vi.fn(), update: vi.fn(() => false) },
@@ -133,7 +133,8 @@ vi.mock("foss-earth/shell", async importOriginal => {
     },
   };
 });
-vi.mock("./jsbsim/createJsbsimRuntime", () => ({ createJsbsimRuntime: vi.fn(async (options: { aircraftId?: string } = {}) => ({
+vi.mock("./jsbsim/createJsbsimRuntime", () => ({ createJsbsimRuntime: vi.fn(async (options: { aircraftId?: string; physicsHz?: 30 | 60 | 120 } = {}) => ({
+  physicsHz: options.physicsHz ?? 60,
   identity: { aircraftId: options.aircraftId ?? "cessna-172", engineModel: null, build: {
     package: { name: "@felipegalind0/jsbsim", version: "1.2.4-fork.20" },
     native: { commit: "a".repeat(40), dirty: false }, sdk: { commit: "a".repeat(40), dirty: false },
@@ -195,7 +196,7 @@ vi.mock("@0sfs/aircraft/aircraftAnimation", () => ({
   applyAircraftRig: mocks.applyAircraftRig,
   readControlSurfaceState: (...args: unknown[]) => { mocks.readControlSurfaceState(...args); return mocks.surfaceState; },
 }));
-vi.mock("./physics/fixedStepLoop", () => ({ FIXED_DT: 1 / 120, createFixedStepPhysicsLoop: vi.fn(() => mocks.physics) }));
+vi.mock("./physics/fixedStepLoop", () => ({ createFixedStepPhysicsLoop: vi.fn(() => mocks.physics) }));
 vi.mock("@0sfs/ground-contact/terrainContact", () => ({ createTerrainContact: () => mocks.terrainContact }));
 vi.mock("@0sfs/ground-contact/visibleMeshCollision", () => ({ createVisibleMeshCollision: vi.fn(() => mocks.visibleMeshCollision) }));
 vi.mock("./hud/flightHud", async importOriginal => {
@@ -212,9 +213,12 @@ vi.mock("./jsbsim/savedFlight", async importOriginal => {
   return { ...actual, captureSavedFlight: vi.fn(() => null), restoreSavedFlight: vi.fn(() => mocks.state) };
 });
 vi.mock("./hud/createFlightHudBar", () => ({
-  createFlightHudBar: (_container: HTMLElement, options: HudBarClicks) => {
+  createFlightHudBar: (container: HTMLElement, options: HudBarClicks) => {
     mocks.hudBarOptions = options;
-    return { update: vi.fn(), destroy: vi.fn(), mountInputMethod: () => () => {} };
+    // The real toolbar's slot, where Compact puts the load, gear and autopilot.
+    const instrumentSlot = container.appendChild(document.createElement("span"));
+    instrumentSlot.className = "flight-toolbar-instruments";
+    return { update: vi.fn(), destroy: vi.fn(), mountInputMethod: () => () => {}, setLayout: vi.fn(), instrumentSlot };
   },
 }));
 
@@ -256,7 +260,7 @@ async function openTab(root: HTMLElement, label: string): Promise<void> {
   const launcher = root.querySelector<HTMLButtonElement>('[aria-label="Open right panel"]')
     ?? root.querySelector<HTMLButtonElement>('.foss-earth-tab-strip [aria-label="Open new tab"]')!;
   await act(async () => launcher.click());
-  const item = Array.from(root.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')).find(button => button.textContent === label)!;
+  const item = Array.from(root.querySelectorAll<HTMLButtonElement>(".foss-earth-new-tab-choice")).find(button => button.textContent === label)!;
   await act(async () => item.click());
 }
 
@@ -441,13 +445,13 @@ it("runs wheel feedback only when selected, exposes A/B while paused, and mutes 
   await act(async () => { app = await createFlightSimApp(root); });
   try {
     const onStep = vi.mocked(createFixedStepPhysicsLoop).mock.calls.at(-1)![1]!;
-    onStep(mocks.state as never);
+    onStep(mocks.state as never, 1 / 60);
     expect(mocks.wheelSpin.step).not.toHaveBeenCalled();
     expect(mocks.tireAudio.setEnabled).not.toHaveBeenCalled();
     await act(async () => window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyP" })));
     expect(mocks.tireAudio.setPaused).toHaveBeenLastCalledWith(true);
     await act(async () => root.querySelector<HTMLButtonElement>('[aria-label="Open right panel"]')!.click());
-    const debug = Array.from(root.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')).find(button => button.textContent === "Debug")!;
+    const debug = Array.from(root.querySelectorAll<HTMLButtonElement>(".foss-earth-new-tab-choice")).find(button => button.textContent === "Debug")!;
     await act(async () => debug.click());
     // "[Off / A / B] ?  Tire sound [switch]"
     const wheel = (mode: string) => root.querySelector<HTMLInputElement>(`[role="radiogroup"][aria-label="Wheel spin experiment"] input[value="${mode}"]`)!;
@@ -461,19 +465,19 @@ it("runs wheel feedback only when selected, exposes A/B while paused, and mutes 
     expect(sound.disabled).toBe(false);
     await act(async () => sound.click());
     expect(mocks.tireAudio.setEnabled).toHaveBeenLastCalledWith(true);
-    onStep(mocks.state as never);
-    expect(mocks.wheelSpin.step).toHaveBeenLastCalledWith(1 / 120, "inertia");
+    onStep(mocks.state as never, 1 / 60);
+    expect(mocks.wheelSpin.step).toHaveBeenLastCalledWith(1 / 60, "inertia");
     await act(async () => root.querySelector<HTMLInputElement>('[aria-label="Show aircraft collision geometry"]')!.click());
     expect(mocks.wheelOverlay.setEnabled).toHaveBeenLastCalledWith(true);
     await act(async () => wheel("instant").click());
-    onStep(mocks.state as never);
-    expect(mocks.wheelSpin.step).toHaveBeenLastCalledWith(1 / 120, "instant");
+    onStep(mocks.state as never, 1 / 60);
+    expect(mocks.wheelSpin.step).toHaveBeenLastCalledWith(1 / 60, "instant");
     await act(async () => wheel("off").click());
     expect(sound.checked).toBe(false);
     expect(mocks.tireAudio.setEnabled).toHaveBeenLastCalledWith(false);
     expect(mocks.wheelOverlay.setEnabled).toHaveBeenLastCalledWith(false);
     mocks.wheelSpin.step.mockClear();
-    onStep(mocks.state as never);
+    onStep(mocks.state as never, 1 / 60);
     expect(mocks.wheelSpin.step).not.toHaveBeenCalled();
   } finally { await act(async () => app.destroy()); }
   expect(mocks.tireAudio.dispose).toHaveBeenCalledOnce();
@@ -536,7 +540,8 @@ it("keeps autopilot configuration on the Autopilot tab, and shared preferences a
     expect(root.querySelector('[data-preset="osfs-low-and-slow"]')).not.toBeNull();
     expect(root.querySelector('[data-preset="sharpest"]')).not.toBeNull();
     await openTab(root, "Interface");
-    expect(sectionTitles()).toEqual(["toolbar", "position", "log"].map(section => getAppSettings().getSectionTitle("interface", section)));
+    expect(sectionTitles()).toEqual(["hud", "toolbar", "position", "log"].map(section => getAppSettings().getSectionTitle("interface", section)));
+    expect(root.querySelector('[data-parameter="osfs.hud.layout"]')).not.toBeNull();
     expect(root.querySelector('[data-parameter="interface.toolbar.bugReport"]')).not.toBeNull();
     expect(root.querySelector('[data-parameter="interface.toolbar.renderer"]')).toBeNull();
     expect(root.querySelector('[data-parameter="interface.toolbar.activityOutline"]')).not.toBeNull();
@@ -648,15 +653,15 @@ it("mounts the shared + menu, opens Location, and applies coordinates to the sim
     expect(root.querySelector<HTMLElement>(".flight-panel-root")!.hidden).toBe(false);
     expect(root.querySelector('[aria-label="Open left panel"]')).toBeNull();
     await act(async () => root.querySelector<HTMLButtonElement>('[aria-label="Open right panel"]')!.click());
-    const aircraft = Array.from(root.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')).find(button => button.textContent === "Aircraft")!;
+    const aircraft = Array.from(root.querySelectorAll<HTMLButtonElement>(".foss-earth-new-tab-choice")).find(button => button.textContent === "Aircraft")!;
     await act(async () => aircraft.click());
     const add = root.querySelector<HTMLButtonElement>('.foss-earth-tab-strip [aria-label="Open new tab"]')!;
     expect(add).not.toBeNull();
     await act(async () => add.click());
-    const location = Array.from(root.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')).find(button => button.textContent === "Location")!;
+    const location = Array.from(root.querySelectorAll<HTMLButtonElement>(".foss-earth-new-tab-choice")).find(button => button.textContent === "Location")!;
     await act(async () => location.click());
     expect(root.querySelector(".foss-earth-location-panel")).not.toBeNull();
-    expect(root.querySelector('[role="menu"]')).toBeNull();
+    expect(root.querySelector(".foss-earth-new-tab")).toBeNull();
     const panel = root.querySelector<HTMLElement>(".foss-earth-dock-panel")!;
     const expandedHeight = panel.style.height;
     const minimize = async () => {
@@ -703,7 +708,7 @@ it("mounts the shared + menu, opens Location, and applies coordinates to the sim
     }
     expect(root.querySelector(".foss-earth-dock-panel")).toBeNull();
     await act(async () => root.querySelector<HTMLButtonElement>('[aria-label="Open right panel"]')!.click());
-    const reopen = Array.from(root.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')).find(button => button.textContent === "Location")!;
+    const reopen = Array.from(root.querySelectorAll<HTMLButtonElement>(".foss-earth-new-tab-choice")).find(button => button.textContent === "Location")!;
     await act(async () => reopen.click());
     expect(root.querySelector(".foss-earth-location-panel")).not.toBeNull();
   } finally { await act(async () => app.destroy()); }
@@ -726,7 +731,7 @@ async function openPanelTab(root: HTMLElement, label: string, initiallyClosed = 
   }
   const launcher = initiallyClosed ? '[aria-label="Open right panel"]' : '[aria-label="Open new tab"]';
   await act(async () => selectionControl<HTMLButtonElement>(root, launcher).click());
-  const item = Array.from(root.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
+  const item = Array.from(root.querySelectorAll<HTMLButtonElement>(".foss-earth-new-tab-choice"))
     .find(button => button.textContent === label);
   if (!item) throw new Error("Missing panel tab: " + label);
   await act(async () => item.click());
@@ -761,6 +766,34 @@ async function mountAircraftSelection(initial: [string, string][] = []) {
 
 const generationSelector = ".flight-panel__generation-field select";
 
+it("flies at 60 Hz unless 120 Hz was saved, and holds a changed rate until the next flight", async () => {
+  let t = await mountAircraftSelection();
+  try {
+    expect(createJsbsimRuntime).toHaveBeenLastCalledWith(expect.objectContaining({ physicsHz: 60 }));
+    expect(vi.mocked(createFixedStepPhysicsLoop).mock.calls.at(-1)![2]).toMatchObject({ physicsHz: 60 });
+    // "Physics [30 / 60 / 120 Hz] ?" in Aircraft → Start.
+    const group = t.root.querySelector<HTMLElement>('[role="radiogroup"][data-parameter="osfs.physics.rate"]')!;
+    expect(group.getAttribute("aria-label")).toBe("Physics");
+    const pills = Array.from(group.querySelectorAll<HTMLInputElement>("input"));
+    expect(pills.map(pill => pill.getAttribute("aria-label"))).toEqual(["30 Hz", "60 Hz", "120 Hz"]);
+    expect(pills.map(pill => pill.closest("label")!.textContent)).toEqual(["30", "60", "120 Hz"]);
+    expect(pills.find(pill => pill.checked)!.value).toBe("60");
+    await act(async () => pills[0].click());
+    // A rate change never reaches the running flight.
+    expect(createJsbsimRuntime).toHaveBeenCalledTimes(1);
+    expect(createFixedStepPhysicsLoop).toHaveBeenCalledTimes(1);
+    expect(group.textContent).toContain("Changes pending");
+    expect(savedSettings(t.storage)["osfs.physics.rate"]).toBe("30");
+  } finally { await act(async () => t.app.destroy()); }
+  resetAppSettings();
+  vi.mocked(createJsbsimRuntime).mockClear();
+  t = await mountAircraftSelection([[SETTINGS_STORAGE_KEY, JSON.stringify({ version: 1, values: { "osfs.physics.rate": "120" } })]]);
+  try {
+    expect(createJsbsimRuntime).toHaveBeenLastCalledWith(expect.objectContaining({ physicsHz: 120 }));
+    expect(vi.mocked(createFixedStepPhysicsLoop).mock.calls.at(-1)![2]).toMatchObject({ physicsHz: 120 });
+  } finally { await act(async () => t.app.destroy()); }
+});
+
 it("connects external tank fuel controls to separation, respawn and simulation time", async () => {
   const readTanks = vi.spyOn(fuelTanks, "readFuelTanks").mockImplementation(() => [0, 1, 2, 3].map(index => ({
     index, capacityLbs: index < 2 ? 6550 : 2991, contentsLbs: index < 2 ? 2500 : 0,
@@ -790,7 +823,7 @@ it("connects external tank fuel controls to separation, respawn and simulation t
     // This test simulator accepted no physics steps: a frame alone cannot age released tanks.
     expect(mocks.externalTanks.update).toHaveBeenLastCalledWith(0);
     const afterStep = vi.mocked(createFixedStepPhysicsLoop).mock.calls.at(-1)![1]!;
-    afterStep(mocks.state); afterStep(mocks.state);
+    afterStep(mocks.state, 1 / 120); afterStep(mocks.state, 1 / 120);
     await act(async () => tick(1 / 60));
     expect(mocks.externalTanks.update).toHaveBeenLastCalledWith(1 / 60);
     await act(async () => {
@@ -1284,6 +1317,22 @@ it("persists the stowed gear debug override and feeds the model actual gear posi
   expect(mocks.aircraftModel.setRenderStowedGear).not.toHaveBeenCalled();
 });
 
+it("starts the model at a quarter of its window tint and applies the Aircraft tab's slider live", async () => {
+  const t = await mountAircraftSelection([["osfs.aircraft", "f-35b"]]);
+  try {
+    expect(vi.mocked(createAircraftModel).mock.calls.at(-1)?.[2]).toMatchObject({ windowTint: 0.25 });
+    expect(t.root.querySelector('[data-parameter="osfs.aircraft.windowTint"]')).not.toBeNull();
+    await act(async () => getAppSettings().set("osfs.aircraft.windowTint", 0.6));
+    expect(mocks.aircraftModel.setWindowTint).toHaveBeenLastCalledWith(0.6);
+    expect(savedSettings(t.storage)["osfs.aircraft.windowTint"]).toBe(0.6);
+  } finally {
+    await act(async () => t.app.destroy());
+  }
+  mocks.aircraftModel.setWindowTint.mockClear();
+  getAppSettings().set("osfs.aircraft.windowTint", 1);
+  expect(mocks.aircraftModel.setWindowTint).not.toHaveBeenCalled();
+});
+
 it("keeps native force observation opt-in and wires live Debug settings to the aircraft CG", async () => {
   const t = await mountAircraftSelection([["osfs.aircraft", "f-35b"]]);
   try {
@@ -1545,7 +1594,7 @@ it("enables collision geometry from Debug while paused, skips disabled work and 
     expect(createCollisionDebugOverlay).not.toHaveBeenCalled();
     await act(async () => window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyP" })));
     await act(async () => root.querySelector<HTMLButtonElement>('[aria-label="Open right panel"]')!.click());
-    const debug = Array.from(root.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')).find(button => button.textContent === "Debug")!;
+    const debug = Array.from(root.querySelectorAll<HTMLButtonElement>(".foss-earth-new-tab-choice")).find(button => button.textContent === "Debug")!;
     await act(async () => debug.click());
     const checkbox = root.querySelector<HTMLInputElement>('[aria-label="Show aircraft collision geometry"]')!;
     expect(checkbox.checked).toBe(false);
@@ -1703,7 +1752,7 @@ it("keeps flightPerf=1, the DevTools aliases and Debug → Frame budget, on the 
 
     await act(async () => window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyP" })));
     await act(async () => root.querySelector<HTMLButtonElement>('[aria-label="Open right panel"]')!.click());
-    const debug = Array.from(root.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')).find(button => button.textContent === "Debug")!;
+    const debug = Array.from(root.querySelectorAll<HTMLButtonElement>(".foss-earth-new-tab-choice")).find(button => button.textContent === "Debug")!;
     await act(async () => debug.click());
     const measure = root.querySelector<HTMLInputElement>('[data-parameter="renderer.profiling.enabled"] input')!;
     expect(measure.checked).toBe(true);
@@ -1979,10 +2028,11 @@ describe("G-forces", () => {
       const tick = mocks.runtime.setSimTick.mock.calls.at(-1)![0] as (dt: number) => void;
       const afterStep = vi.mocked(createFixedStepPhysicsLoop).mock.calls.at(-1)![1]!;
       const fly = (seconds: number): void => {
-        for (let step = 0; step < seconds * 120; step += 1) afterStep(mocks.state);
+        for (let step = 0; step < seconds * 120; step += 1) afterStep(mocks.state, 1 / 120);
         tick(1 / 60);
       };
-      const chip = t.root.querySelector<HTMLButtonElement>(".flight-hud__tapes .flight-g-meter")!;
+      // Compact, the default layout, puts the load at the toolbar's end.
+      const chip = t.root.querySelector<HTMLButtonElement>(".flight-toolbar-instruments .flight-g-meter")!;
       const shown = chip.querySelector<HTMLElement>('[data-value="g"]')!;
       const black = t.root.querySelector<HTMLElement>(".flight-g-vision__layer--blackout")!;
       const red = t.root.querySelector<HTMLElement>(".flight-g-vision__layer--redout")!;
@@ -2049,10 +2099,18 @@ describe("G-forces", () => {
       expect(tabs()).not.toContain("G-forces");
       await act(async () => chip.click());
       expect(tabs()).toContain("G-forces");
-      for (const id of ["indicator", "vision", "blackoutRange", "redoutRange", "onsetTime", "recoveryTime", "visionStrength",
+      for (const id of ["indicator", "response", "vision", "blackoutRange", "redoutRange", "onsetTime", "recoveryTime", "visionStrength",
         "visionViews", "visionLayer", "passOut", "unconsciousTime", "unconsciousSpread"]) {
         expect(t.root.querySelector(`[data-parameter="osfs.gForce.${id}"]`), id).not.toBeNull();
       }
+      // The other responses' pilots show only once they are chosen.
+      expect(t.root.querySelector('[data-parameter="osfs.gForce.exposure.pilot"]')).toBeNull();
+      expect(t.root.querySelector('[data-parameter="osfs.gForce.perfusion.pilot"]')).toBeNull();
+      // Curve's preview: +9 g from rest closes the black vignette but never passes the pilot out.
+      const previewEvents = t.root.querySelector("[data-preview-events]")!.textContent!;
+      expect(previewEvents).toContain("+9 g held 15 s from rest at 60 Hz.");
+      expect(previewEvents).toContain("Sight lost");
+      expect(previewEvents).not.toContain("LOC");
       await act(async () => chip.click());
       expect(tabs()).not.toContain("G-forces");
     } finally { await act(async () => t.app.destroy()); canvas.mockRestore(); }
@@ -2075,7 +2133,7 @@ describe("G-forces", () => {
       // Each frame applies the controls first, then follows the load over the time it stepped.
       // A tenth of a second a frame lets a held key move the stick.
       const fly = (seconds: number): void => {
-        for (let step = 0; step < Math.round(seconds * 120); step += 1) afterStep(mocks.state);
+        for (let step = 0; step < Math.round(seconds * 120); step += 1) afterStep(mocks.state, 1 / 120);
         tick(0.1);
       };
       const set = (id: string, value: unknown) => act(async () => { getAppSettings().set(id as never, value as never); });
@@ -2137,6 +2195,74 @@ describe("G-forces", () => {
       fly(0.5);
       expect(aileron()).toBeGreaterThan(0.05);
       window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyD" }));
+    } finally { await act(async () => t.app.destroy()); canvas.mockRestore(); }
+  });
+
+  it("follows an Exposure pilot step by step: out under a held pull, kept out by it, and back once unloaded", async () => {
+    mocks.useRealFlightHud = true;
+    const canvas = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      new Proxy({}, { get: () => () => undefined }) as unknown as CanvasRenderingContext2D,
+    );
+    const t = await mountAircraftSelection([[SETTINGS_STORAGE_KEY, JSON.stringify({ version: 1, values: {
+      "osfs.gForce.response": "exposure", "osfs.gForce.exposure.pilot": "relaxed", "osfs.gForce.passOut": true,
+    } })]]);
+    try {
+      const runtime = await vi.mocked(createJsbsimRuntime).mock.results.at(-1)!.value;
+      const read = vi.mocked(runtime.sdk.getPropertyValue).getMockImplementation()!;
+      let bodyZ = -1;
+      vi.mocked(runtime.sdk.getPropertyValue).mockImplementation((property: string) =>
+        property === "accelerations/n-pilot-z-norm" ? bodyZ : read(property));
+      const tick = mocks.runtime.setSimTick.mock.calls.at(-1)![0] as (dt: number) => void;
+      const afterStep = vi.mocked(createFixedStepPhysicsLoop).mock.calls.at(-1)![1]!;
+      const fly = (seconds: number): void => {
+        for (let step = 0; step < Math.round(seconds * 120); step += 1) afterStep(mocks.state, 1 / 120);
+        tick(0.1);
+      };
+      const set = (id: string, value: unknown) => act(async () => { getAppSettings().set(id as never, value as never); });
+      const black = t.root.querySelector<HTMLElement>(".flight-g-vision__layer--blackout")!;
+      const closed = (): number => black.hidden ? 0 : Number(black.style.getPropertyValue("--closed"));
+      const aileron = (): number | undefined => vi.mocked(runtime.sdk.setPropertyValue).mock.calls
+        .filter(([property]) => property === "fcs/aileron-cmd-norm").at(-1)?.[1];
+
+      // Only the chosen response's settings show; its preview passes this pilot out.
+      await act(async () => t.root.querySelector<HTMLButtonElement>(".flight-toolbar-instruments .flight-g-meter")!.click());
+      expect(t.root.querySelector('[data-parameter="osfs.gForce.exposure.pilot"]')).not.toBeNull();
+      for (const id of ["perfusion.pilot", "blackoutRange", "onsetTime", "recoveryTime", "unconsciousTime", "unconsciousSpread"]) {
+        expect(t.root.querySelector(`[data-parameter="osfs.gForce.${id}"]`), id).toBeNull();
+      }
+      expect(t.root.querySelector('[data-parameter="osfs.gForce.redoutRange"]')).not.toBeNull();
+      expect(t.root.querySelector("[data-preview-events]")!.textContent).toContain("LOC 7.9 s");
+
+      // +8 g: sight goes first, and the pilot passes out after 7.9 s of it.
+      window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyD" }));
+      bodyZ = -8;
+      fly(5);
+      expect(closed()).toBeGreaterThan(0);
+      expect(aileron()).toBeGreaterThan(0.05);
+      fly(4);
+      expect(aileron()).toBe(0);
+      expect(closed()).toBe(1);
+      // No timer wakes a pilot still under the load, and an edit within the response grants no recovery.
+      fly(20);
+      expect(aileron()).toBe(0);
+      await set("osfs.gForce.exposure.pilot", "suit-strain");
+      fly(0.5);
+      expect(aileron()).toBe(0);
+      await set("osfs.gForce.exposure.pilot", "relaxed");
+      // Unloaded, the pilot comes to once the brain's buffer has refilled and stayed so.
+      bodyZ = -1;
+      fly(3);
+      expect(aileron()).toBe(0);
+      fly(5);
+      expect(aileron()).toBeGreaterThan(0.05);
+      window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyD" }));
+
+      // A change of response waits for the next flight.
+      const group = t.root.querySelector<HTMLElement>('[role="radiogroup"][data-parameter="osfs.gForce.response"]')!;
+      const curve = Array.from(group.querySelectorAll<HTMLInputElement>("input")).find(pill => pill.value === "curve")!;
+      await act(async () => curve.click());
+      expect(group.textContent).toContain("Changes pending");
+      expect(createFixedStepPhysicsLoop).toHaveBeenCalledTimes(1);
     } finally { await act(async () => t.app.destroy()); canvas.mockRestore(); }
   });
 });

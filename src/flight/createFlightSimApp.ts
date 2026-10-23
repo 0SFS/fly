@@ -92,6 +92,7 @@ import { applyAircraftRig, readControlSurfaceState, readGearDownNorm } from "@0s
 import { flightLog } from "@0sfs/logging/flightLog";
 import { createFlightRecorder } from "@0sfs/logging/flightRecorder";
 import { createEvaluationInstruments } from "./hud/evaluationInstruments";
+import { INSTRUMENT_BANDS, readingTints } from "./hud/instrumentBands";
 import { createGMeter } from "@0sfs/g-forces/gMeter";
 import { createGVisionOverlay } from "@0sfs/g-forces/gVisionOverlay";
 import type { LoggingAction, LoggingPanelState } from "@0sfs/logging/LoggingPanel";
@@ -1426,6 +1427,8 @@ async function createFlightSimSession(
   const evaluationInstruments = createEvaluationInstruments(
     hudRoot.querySelector<HTMLElement>(".flight-hud__eval") ?? hudRoot,
   );
+  // What the airspeed, angle of attack and load chips are tinted against.
+  const instrumentBands = INSTRUMENT_BANDS[initialAircraftId];
   // G-forces: the load at the pilot's seat is read after each accepted physics
   // step, for the pilot, and shown by the indicator and the vignettes once a
   // frame. All of it is DOM, so none of it asks the globe for a frame.
@@ -2581,7 +2584,7 @@ async function createFlightSimSession(
       flight: () => createPanelSnapshot(),
     } });
   const diagnosticsParameters = ui.section(settings, { tab: "settings", section: "diagnostics", footer: diagnosticsSection.element });
-  const interfaceParameterSections = (["position", "log"] as const)
+  const interfaceParameterSections = (["hud", "position", "log"] as const)
     .map(section => ({ section, handle: ui.section(settings, { tab: "interface", section }) }));
   // The flight retains its existing controls. The bug shortcut alone follows
   // the shared Auto fit choice, with its priority in the same Toolbar home,
@@ -2613,11 +2616,14 @@ async function createFlightSimSession(
   // Which version runs, and everything it is built from, read from the page itself.
   const about = createAboutPanel({ site: __REPOSITORY_SLUG__ || undefined });
   const browserData = createBrowserDataPanel(document);
+  const interfaceParameterPanels = interfaceParameterSections.map(({ section, handle }) => ({
+    id: section, title: settings.getSectionTitle("interface", section), element: handle.element,
+  }));
+  // The instruments' layout first: it changes the most of the screen.
   const interfaceSections: PanelSection[] = [
+    interfaceParameterPanels[0]!,
     { id: "toolbar", title: settings.getSectionTitle("interface", "toolbar"), element: toolbarParameters.element },
-    ...interfaceParameterSections.map(({ section, handle }) => ({
-      id: section, title: settings.getSectionTitle("interface", section), element: handle.element,
-    })),
+    ...interfaceParameterPanels.slice(1),
   ];
   // The Location tab's lookup, airport choice and saved form, owned by the flight;
   // the lookup's `search.*` limits sit under the form, as on the globe.
@@ -2790,6 +2796,16 @@ async function createFlightSimSession(
     },
   });
   hudBar?.setResumeBlocked?.(aircraftSwitching);
+  // Interface → Flight instruments → Layout: Compact moves the load, gear and
+  // autopilot into the toolbar, so it waits for the toolbar.
+  const applyHudLayout = (): void => {
+    const layout = parameters.get("osfs.hud.layout");
+    hudBar?.setLayout(layout);
+    flightHud.setLayout(layout, hudBar?.instrumentSlot);
+    runtime.requestRender();
+  };
+  applyHudLayout();
+  stopWatching.push(parameters.watch("osfs.hud.layout", applyHudLayout));
   statusOverlay = createFlightStatusOverlay(statusRoot, {
     onResume: () => setSimulationPaused(false),
   });
@@ -3139,8 +3155,15 @@ async function createFlightSimSession(
     flightRecorder.sample(jsbsim.sdk);
     evaluationInstruments.update(jsbsim.sdk);
     // The pilot has followed each step already; the indicator shows the last.
-    if (gIndicatorShown) gMeter.update(steppedPilotG ?? readPilotG(jsbsim.sdk));
+    const shownPilotG = gIndicatorShown ? steppedPilotG ?? readPilotG(jsbsim.sdk) : null;
+    if (shownPilotG !== null) gMeter.update(shownPilotG);
     steppedPilotG = null;
+    flightHud.setReadingTints(readingTints(instrumentBands, {
+      iasKt: displayState.airspeedKts, aoaDeg: evaluationInstruments.aoaDeg(), g: shownPilotG,
+      vsFpm: displayState.verticalSpeedFps * 60, flaps: actualFlaps,
+      weightLb: jsbsim.sdk.getPropertyValue("inertia/weight-lbs"), onGround: aircraftOnGround(),
+      jetBorne: vtolProfile !== undefined && jsbsim.sdk.getPropertyValue(vtolProfile.positionProperty) > 0.01,
+    }));
     // Every frame: a change of camera view changes what is drawn without a step.
     showGVision();
     engineMonitor.update(jsbsim.sdk, feedbackHeld || worldLoading);

@@ -341,6 +341,104 @@ describe("flight HUD gear button", () => {
   });
 });
 
+describe("flight HUD layout", () => {
+  const order = (parent: Element) => [...parent.children].map(child =>
+    (child as HTMLElement).dataset.reading ?? (child as HTMLElement).dataset.slot ?? (child as HTMLElement).dataset.control);
+
+  it("puts the readings on the attitude indicator's corners and the buttons in the toolbar in Compact", () => {
+    const t = mount();
+    const toolbar = document.createElement("span");
+    document.body.append(toolbar);
+    const hud = t.host.querySelector<HTMLElement>(".flight-hud")!;
+    expect(hud.dataset.layout).toBe("classic");
+
+    t.hud.setLayout("compact", toolbar);
+    expect(hud.dataset.layout).toBe("compact");
+    const readings = t.host.querySelector(".flight-hud__attitude-readings")!;
+    // Over the pad, in its cell of the attitude cluster.
+    expect(readings.previousElementSibling).toBe(t.host.querySelector(".flight-hud__attitude"));
+    expect(order(readings)).toEqual(["ias", "vs", "aoa", "hdg"]);
+    expect(order(toolbar)).toEqual(["g", "gear", "autopilot"]);
+    expect(t.host.querySelector(".flight-hud__tapes")!.children).toHaveLength(0);
+    // The buttons answer from the toolbar as from the row.
+    t.gear.click();
+    expect(t.onGearChange).toHaveBeenCalledWith(false);
+
+    t.hud.setLayout("classic", toolbar);
+    expect(order(t.host.querySelector(".flight-hud__tapes")!)).toEqual(["ias", "hdg", "vs", "aoa", "g", "gear", "autopilot"]);
+    expect(readings.children).toHaveLength(0);
+    expect(toolbar.children).toHaveLength(0);
+
+    t.hud.setLayout("compact", toolbar);
+    t.hud.destroy();
+    expect(toolbar.children).toHaveLength(0);
+  });
+
+  it("keeps the buttons in the row when Compact has no toolbar to put them in", () => {
+    const t = mount();
+    t.hud.setLayout("compact");
+    expect(order(t.host.querySelector(".flight-hud__tapes")!)).toEqual(["g", "gear", "autopilot"]);
+    t.hud.destroy();
+  });
+
+  it("tints airspeed, angle of attack and load in steps, writing only when a step changes", () => {
+    const t = mount();
+    const ias = t.host.querySelector<HTMLElement>('[data-reading="ias"]')!;
+    const aoa = t.host.querySelector<HTMLElement>(".flight-hud__aoa")!;
+    const g = t.host.querySelector<HTMLElement>(".flight-hud__g")!;
+    t.hud.setReadingTints({ ias: 0, aoa: 0.51, g: null, vs: null });
+    expect(ias.style.getPropertyValue("--hud-tint")).toBe("0.00");
+    expect(aoa.dataset.tint).toBe("0.50");
+    expect(g.hasAttribute("data-tint")).toBe(false);
+
+    const observer = new MutationObserver(() => undefined);
+    observer.observe(t.host, { subtree: true, attributes: true });
+    t.hud.setReadingTints({ ias: 0.01, aoa: 0.52, g: null, vs: null });
+    expect(observer.takeRecords()).toEqual([]);
+
+    t.hud.setReadingTints({ ias: 1.4, aoa: null, g: 0.3, vs: null });
+    expect(ias.dataset.tint).toBe("1.00");
+    expect(aoa.hasAttribute("data-tint")).toBe(false);
+    expect(aoa.style.getPropertyValue("--hud-tint")).toBe("");
+    expect(g.style.getPropertyValue("--hud-tint")).toBe("0.30");
+    observer.disconnect();
+    t.hud.destroy();
+  });
+
+  it("colours vertical speed by direction, with dark ink on the pale end", () => {
+    const t = mount();
+    const vs = t.host.querySelector<HTMLElement>('[data-reading="vs"]')!;
+    const tints = { ias: null, aoa: null, g: null };
+    t.hud.setReadingTints({ ...tints, vs: 0.71 });
+    expect(vs.dataset.vsTint).toBe("0.70");
+    expect(vs.dataset.vsDirection).toBe("up");
+    expect(vs.dataset.vsInk).toBe("light");
+    expect(vs.style.getPropertyValue("--hud-vs-mix")).toBe("0.70");
+    // Not the green-to-red tint.
+    expect(vs.hasAttribute("data-tint")).toBe(false);
+
+    t.hud.setReadingTints({ ...tints, vs: -0.3 });
+    expect(vs.dataset.vsTint).toBe("-0.30");
+    expect(vs.dataset.vsDirection).toBe("down");
+    expect(vs.dataset.vsInk).toBe("dark");
+    expect(vs.style.getPropertyValue("--hud-vs-mix")).toBe("0.30");
+
+    t.hud.setReadingTints({ ...tints, vs: -0.01 });
+    expect(vs.dataset.vsTint).toBe("0.00");
+    const observer = new MutationObserver(() => undefined);
+    observer.observe(t.host, { subtree: true, attributes: true });
+    t.hud.setReadingTints({ ...tints, vs: 0.02 });
+    expect(observer.takeRecords()).toEqual([]);
+    observer.disconnect();
+
+    t.hud.setReadingTints({ ...tints, vs: null });
+    expect(vs.hasAttribute("data-vs-tint")).toBe(false);
+    expect(vs.hasAttribute("data-vs-direction")).toBe(false);
+    expect(vs.style.getPropertyValue("--hud-vs-mix")).toBe("");
+    t.hud.destroy();
+  });
+});
+
 describe("flight HUD auto-trim", () => {
   it("puts both autos in a diagonally split square, pitch in the lower left", () => {
     const t = mount();

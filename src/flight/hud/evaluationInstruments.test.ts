@@ -37,6 +37,9 @@ describe("evaluation instruments", () => {
     const handle = mount();
     handle.update(reader(SF50));
     expect(text('[data-value="aoa"]')).toBe("3.1");
+    // One space of room for the tens, and no more.
+    expect(root.querySelector('[data-value="aoa"]')?.textContent).toBe(" 3.1");
+    expect(handle.aoaDeg()).toBe(3.14);
     expect((root.querySelector('[data-readout="aoa"]') as HTMLElement).hidden).toBe(false);
     expect(root.querySelector('[data-readout="n1"]')).toBeNull();
     expect(root.querySelector('[data-readout="ff"]')).toBeNull();
@@ -64,6 +67,7 @@ describe("evaluation instruments", () => {
     const handle = mount();
     handle.update(reader({ "propulsion/engine[0]/n1": 40 }));
     expect((root.querySelector('[data-readout="aoa"]') as HTMLElement).hidden).toBe(true);
+    expect(handle.aoaDeg()).toBeNull();
     expect(text(".flight-eval__cas")).toBe("");
   });
 

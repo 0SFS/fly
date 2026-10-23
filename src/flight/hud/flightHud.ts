@@ -8,6 +8,14 @@ import {
   type AttitudeRendererStatus,
 } from "./attitudeRenderer";
 import type { AttitudeView } from "./attitudeIndicator";
+import type { ReadingTints } from "./instrumentBands";
+
+/**
+ * Interface → Flight instruments → Layout: osfs.hud.layout. Classic keeps the
+ * instrument row above the attitude indicator; Compact puts its readings on
+ * the indicator's corners and its buttons in the toolbar.
+ */
+export type FlightHudLayout = "compact" | "classic";
 
 export interface FlightHudOptions {
   onGearChange(down: boolean): void;
@@ -116,6 +124,15 @@ export interface FlightHudHandle {
   refreshFlaps(): void;
   setAttitudeRenderer(preference: AttitudeRendererPreference): void;
   /**
+   * Moves the readings and buttons between the instrument row and their
+   * Compact places: airspeed, vertical speed and angle of attack on the
+   * attitude indicator's corners, heading over its horizon, and the load,
+   * gear and autopilot into `toolbarSlot`. Without a slot they stay in the row.
+   */
+  setLayout(layout: FlightHudLayout, toolbarSlot?: HTMLElement | null): void;
+  /** Tints the airspeed, angle of attack and load chips, 0 green to 1 red; null leaves one untinted. */
+  setReadingTints(tints: ReadingTints): void;
+  /**
    * A pointer is down on one of the flight controls. A finger resting on a
    * lever is still flying, though it sends nothing until it moves, so control
    * must not go back to a phone underneath it.
@@ -190,6 +207,7 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
           </span>
         </label>
         <div class="flight-hud__attitude" role="button" tabindex="0" data-takes-keys="ArrowLeft ArrowRight ArrowUp ArrowDown" aria-label="Attitude indicator and pitch roll control. Drag to steer."></div>
+        <div class="flight-hud__attitude-readings" aria-label="Flight readings"></div>
         <div class="flight-hud__lever flight-hud__lever--flaps">
           <span class="flight-hud__lever-meta">
             <span>FLAPS</span>
@@ -202,21 +220,21 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
         </div>
       </div>
       <div class="flight-hud__tapes">
-        <div class="flight-hud__tape">
+        <div class="flight-hud__tape" data-reading="ias">
           <div class="flight-hud__tape-header">
             <span class="flight-hud__label">IAS</span>
             <span class="flight-hud__unit">kt</span>
           </div>
           <span class="flight-hud__value" data-metric="ias">000</span>
         </div>
-        <div class="flight-hud__tape">
+        <div class="flight-hud__tape" data-reading="hdg">
           <div class="flight-hud__tape-header">
             <span class="flight-hud__label">HDG</span>
             <span class="flight-hud__unit">°</span>
           </div>
           <span class="flight-hud__value" data-metric="hdg">000</span>
         </div>
-        <div class="flight-hud__tape">
+        <div class="flight-hud__tape" data-reading="vs">
           <div class="flight-hud__tape-header">
             <span class="flight-hud__label">VS</span>
             <span class="flight-hud__unit">fpm</span>
@@ -274,9 +292,18 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
   const rudderOutput = root.querySelector<HTMLOutputElement>('[data-output="rudder"]');
   const gearButton = root.querySelector<HTMLButtonElement>('[data-control="gear"]');
   const apButton = root.querySelector<HTMLButtonElement>('[data-control="autopilot"]');
+  const hud = root.querySelector<HTMLElement>(".flight-hud");
+  const tapes = root.querySelector<HTMLElement>(".flight-hud__tapes");
+  const attitudeReadings = root.querySelector<HTMLElement>(".flight-hud__attitude-readings");
+  const iasTape = root.querySelector<HTMLElement>('[data-reading="ias"]');
+  const hdgTape = root.querySelector<HTMLElement>('[data-reading="hdg"]');
+  const vsTape = root.querySelector<HTMLElement>('[data-reading="vs"]');
+  const aoaSlot = root.querySelector<HTMLElement>(".flight-hud__aoa");
+  const gSlot = root.querySelector<HTMLElement>(".flight-hud__g");
 
   if (!pad || !gearButton || !apButton || !pitchAutoTrimButton || !rollAutoTrimButton
-    || !iasEl || !hdgEl || !vsEl
+    || !iasEl || !hdgEl || !vsEl || !hud || !tapes || !attitudeReadings
+    || !iasTape || !hdgTape || !vsTape || !aoaSlot || !gSlot
     || !throttleControl || !pitchTrimInput || !rollTrimInput || !flapsInput || !rudderInput
     || !pitchTrimOutput || !rollTrimOutput || !flapsOutput || !rudderOutput) {
     throw new Error("Flight HUD markup failed to initialize.");
@@ -600,11 +627,62 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
     refreshFlaps();
   };
 
+  // The row's own order, which Classic puts back.
+  const rowItems = [iasTape, hdgTape, vsTape, aoaSlot, gSlot, gearButton, apButton];
+  const toolbarItems = [gSlot, gearButton, apButton];
+  hud.dataset.layout = "classic";
+  const setLayout = (layout: FlightHudLayout, toolbarSlot: HTMLElement | null = null): void => {
+    if (layout === "compact") {
+      // Corners clockwise from the top left, heading last so it reads over the horizon.
+      attitudeReadings.append(iasTape, vsTape, aoaSlot, hdgTape);
+      (toolbarSlot ?? tapes).append(...toolbarItems);
+    } else {
+      tapes.append(...rowItems);
+    }
+    hud.dataset.layout = layout;
+  };
+
+  // Steps of 5%: a reading that holds still writes nothing.
+  const tintStep = (value: number, min: number) => (Math.round(Math.min(1, Math.max(min, value)) * 20) / 20).toFixed(2);
+  const tintTargets = [["ias", iasTape], ["aoa", aoaSlot], ["g", gSlot]] as const;
+  const setReadingTints = (tints: ReadingTints): void => {
+    for (const [reading, element] of tintTargets) {
+      const value = tints[reading];
+      const step = value === null ? "" : tintStep(value, 0);
+      if ((element.dataset.tint ?? "") === step) continue;
+      if (step === "") {
+        delete element.dataset.tint;
+        element.style.removeProperty("--hud-tint");
+      } else {
+        element.dataset.tint = step;
+        element.style.setProperty("--hud-tint", step);
+      }
+    }
+    // Signed: brown one way, blue the other.
+    const vsStep = tints.vs === null ? "" : tintStep(tints.vs, -1);
+    if ((vsTape.dataset.vsTint ?? "") === vsStep) return;
+    if (vsStep === "") {
+      delete vsTape.dataset.vsTint;
+      delete vsTape.dataset.vsDirection;
+      delete vsTape.dataset.vsInk;
+      vsTape.style.removeProperty("--hud-vs-mix");
+      return;
+    }
+    const mix = Math.abs(Number(vsStep));
+    vsTape.dataset.vsTint = vsStep;
+    vsTape.dataset.vsDirection = vsStep.startsWith("-") ? "down" : "up";
+    // Dark ink until the fill is darker than mid grey.
+    vsTape.dataset.vsInk = mix < 0.6 ? "dark" : "light";
+    vsTape.style.setProperty("--hud-vs-mix", mix.toFixed(2));
+  };
+
   return {
     setGearDown,
     refreshVtolConversion,
     refreshFlaps,
     setAttitudeRenderer: preference => attitude.setPreference(preference),
+    setLayout,
+    setReadingTints,
     update(
       state: FlightState,
       controls: FlightHudControls,
@@ -690,6 +768,8 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
       window.removeEventListener("pointerup", onHoldEnd, { capture: true });
       window.removeEventListener("pointercancel", onHoldEnd, { capture: true });
       window.removeEventListener("blur", clearHeld);
+      // In Compact these sit in the toolbar, outside the root.
+      for (const element of toolbarItems) element.remove();
       root.innerHTML = "";
     },
     isPilotHolding: () => heldPointers.size > 0,

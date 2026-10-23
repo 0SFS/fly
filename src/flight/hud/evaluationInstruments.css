@@ -1,4 +1,4 @@
-/* CAS sits above yaw. AoA is a tape in the left instrument row. */
+/* CAS sits above yaw. AoA is a tape in the left instrument row, or on the attitude indicator's corner. */
 .flight-eval {
   display: flex;
   flex-direction: column;
@@ -8,10 +8,6 @@
   pointer-events: none;
   color: #e8edf5;
   font-family: "SF Mono", "Menlo", "Consolas", monospace;
-}
-
-.flight-eval__readout {
-  min-width: 52px;
 }
 
 .flight-eval__readout[hidden] {

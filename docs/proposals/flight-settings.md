@@ -386,6 +386,7 @@ share this assist; variant-specific automatic flap behavior is not asserted.
 | `osfs.camera.orbitRestoreYaw` | deg | 0 |
 | `osfs.camera.chaseDistance` / `.chaseHeight` | m | Per aircraft, in the aircraft catalog |
 | `osfs.camera.fieldOfView` | deg | Inherited from the globe camera |
+| `osfs.aircraft.windowTint` | fraction | 25% of the model's authored glazing opacity; only catalogued see-through windows (the F-35B canopy) |
 | Phone camera tuning | various | Exists (`osfs.phone-camera-tuning`) |
 
 ### Start
@@ -1047,3 +1048,71 @@ Two app tests carry the load through to the screen and the controls:
 The stylesheet was drawn in headless Chrome at ten amounts of closing and
 looked at, before the layer setting was added. The layer setting was checked
 only in jsdom. None of it has been flown by a person.
+
+## Instrument layout (2026-10-22)
+
+**Interface → Flight instruments → Layout** (`osfs.hud.layout`, Compact or
+Classic, default Compact) says where the HUD's instruments sit. It applies live.
+
+- **Classic** is the layout before this setting: the instrument row (IAS, HDG,
+  VS, AoA, G, gear, AP) above the attitude cluster, and one position readout in
+  the toolbar.
+- **Compact** puts both clusters against the toolbar in the bottom corners, on
+  see-through surfaces. Airspeed, vertical speed and angle of attack sit on the
+  attitude indicator's top left, top right and bottom left corners, and heading
+  sits over its horizon at the top. The load, gear and autopilot sit at the
+  toolbar's right end, before the basemap. The position splits into four chips:
+  latitude and longitude, altitude, heading and pitch. Each chip shows its value
+  over its label, as the frame rate does, and each one toggles Location. The
+  heading chip's label is the nearest of the eight compass points. Latitude,
+  longitude and altitude follow Interface → Position readout.
+
+In both layouts the airspeed, angle of attack and load chips are tinted green
+to red, through yellow, against bands per aircraft
+(`src/flight/hud/instrumentBands.ts`). Airspeed is red at the 1 g stall speed,
+green from 1.3 times it, and red again from its upper limit. The angle of
+attack is green to about 1.3 times the stall speed and red at the stall. Both
+stall ends follow the flaps, and the stall speed follows the square root of
+the weight:
+
+| Aircraft | IAS stall, green from 1.3× | IAS high, green → red | AoA green → red | Load limits |
+| --- | --- | --- | --- | --- |
+| Cessna 172 | 47 / 44 / 43 / 42 kt at flaps 0° / 10° / 20° / 30°, 1,880 lb | 129 → 163 kt (Vno, Vne) | 6° → 15° | +3.8 / −1.52 g |
+| Vision Jet | 86 / 77 / 67 kt at flaps 0 / 50 / 100 %, 6,000 lb (AFM, pusher) | 230 → 250 kt (VMO) | 5.4 / 3.4 / 2.6° → 11.1 / 10.34 / 12.5° (pusher) | +3.6 / −1.44 g |
+| F-35B | 110 kt at 37,600 lb, wing-borne only | 600 → 700 kt (estimate) | 9° → 30° | +7 / −3 g |
+
+Where the stall numbers come from:
+
+- **C172:** the c172p model's own. Trimmed at 1 g, it fails past 15°, and its
+  lift peaks at 16°. The stall speeds are where that trim reaches 15°, at the
+  loading the app flies.
+- **Vision Jet:** the AFM's, which are the pusher's. The model fires within a
+  knot of them. The angle-of-attack reds are the pusher thresholds in
+  `sf50.xml`.
+- **F-35B:** its stall speed is the slowest 1 g trim. Its flight control
+  system holds the angle of attack down, so this is not an aerodynamic stall.
+  Its angle-of-attack red is the lift peak.
+
+The load is green at 1 g and red at either limit.
+
+Vertical speed runs dark brown descending, through white level, to dark blue
+climbing, as the attitude indicator's ground and sky. It is darkest at
+±1,000 fpm in the C172, ±3,000 in the Vision Jet and ±10,000 in the F-35B. The
+chip is filled with the colour and the text switches to dark on the pale end.
+
+Some ends are left untinted:
+
+- Neither stall end is tinted on the ground, as a low-speed awareness band is
+  not.
+- The stall speed is not tinted while the F-35B's lift system holds it up.
+- The angle of attack is not tinted below 20 kt, where it means nothing.
+
+Checks:
+
+- Unit tests cover the bands, the moves between layouts, the tints and the
+  split chips.
+- Both layouts were drawn in headless Chrome at desktop and phone sizes and
+  looked at.
+- Full aft stick held from 70 kt (C172) and 100 kt (Vision Jet) turned
+  airspeed and angle of attack red at the stall, and vertical speed blue.
+- None of it has been flown by a person.

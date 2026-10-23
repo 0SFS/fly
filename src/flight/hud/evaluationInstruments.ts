@@ -3,7 +3,8 @@ import { propertyInCatalog, type FlightRecorderPropertyReader } from "@0sfs/logg
 
 /**
  * Angle-of-attack tape and CAS warnings for pilot evaluation. AoA sits in the
- * left tape row, immediately right of VS. CAS sits above yaw. N1, fuel flow
+ * left tape row, immediately right of VS, or on the attitude indicator's
+ * bottom left corner in the Compact layout. CAS sits above yaw. N1, fuel flow
  * and flight recording live elsewhere.
  *
  * Readouts appear only for properties the loaded aircraft has, so the C172
@@ -12,6 +13,8 @@ import { propertyInCatalog, type FlightRecorderPropertyReader } from "@0sfs/logg
 
 export interface EvaluationInstrumentsHandle {
   update(reader: FlightRecorderPropertyReader): void;
+  /** The angle of attack last read, in degrees; null when the aircraft has none. */
+  aoaDeg(): number | null;
   destroy(): void;
 }
 
@@ -31,7 +34,7 @@ export function createEvaluationInstruments(root: HTMLElement): EvaluationInstru
   aoa.hidden = true;
   aoa.innerHTML = `
     <div class="flight-hud__tape-header"><span class="flight-hud__label">AOA</span><span class="flight-hud__unit">°</span></div>
-    <span class="flight-hud__value" data-value="aoa">  0.0</span>
+    <span class="flight-hud__value" data-value="aoa"> 0.0</span>
   `;
   const aoaHost = root.closest(".flight-hud")?.querySelector(".flight-hud__aoa") ?? container;
   aoaHost.appendChild(aoa);
@@ -47,6 +50,7 @@ export function createEvaluationInstruments(root: HTMLElement): EvaluationInstru
 
   let available: Record<"aoa" | "stallWarning" | "stickPusher", boolean> | null = null;
   let lastCas = "";
+  let lastAoaDeg: number | null = null;
 
   return {
     update(reader: FlightRecorderPropertyReader): void {
@@ -60,7 +64,9 @@ export function createEvaluationInstruments(root: HTMLElement): EvaluationInstru
         aoa.hidden = !available.aoa;
       }
       if (available.aoa) {
-        const text = reader.getPropertyValue(ALPHA).toFixed(1).padStart(5, " ");
+        lastAoaDeg = reader.getPropertyValue(ALPHA);
+        // Room for "12.3" and "-4.5"; only a deep negative stall is wider.
+        const text = lastAoaDeg.toFixed(1).padStart(4, " ");
         if (aoaText.data !== text) aoaText.data = text;
       }
 
@@ -73,6 +79,7 @@ export function createEvaluationInstruments(root: HTMLElement): EvaluationInstru
         cas.classList.toggle("is-active", next !== "");
       }
     },
+    aoaDeg: () => lastAoaDeg,
     destroy(): void {
       aoa.remove();
       container.remove();

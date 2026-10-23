@@ -52,7 +52,7 @@ vi.mock("foss-earth/runtime", () => ({
   RASTER_BASE_MAP_SOURCES: [], TERRAIN_SOURCES: [], resolveTerrainSource: vi.fn(), resolveRasterBaseMapSource: vi.fn(),
   resolveMapRuntimeConfig: () => ({}), applyRendererChoice: vi.fn(), setMapSourcePreference: vi.fn(), setTerrainSourcePreference: vi.fn(),
 }));
-vi.mock("./jsbsim/createJsbsimRuntime", () => ({ createJsbsimRuntime: async () => ({ sdk: { setPropertyValue: vi.fn(), getPropertyValue: vi.fn(() => 0) }, dispose: vi.fn() }) }));
+vi.mock("./jsbsim/createJsbsimRuntime", () => ({ createJsbsimRuntime: async () => ({ physicsHz: 60, sdk: { setPropertyValue: vi.fn(), getPropertyValue: vi.fn(() => 0) }, dispose: vi.fn() }) }));
 vi.mock("@0sfs/ground-contact/ecefBridge", () => ({ readFlightState: () => mocks.state }));
 vi.mock("./bridge/floatingOrigin", () => ({ createFloatingOrigin: () => ({ aircraftRoot: { setEnabled: vi.fn() }, apply: vi.fn(), dispose: vi.fn() }) }));
 vi.mock("./hud/flightCompass", () => ({ createFlightCompass: () => ({ update: vi.fn(), destroy: vi.fn() }) }));
@@ -64,12 +64,12 @@ vi.mock("@0sfs/sound/createTireAudio", () => ({ createTireAudio: () => mocks.tir
 vi.mock("@0sfs/aircraft/createAircraftModel", () => ({ createAircraftModel: () => mocks.aircraftModel }));
 vi.mock("@0sfs/aircraft/createAircraftLights", () => ({ createAircraftLights: () => ({ refresh: vi.fn(), dispose: vi.fn() }) }));
 vi.mock("@0sfs/aircraft/aircraftAnimation", () => ({ applyAircraftRig: vi.fn(), readControlSurfaceState: () => ({ gearDownNorm: 1 }) }));
-vi.mock("./physics/fixedStepLoop", () => ({ FIXED_DT: 1 / 120, createFixedStepPhysicsLoop: vi.fn(() => mocks.physics) }));
+vi.mock("./physics/fixedStepLoop", () => ({ createFixedStepPhysicsLoop: vi.fn(() => mocks.physics) }));
 vi.mock("@0sfs/ground-contact/terrainContact", () => ({ createTerrainContact: () => mocks.terrainContact }));
 vi.mock("@0sfs/ground-contact/visibleMeshCollision", () => ({ createVisibleMeshCollision: vi.fn(() => mocks.visibleMeshCollision) }));
-vi.mock("./hud/flightHud", () => ({ createFlightHud: () => ({ update: vi.fn(), destroy: vi.fn() }) }));
+vi.mock("./hud/flightHud", () => ({ createFlightHud: () => ({ update: vi.fn(), setLayout: vi.fn(), setReadingTints: vi.fn(), destroy: vi.fn() }) }));
 vi.mock("./jsbsim/resetFlightLocation", () => ({ resetFlightLocation: () => mocks.state }));
-vi.mock("./hud/createFlightHudBar", () => ({ createFlightHudBar: () => ({ update: vi.fn(), destroy: vi.fn() }) }));
+vi.mock("./hud/createFlightHudBar", () => ({ createFlightHudBar: () => ({ update: vi.fn(), setLayout: vi.fn(), destroy: vi.fn() }) }));
 
 import { resetAppSettings, SETTINGS_STORAGE_KEY } from "foss-earth/settings";
 import { createFlightSimApp } from "./createFlightSimApp";
@@ -103,7 +103,7 @@ async function mount() {
     const launcher = root.querySelector<HTMLButtonElement>('[aria-label="Open right panel"]')
       ?? root.querySelector<HTMLButtonElement>('.foss-earth-tab-strip [aria-label="Open new tab"]')!;
     await act(async () => launcher.click());
-    const item = Array.from(root.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')).find(button => button.textContent === label)!;
+    const item = Array.from(root.querySelectorAll<HTMLButtonElement>(".foss-earth-new-tab-choice")).find(button => button.textContent === label)!;
     await act(async () => item.click());
   };
   const choose = async (label: string, value: string) => {
@@ -111,7 +111,7 @@ async function mount() {
     await act(async () => { select.value = value; select.dispatchEvent(new Event("change", { bubbles: true })); });
   };
   const pause = () => act(async () => window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyP" })));
-  return { root, app, onStep: () => onStep(mocks.state as never), tick, openTab, choose, pause };
+  return { root, app, onStep: () => onStep(mocks.state as never, 1 / 60), tick, openTab, choose, pause };
 }
 
 it("queues wheel-model changes until pause, applies audio immediately, and restores them in a new flight", async () => {
@@ -141,7 +141,7 @@ it("queues wheel-model changes until pause, applies audio immediately, and resto
     expect(mocks.wheelSpin.reset).not.toHaveBeenCalled();
     await view.pause();
     view.onStep();
-    expect(mocks.wheelSpin.step).toHaveBeenLastCalledWith(1 / 120, "inertia");
+    expect(mocks.wheelSpin.step).toHaveBeenLastCalledWith(1 / 60, "inertia");
     expect(mocks.tireAudio.setEnabled).toHaveBeenLastCalledWith(true);
   } finally { await act(async () => view.app.destroy()); }
 
@@ -149,7 +149,7 @@ it("queues wheel-model changes until pause, applies audio immediately, and resto
   const second = await mount();
   try {
     second.onStep();
-    expect(mocks.wheelSpin.step).toHaveBeenLastCalledWith(1 / 120, "inertia");
+    expect(mocks.wheelSpin.step).toHaveBeenLastCalledWith(1 / 60, "inertia");
   } finally { await act(async () => second.app.destroy()); }
 });
 
@@ -160,7 +160,7 @@ it("keeps Debug experiment choices only through the explicit Ground handling act
     await view.openTab("Debug");
     await act(async () => view.root.querySelector<HTMLInputElement>('[role="radiogroup"][aria-label="Wheel spin experiment"] input[value="instant"]')!.click());
     view.onStep();
-    expect(mocks.wheelSpin.step).toHaveBeenLastCalledWith(1 / 120, "instant");
+    expect(mocks.wheelSpin.step).toHaveBeenLastCalledWith(1 / 60, "instant");
     expect(saved(storage)).not.toHaveProperty("osfs.ground.rotation");
     await view.openTab("Aircraft");
     const override = view.root.querySelector('[aria-label="Wheel experiment override"]')!;
