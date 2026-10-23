@@ -9,9 +9,11 @@ California, heading **000° true** at **110 kt** in the **Cessna 172**. Cruise
 starts 1,500 m above the initially prepared ground; low starts 150 m above it.
 The autopilot holds that fixed MSL altitude (initial ground plus clearance),
 heading and airspeed. A route-only outer altitude controller supplies pitch
-targets to the existing attitude autopilot. It pauses after exactly 21,600
-accepted 120 Hz physics steps (180 simulated seconds). Loading, terrain holds
-and pauses do not advance this clock; the wall duration may be longer.
+targets to the existing attitude autopilot. It pauses after 180 simulated
+seconds of accepted physics steps: 10,800 at the default 60 Hz, 21,600 at
+120 Hz. The result records the rate (`physicsHz`, `fixedDtSeconds`) and the
+Physics setting, so compare routes only at the same rate. Loading, terrain
+holds and pauses do not advance this clock; the wall duration may be longer.
 
 The start, aircraft, autopilot axes and initial throttle (0.65) are forced for
 the visit. Saved-flight resume and saving are disabled for this visit; stored
@@ -38,8 +40,10 @@ Run `node scripts/profile-flight.mjs --route=low --runs=webgpu-webgpu` for a
 headed 1280×720 CSS-pixel measurement at the display's pixel ratio. Repeat with
 `--route=cruise`. Each configuration gets a fresh profile in the output's
 gitignored `build/` tree, deleted on exit. The key is read only from
-`FOSS_EARTH_GOOGLE_KEY`, then that named variable in `.env.local` under
-`~/gh/foss-earth/app`, `~/gh/UMN-VR/tour`, or `~/gh/0sfs/fly`. It is inserted into
+`GOOGLE_3D_TILES_KEY`, with `FOSS_EARTH_GOOGLE_KEY` as a legacy fallback, then from
+those named variables in `.env.local` under `~/gh/foss-earth/app`, `~/gh/UMN-VR/tour`,
+or `~/gh/0sfs/fly`. Either environment name beats files; the new name beats the legacy
+name across files. It is inserted into
 local storage before app startup and excluded from output. `--headless` is an
 explicit diagnostic override; those results are labelled ineligible as a
 headed baseline. `--timeout=600` bounds the route's wall-clock wait.

@@ -17,11 +17,12 @@
  *    desktop opened at `localhost` gets the HTTPS LAN form rather than the plain
  *    HTTP one `vite.config.ts` injects.
  *
- * Plain `npm run dev -- --host` also serves the LAN and produces a working QR,
- * over HTTP. Use this when something needs a secure context — the screen wake
- * lock and the clipboard button are secure-only.
+ * `npm run dev -- --host` also serves the LAN over HTTPS through the shared
+ * dev plugin and produces a working QR. This launcher explicitly supplies
+ * the LAN certificate and invitation URL; the wake lock and clipboard need
+ * a secure context.
  *
- * Usage: npm run dev:lan  [-- --port 5173]
+ * Usage: npm run dev:lan  [-- --port 7470]
  *        npm run dev:lan -- --print   (show the address and command, start nothing)
  */
 import { spawnSync } from "node:child_process";
@@ -107,7 +108,7 @@ if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).
     console.error("No LAN address found. Connect this machine to Wi-Fi or Ethernet and try again.");
     process.exit(1);
   }
-  const port = argValue("port", "5173");
+  const port = argValue("port", "7470");
   const origin = `https://${found.address}:${port}/`;
   const created = ensureCertificate(found.address);
 

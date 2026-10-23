@@ -13,11 +13,42 @@ npm install
 npm run dev
 ```
 
-Open the URL Vite prints and add `/fly/` for the simulator or `/rc/` for the phone controller. For example, `http://127.0.0.1:5173/fly/`. The server's `/` goes to `/fly/`: the landing page is the website's, and its README shows how to build and preview the whole site.
+Open the URL Vite prints and add `/fly/` for the simulator or `/rc/` for the phone controller. For example, `https://127.0.0.1:7470/fly/`. The server's `/` goes to `/fly/`: the landing page is the website's, and its README shows how to build and preview the whole site.
 
-For a phone on the same network, use `npm run dev -- --host`. The server then uses HTTPS with a self-signed certificate. The browser warns once per address; in Chrome, tap Advanced, then Proceed. After that the page is secure and can use WebGPU. A plain `http://` network address can't. `FOSS_EARTH_DEV_HTTPS=off` keeps http.
+Development and preview default to port `7470` and stop if it is occupied. Use `-- --port <number>` to choose another port explicitly.
 
-To use Google Photorealistic 3D Tiles, add `?key=YOUR_GOOGLE_MAPS_API_KEY` once. The key is saved in the browser and removed from the URL. JSBSim comes from the tarball in `deps/`.
+[Local app ports](docs/development-ports.md) records all three apps' assignments,
+override commands, browser-storage implications and validation results.
+
+`npm run dev` listens on the network by default and prints a network URL and QR code to `/fly/`. The server uses HTTPS with a self-signed certificate. The browser warns once per address; in Chrome, tap Advanced, then Proceed. After that the page is secure and can use WebGPU. A plain `http://` network address can't. `FOSS_EARTH_DEV_HTTPS=off` keeps http.
+
+For local-only development use `npm run dev -- --host localhost`. HTTPS setup
+requires `openssl`; startup fails clearly if a certificate cannot be created.
+
+Use `npm run llm-dev` for automated checks, or `npm run dev -- --no-qr`,
+to omit QR art while keeping HTTPS and network links.
+The `--` passes the flag through npm. Other Vite options still work, for example
+`npm run llm-dev -- --port 9000`.
+
+Normal `npm run dev` also reads `GOOGLE_3D_TILES_KEY` from the environment or
+`.env.local` (this app first, then the linked FOSS Earth app). It appends
+`?gkey=YOUR_GOOGLE_MAPS_API_KEY` to the printed startup URLs and the QR code.
+Opening the link saves the key on that device and removes it from the address
+bar. Use `npm run dev -- --no-gkey` to omit the key (`--no-key` also works).
+`npm run llm-dev` omits both the key and QR output.
+
+Manual `?gkey=YOUR_GOOGLE_MAPS_API_KEY` links save a key on the device and remove
+it from the address bar. Existing `?key=` / `?googleKey=` links and saved keys
+still work; `gkey` takes precedence. Existing `FOSS_EARTH_GOOGLE_KEY` environment
+setups are accepted as a legacy fallback.
+
+QR codes appear automatically in interactive terminals and are omitted from
+captured output and CI logs. `FOSS_EARTH_DEV_QR=on npm run dev` forces a QR when
+output is redirected; `--no-qr` takes precedence. Agents stop their temporary
+servers after checking; to test a change yourself, run `npm run dev` in this
+repo in your own terminal.
+
+To use Google Photorealistic 3D Tiles, add `?gkey=YOUR_GOOGLE_MAPS_API_KEY` once. The key is saved in the browser and removed from the URL. JSBSim comes from the tarball in `deps/`.
 
 Open **+ → Browser data** to review clearing this site's saved settings, window layout and caches. **Keep API keys** starts checked. The phone controller has the same review. After two failed or stalled starts, the page offers that review before the app loads. Nothing is deleted until you confirm.
 
@@ -35,6 +66,14 @@ npm run build
 `npm run check:aircraft-ui` checks the aircraft picker at wide, narrow and short window sizes. `npm run check:aircraft-switch` runs the actual flight application, JSBSim and aircraft meshes in headless Chrome, checking switches, loading holds, failure recovery and saved selection. Both write reports and screenshots under ignored `build/` directories and require installed Chrome (`CHROME_BIN` can select its executable). The UI fixture alone does not validate aircraft activation.
 
 [Aircraft switching](docs/aircraft-switching.md) records the settings-reset cause, runtime ownership, UI decisions and validation scope for future changes.
+
+The [cockpit screen](docs/proposals/cockpit-screen.md) shows the flight's interface in the cockpit, and in a VR headset, which seats the pilot there. `npm run dev` gives a page opened with `?headsetEmulator=quest3` an emulated headset; [Testing as an agent](https://github.com/foss-earth/docs/blob/main/docs/agent-testing.md) has the rest.
+
+## Performance work
+
+The [performance handoff](docs/performance/2026-10-21/session-handoff.md) records
+the F-35 CPU fixes, measurements, validation, repository boundaries, retained
+evidence and independent implementation specifications.
 
 ## Community
 

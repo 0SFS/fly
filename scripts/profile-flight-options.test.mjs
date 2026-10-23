@@ -15,7 +15,8 @@ test("routes default to headed 180s; ordinary profiles keep existing defaults", 
 });
 
 test("key lookup reads only the named variable, preferring environment then agreed files", async () => {
-  assert.equal(await flightGoogleKey({ env: { FOSS_EARTH_GOOGLE_KEY: "env-key" }, read: () => assert.fail("should not read") }), "env-key");
+  assert.equal(await flightGoogleKey({ env: { GOOGLE_3D_TILES_KEY: " canonical-key ", FOSS_EARTH_GOOGLE_KEY: "legacy-key" }, read: () => assert.fail("should not read") }), "canonical-key");
+  assert.equal(await flightGoogleKey({ env: { GOOGLE_3D_TILES_KEY: " ", FOSS_EARTH_GOOGLE_KEY: "env-key" }, read: () => assert.fail("should not read") }), "env-key");
   const seen = [];
   const key = await flightGoogleKey({ env: { GOOGLE_MAPS_API_KEY: "ignored" }, files: ["first", "second"], read: async file => {
     seen.push(file);
@@ -25,9 +26,25 @@ test("key lookup reads only the named variable, preferring environment then agre
   assert.deepEqual(seen, ["first", "second"]);
 });
 
+test("canonical keys in agreed files take precedence over earlier legacy values", async () => {
+  const files = ["first", "second"];
+  const read = async file => file === "first"
+    ? 'GOOGLE_3D_TILES_KEY=" "\nFOSS_EARTH_GOOGLE_KEY=legacy-key\n'
+    : 'export GOOGLE_3D_TILES_KEY="canonical-key" # local\nFOSS_EARTH_GOOGLE_KEY=other-legacy-key\n';
+  assert.equal(await flightGoogleKey({ env: {}, files, read }), "canonical-key");
+  assert.equal(await flightGoogleKey({ env: { FOSS_EARTH_GOOGLE_KEY: "legacy-env" }, files, read }), "legacy-env");
+  assert.equal(await flightGoogleKey({ env: {}, files: ["first"], read }), "legacy-key");
+  assert.equal(await flightGoogleKey({ env: {}, files: ["first"], read: async () => "GOOGLE_3D_TILES_KEY=\nFOSS_EARTH_GOOGLE_KEY=legacy-key\n" }), "legacy-key");
+});
+
 test("report redaction covers nested URLs and exact key occurrences", () => {
   const safe = redactFlightProfile({ exceptions: ["https://tiles.test/?key=secret&session=token"], nested: { googleKey: "secret", text: "secret was omitted" } }, ["secret"]);
   assert.deepEqual(safe, { exceptions: ["https://tiles.test/?key=[redacted]&session=[redacted]"], nested: { googleKey: "[redacted]", text: "[redacted] was omitted" } });
+});
+
+test("report redaction removes gkey from nested URLs and objects without known secrets", () => {
+  const safe = redactFlightProfile({ urls: ["https://app.test/?gkey=private-url&key=legacy-private", "https://app.test/?GKEY=upper-private"], nested: { gkey: "private-object" } });
+  assert.deepEqual(safe, { urls: ["https://app.test/?gkey=[redacted]&key=[redacted]", "https://app.test/?GKEY=[redacted]"], nested: { gkey: "[redacted]" } });
 });
 
 test("profile output rejects paths outside build, ignored-state failures and symlink ancestors", async () => {

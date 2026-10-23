@@ -63,33 +63,40 @@ export function flightProfileOptions(argv) {
   };
 }
 
-/** Read only the agreed variable, never a legacy key file or another env name. */
+/** Prefer the Google 3D tiles variable, with the previous name as a fallback. */
 export async function flightGoogleKey({ env = process.env, files = [
   path.join(homedir(), "gh/foss-earth/app/.env.local"),
   path.join(homedir(), "gh/UMN-VR/tour/.env.local"),
   path.join(homedir(), "gh/0sfs/fly/.env.local"),
 ], read = readFile } = {}) {
+  if (env.GOOGLE_3D_TILES_KEY?.trim()) return env.GOOGLE_3D_TILES_KEY.trim();
   if (env.FOSS_EARTH_GOOGLE_KEY?.trim()) return env.FOSS_EARTH_GOOGLE_KEY.trim();
+  let legacy = null;
   for (const file of files) {
     let contents;
     try { contents = await read(file, "utf8"); } catch (error) { if (error.code === "ENOENT") continue; throw error; }
-    const line = /^\s*(?:export\s+)?FOSS_EARTH_GOOGLE_KEY\s*=\s*(.*?)\s*$/m.exec(contents)?.[1];
-    if (!line) continue;
-    const value = line.startsWith('"') || line.startsWith("'")
-      ? /^(["'])(.*?)\1(?:\s*#.*)?$/.exec(line)?.[2]
-      : line.replace(/\s+#.*$/, "").trim();
-    if (value) return value;
+    const valueFor = name => {
+      const line = new RegExp(`^[ \\t]*(?:export[ \\t]+)?${name}[ \\t]*=[ \\t]*(.*)$`, "m").exec(contents)?.[1]?.trim();
+      if (!line) return null;
+      const value = line.startsWith('"') || line.startsWith("'")
+        ? /^(["'])(.*?)\1(?:\s*#.*)?$/.exec(line)?.[2]
+        : line.replace(/\s+#.*$/, "").trim();
+      return value?.trim() || null;
+    };
+    const canonical = valueFor("GOOGLE_3D_TILES_KEY");
+    if (canonical) return canonical;
+    legacy ??= valueFor("FOSS_EARTH_GOOGLE_KEY");
   }
-  return null;
+  return legacy;
 }
 
 export function redactFlightProfile(value, secrets = []) {
   if (typeof value === "string") {
-    let safe = value.replace(/([?&](?:key|session)=)[^&#\s"']+/gi, "$1[redacted]");
+    let safe = value.replace(/([?&](?:gkey|key|session)=)[^&#\s"']+/gi, "$1[redacted]");
     for (const secret of secrets) if (secret) safe = safe.replaceAll(secret, "[redacted]");
     return safe;
   }
   if (Array.isArray(value)) return value.map(item => redactFlightProfile(item, secrets));
-  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, /^(?:key|session|googleKey)$/i.test(key) ? "[redacted]" : redactFlightProfile(item, secrets)]));
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, /^(?:gkey|key|session|googleKey)$/i.test(key) ? "[redacted]" : redactFlightProfile(item, secrets)]));
   return value;
 }

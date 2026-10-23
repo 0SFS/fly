@@ -4,7 +4,7 @@ import { execSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { defaultClientConditions, defaultServerConditions, type Plugin } from 'vite'
-import { babylonBarrels, babylonShaderChunks, builtFrom, crossOriginIsolation, deployedIsolation, localSource, networkHttps } from 'foss-earth/vite'
+import { babylonBarrels, babylonShaderChunks, builtFrom, crossOriginIsolation, deployedIsolation, headsetEmulator, localSource, networkHttps } from 'foss-earth/vite'
 import { appFiles, bootTerminal, browserRecovery } from '@foss-earth/ui/vite'
 import { findLanAddress } from './scripts/dev-lan.mjs'
 import { linkPackPublicFiles } from './scripts/link-packs.mjs'
@@ -176,14 +176,17 @@ function linkedPackageTests(): string[] {
 export default defineConfig({
   base,
   server: {
+    port: 7470,
+    strictPort: true,
     fs: { allow: ['.', '..', '../../foss-earth', '../../Felipegalind0/gamepad-tools'] },
     // `scripts/dev-lan.mjs` supplies these so a phone gets a secure context on
     // the LAN; `crypto.randomUUID` and the wake lock need one. Plain `npm run
-    // dev` leaves them unset and stays on HTTP.
+    // dev` uses the shared networkHttps certificate instead.
     ...(process.env.DEV_TLS_CERT && process.env.DEV_TLS_KEY
       ? { https: { cert: readFileSync(process.env.DEV_TLS_CERT), key: readFileSync(process.env.DEV_TLS_KEY) } }
       : {}),
   },
+  preview: { port: 7470, strictPort: true },
   resolve: {
     dedupe: ['@babylonjs/core', '@babylonjs/loaders', '3d-tiles-renderer', 'react', 'react-dom'],
     // FOSS Earth is linked from its checkout beside this organization's and used from
@@ -212,8 +215,8 @@ export default defineConfig({
   plugins: [
     // Off unless FOSS_EARTH_ISOLATION asks: a threaded WebAssembly core needs an isolated page.
     crossOriginIsolation(),
-    // https when --host lets a phone reach the server: only a secure page there shares memory or uses WebGPU.
-    networkHttps(),
+    // Dev defaults to LAN HTTPS and prints a QR for the flight page.
+    networkHttps({ path: "/fly/" }),
     // GitHub Pages sends no such headers, so in a build a service worker adds them, and each page, /fly/ and /rc/
     // copied with it, starts with the script that asks for it (FOSS Earth's docs/docs/proposals/webassembly.md,
     // step 3). The worker keeps none of the flight's files. FOSS_EARTH_ISOLATION=report-only or off at build time
@@ -227,6 +230,8 @@ export default defineConfig({
     { name: 'osfs-link-packs', config: () => { linkPackPublicFiles(import.meta.dirname) } },
     dropLinkList(),
     react(), copyIndexToPagesPaths(), lanOriginPlugin(), builtFrom({ describe: jsbsimBuild }), babylonBarrels(), babylonShaderChunks(),
+    // npm run dev only: a page opened with ?headsetEmulator=quest3 gets an emulated VR headset (FOSS Earth's docs/agent-testing.md).
+    headsetEmulator(),
   ],
   test: {
     maxWorkers: '50%',

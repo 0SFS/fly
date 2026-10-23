@@ -47,7 +47,7 @@ const runNames = arg("runs", Object.keys(RUNS).join(",")).split(",");
 for (const name of runNames) if (!RUNS[name]) throw new Error(`Unknown run ${name}; choose from ${Object.keys(RUNS).join(", ")}`);
 if (new Set(runNames).size !== runNames.length) throw new Error("Run configurations must be unique.");
 const googleKey = route && !buildOnly ? await flightGoogleKey() : null;
-if (route && !buildOnly && !googleKey) throw new Error("A W0 route needs FOSS_EARTH_GOOGLE_KEY in the environment or an agreed .env.local file (see docs/benchmark-routes.md).");
+if (route && !buildOnly && !googleKey) throw new Error("A W0 route needs GOOGLE_3D_TILES_KEY in the environment or an agreed .env.local file (legacy FOSS_EARTH_GOOGLE_KEY is accepted; see docs/benchmark-routes.md).");
 const safe = value => redactFlightProfile(value, [googleKey]);
 
 const dist = path.join(out, "dist");

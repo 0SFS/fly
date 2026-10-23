@@ -66,13 +66,13 @@ site's landing page is the website's, in
 site.
 
 ```text
-http://127.0.0.1:5173/fly/?mapSource=osm-standard
+http://127.0.0.1:7470/fly/?mapSource=osm-standard
 ```
 
 To use Google Photorealistic 3D Tiles, pass your own key once, or paste it in Map → Source:
 
 ```text
-http://127.0.0.1:5173/fly/?key=YOUR_GOOGLE_MAPS_API_KEY
+http://127.0.0.1:7470/fly/?key=YOUR_GOOGLE_MAPS_API_KEY
 ```
 
 FOSS Earth's settings registry saves the key in this origin's local storage and removes it from the
@@ -80,8 +80,14 @@ address bar, so later visits need no `?key=` and copied links do not carry it. T
 elevation provider chosen in the Map tab are written back to the URL as `mapSource` and
 `elevationSource`.
 
-Vite may choose a different port when `5173` is occupied. `/rc/` loads the phone controller route
-on its own. `?mode=flight` redirects to `/fly/` and `?mode=remote` redirects to `/rc/`, keeping other
+Development and preview use port `7470` and stop if it is occupied. Override it explicitly with
+`npm run dev -- --port <number>` or `npm run preview -- --port <number>`. Dev and preview
+share the default port, so give one an override to run both together. UMN Tour uses `8660`
+and FOSS Earth uses `3600`; [Local app ports](development-ports.md) records the full decision
+and verification. Browser settings and keys saved at an old port remain on that old origin.
+
+`/rc/` loads the phone controller route on its own. `?mode=flight` redirects to `/fly/`
+and `?mode=remote` redirects to `/rc/`, keeping other
 query parameters and the invitation hash. `?mode=globe` leaves 0SFS and opens
 [foss-earth.github.io](https://foss-earth.github.io/), the standalone globe.
 
@@ -162,14 +168,16 @@ way, including holding and dragging them.
 
 ```sh
 npm run dev:lan          # HTTPS on this machine's LAN address
-npm run dev -- --host    # plain HTTP on the LAN, no certificate
+npm run dev -- --host    # HTTPS on the LAN through the shared dev plugin
 ```
 
 Either one serves the site to other devices on the network, and the phone-controller QR then points
 at this machine instead of the deployed site — so pairing can be tested without deploying.
+Both default to port `7470`. For `npm run dev -- --host`, `FOSS_EARTH_DEV_HTTPS=off`
+keeps plain HTTP, which does not provide the phone's secure context.
 
 `dev:lan` adds a self-signed certificate for the LAN address and `localhost`, and listens on both:
-open `https://localhost:5173/fly/` on the computer, and the QR still sends the phone to the LAN
+open `https://localhost:7470/fly/` on the computer, and the QR still sends the phone to the LAN
 address. That matters when something needs a secure context: the screen wake lock and the clipboard
 button are secure-only and silently do nothing over plain HTTP, and the phone controller's QR scanner
 cannot open the camera without one. Flight control itself does not need one. The certificate is

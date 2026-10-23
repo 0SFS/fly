@@ -10,7 +10,8 @@
     "url": "https://github.com/0SFS/fly.git"
   },
   "scripts": {
-    "dev": "vite --configLoader native",
+    "dev": "node scripts/dev.mjs",
+    "llm-dev": "node scripts/dev.mjs --no-qr --no-gkey",
     "dev:lan": "node scripts/dev-lan.mjs",
     "build": "npm run verify:jsbsim && npm run verify:audio && npm run verify:exhaust && npm run verify:engine-assets && npm run typecheck && vite build --configLoader native && node scripts/verify-jsbsim-artifact.mjs --dist=dist && node ../sound/scripts/verify-audio-artifact.mjs --dist=dist",
     "build:audio": "node ../sound/scripts/build-audio-wasm.mjs",
