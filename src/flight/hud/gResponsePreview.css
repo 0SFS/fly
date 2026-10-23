@@ -1,0 +1,83 @@
+/* G-forces → Pilot: the response preview, in the flight panel's colours. */
+
+.flight-g-preview {
+  display: grid;
+  gap: 6px;
+  --flight-g-preview-load: var(--flight-panel-text);
+  --flight-g-preview-peripheral: #8d999c;
+  --flight-g-preview-central: var(--flight-panel-accent);
+  --flight-g-preview-redout: #e06b5f;
+  --flight-g-preview-loc: #e8a0a0;
+  --flight-g-preview-awake: #8fd19e;
+}
+
+.flight-g-preview__chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.flight-g-preview__chart polyline {
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.flight-g-preview__rule {
+  stroke: var(--flight-panel-line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.flight-g-preview__axis {
+  fill: var(--flight-panel-muted);
+  font-size: 9px;
+}
+
+.flight-g-preview__load { stroke: var(--flight-g-preview-load); }
+.flight-g-preview__peripheral { stroke: var(--flight-g-preview-peripheral); stroke-dasharray: 4 2; }
+.flight-g-preview__central { stroke: var(--flight-g-preview-central); }
+.flight-g-preview__redout { stroke: var(--flight-g-preview-redout); }
+
+.flight-g-preview__loc line,
+.flight-g-preview__awake line {
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.flight-g-preview__loc line { stroke: var(--flight-g-preview-loc); }
+.flight-g-preview__awake line { stroke: var(--flight-g-preview-awake); }
+
+.flight-g-preview__loc text,
+.flight-g-preview__awake text {
+  font-size: 9px;
+}
+
+.flight-g-preview__loc text { fill: var(--flight-g-preview-loc); }
+.flight-g-preview__awake text { fill: var(--flight-g-preview-awake); }
+
+.flight-g-preview__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  color: var(--flight-panel-muted);
+  font-size: 11px;
+}
+
+.flight-g-preview__key::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  margin-right: 5px;
+  vertical-align: middle;
+  border-top: 2px solid currentColor;
+}
+
+.flight-g-preview__key--load::before { border-top-color: var(--flight-g-preview-load); }
+.flight-g-preview__key--peripheral::before { border-top: 2px dashed var(--flight-g-preview-peripheral); }
+.flight-g-preview__key--central::before { border-top-color: var(--flight-g-preview-central); }
+.flight-g-preview__key--redout::before { border-top-color: var(--flight-g-preview-redout); }

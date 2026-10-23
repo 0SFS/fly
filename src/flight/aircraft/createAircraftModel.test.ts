@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { AssetContainer, LoadAssetContainerAsync, Matrix, Mesh, MeshBuilder, NullEngine, PointLight, Quaternion, Scene, TransformNode, Vector3, type AbstractMesh, type ISceneLoaderProgressEvent } from "@babylonjs/core";
+import { AssetContainer, LoadAssetContainerAsync, Matrix, Mesh, MeshBuilder, NullEngine, PBRMaterial, PointLight, Quaternion, Scene, TransformNode, Vector3, type AbstractMesh, type ISceneLoaderProgressEvent } from "@babylonjs/core";
 import { describe, expect, it, vi } from "vitest";
 import { createAircraftModel, type AircraftModelState } from "@0sfs/aircraft/createAircraftModel";
 import { getFdmProfile } from "../jsbsim/fdmProfiles";
@@ -409,6 +409,50 @@ describe("aircraft model loader", () => {
     expect(gear.every(mesh => mesh.isVisible === renderStowedGear)).toBe(true);
     expect(requestRender).toHaveBeenCalledOnce();
     model.dispose();
+    t.teardown();
+  });
+
+  it("draws the F-35B canopy at the window tint's part of its authored opacity, before reveal and live", async () => {
+    const t = setup();
+    const bytes = readFileSync("public/aircraft/f-35b/F-35B_AF267-airframe.glb");
+    const gltf = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12)).toString()) as {
+      materials: { name: string; alphaMode?: string; pbrMetallicRoughness: { baseColorFactor: number[] } }[];
+    };
+    const authored = gltf.materials.find(material => material.name === "window")!;
+    expect(authored.alphaMode).toBe("BLEND");
+    const glass = new PBRMaterial("window", t.scene);
+    glass.alpha = authored.pbrMetallicRoughness.baseColorFactor[3];
+    expect(glass.alpha).toBe(0.5);
+    t.scene.removeMaterial(glass);
+    const gate = readinessGate();
+    const requestRender = vi.fn();
+    const model = createAircraftModel(t.scene, t.parent, {
+      aircraftId: "f-35b", lodId: "hd", windowTint: 0.25, whenReady: gate.whenReady, requestRender,
+      loadContainer: async (url, scene) => {
+        if (url.includes("/engine/")) return loadEngineFixture(url, scene);
+        const container = new AssetContainer(scene);
+        container.materials.push(glass);
+        return container;
+      },
+    });
+    await vi.waitFor(() => expect(gate.waits).toHaveLength(1));
+    expect(glass.alpha).toBe(0.125);
+    model.setWindowTint(0.5);
+    expect(requestRender).not.toHaveBeenCalled(); // Nothing is shown yet.
+    gate.releaseLast();
+    await vi.waitFor(() => expect(model.getState().status).toBe("ready"));
+    expect(glass.alpha).toBe(0.25);
+    requestRender.mockClear();
+    model.setWindowTint(0.5);
+    expect(requestRender).not.toHaveBeenCalled();
+    model.setWindowTint(2);
+    expect(glass.alpha).toBe(0.5);
+    expect(requestRender).toHaveBeenCalledOnce();
+    model.setWindowTint(0);
+    expect(glass.alpha).toBe(0);
+    model.dispose();
+    model.setWindowTint(1);
+    expect(requestRender).toHaveBeenCalledTimes(2);
     t.teardown();
   });
 

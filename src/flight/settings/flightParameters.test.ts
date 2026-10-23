@@ -6,6 +6,7 @@ import { createSettingsRegistry, getAppSettings, resetAppSettings, SETTINGS_STOR
 import { aircraftSelectionValues, readAircraftSelection } from "@0sfs/aircraft/aircraftSelectionSetting";
 import { FLIGHT_SECTION_TITLES, flightParameterDefaults, OSFS_PARAMETERS } from "./flightParameters";
 import { FLIGHT_PRESETS } from "./flightPresets";
+import { DEFAULT_PHYSICS_HZ, PHYSICS_RATE_PARAMETER_ID, readPhysicsHz } from "../physics/physicsRate";
 import { parameterSourceFile, registerFlightSettings } from "./registerFlightSettings";
 
 afterEach(() => { vi.unstubAllGlobals(); resetAppSettings(); });
@@ -226,5 +227,45 @@ describe("flight parameter catalogue", () => {
     const reloaded = createSettingsRegistry({ storage });
     reloaded.register(OSFS_PARAMETERS);
     expect(reloaded.get(id)).toBe(10);
+  });
+
+  it("steps physics at 60 Hz unless 30 or 120 Hz was saved, and never upgrades to 120 Hz on its own", () => {
+    const saved = new Map<string, string>();
+    const storage = { getItem: (key: string) => saved.get(key) ?? null,
+      setItem: (key: string, value: string) => { saved.set(key, value); } };
+    const boot = () => {
+      const registry = createSettingsRegistry({ storage });
+      registry.register(OSFS_PARAMETERS);
+      return registry;
+    };
+    const settings = boot();
+    const id = PHYSICS_RATE_PARAMETER_ID;
+    // "Physics [30 / 60 / 120 Hz] ?" in Aircraft → Start, for the next flight.
+    expect(settings.inspect(id).spec).toMatchObject({ label: "Physics", unit: "Hz", kind: "choice", default: "60",
+      home: { tab: "aircraft", section: "start" }, appliesLive: false, persistDefault: true });
+    expect(settings.inspect(id).spec.auto).toBeUndefined();
+    expect(settings.inspect(id).choices.map(choice => [choice.id, choice.shortLabel, choice.label]))
+      .toEqual([["30", "30", "30 Hz"], ["60", "60", "60 Hz"], ["120", "120 Hz", "120 Hz"]]);
+    expect(settings.get(id)).toBe("60");
+    expect(readPhysicsHz(settings)).toBe(DEFAULT_PHYSICS_HZ);
+    expect(settings.set(id, "90").ok).toBe(false);
+    expect(settings.set(id, 120 as never).ok).toBe(false);
+
+    expect(settings.set(id, "120").ok).toBe(true);
+    expect(readPhysicsHz(boot())).toBe(120);
+    expect(settings.set(id, "30").ok).toBe(true);
+    expect(readPhysicsHz(boot())).toBe(30);
+    // An explicit 60 stays saved, so a later default cannot move it.
+    expect(settings.set(id, "60").ok).toBe(true);
+    expect(JSON.parse(saved.get(SETTINGS_STORAGE_KEY)!).values[id]).toBe("60");
+
+    // A saved value the app cannot take falls back to 60 Hz, never 120.
+    saved.set(SETTINGS_STORAGE_KEY, JSON.stringify({ version: 1, values: { [id]: "240" } }));
+    expect(readPhysicsHz(boot())).toBe(60);
+
+    // No preset chooses 120 Hz.
+    const app = getAppSettings();
+    registerFlightSettings(app);
+    for (const preset of app.listPresets()) expect(preset.values[id], preset.id).not.toBe("120");
   });
 });

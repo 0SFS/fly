@@ -1,7 +1,7 @@
 import "foss-earth/windowing.css";
 
 import type { FlightSectionFactory } from "../earthUiHost";
-import { ChoiceTrack, createHelpTooltip, createParameterControl, createParameterSection, HelpTip, IconButton, MeshInspectorPanel, WindowOverlay, type PanelSection, type WindowOverlayHandle } from "foss-earth/shell";
+import { ChoiceTrack, createHelpTooltip, createParameterControl, createParameterSection, HelpTip, IconButton, MeshInspectorPanel, ParameterSettings, Resettable, WindowOverlay, type PanelSection, type WindowOverlayHandle } from "foss-earth/shell";
 import type { MeshInspectorHandle } from "foss-earth/diagnosticDrawing";
 import type { SettingsRegistry } from "foss-earth/settings";
 import {
@@ -65,6 +65,7 @@ import { FuelPanel, type FuelPanelState } from "@0sfs/fuel/FuelPanel";
 import { SoundSettingsPanel, type SoundAction } from "@0sfs/sound/SoundSettingsPanel";
 import { AUDIO_PARAMETER_IDS } from "@0sfs/sound/audioSettings";
 import { FrameBudgetPanel } from "./FrameBudgetPanel";
+import { GResponsePreview, GVisionHint, PassOutHint } from "./GResponsePreview";
 import { RemoteControlTab, type MountPhonePairing } from "@0sfs/rc/RemoteControlTab";
 import { PhoneCameraTuningPanel } from "@0sfs/rc/PhoneCameraTuningPanel";
 import { LoggingPanel, type LoggingAction, type LoggingPanelState } from "@0sfs/logging/LoggingPanel";
@@ -146,7 +147,7 @@ export interface FlightControlPanelSnapshot {
 }
 
 /** Every tab the panel can show: the flight's own, and the shared globe tabs. */
-export type FlightOverlayTab = "location" | "map" | "renderer" | "sky" | "time" | "bug-report" | "browser-data" | FlightPanelTab;
+export type FlightOverlayTab = "location" | "map" | "renderer" | "sky" | "time" | "vr" | "bug-report" | "test-feedback" | "browser-data" | FlightPanelTab;
 
 export interface FlightControlPanelOptions {
   /** The app's settings registry, whose sections the tabs draw. */
@@ -169,12 +170,15 @@ export interface FlightControlPanelOptions {
   settingsSections: readonly PanelSection[];
   /** The shared Native tab: the startup native selection and what each converted core ran. */
   nativeSections?: readonly PanelSection[];
+  /** The shared VR tab, from `createHeadsetPanel`: entering a headset session, and its controls. */
+  headsetTab?: HTMLElement;
   /** The shared About tab, from `createAboutPanel`: which version runs, and what it is built from. */
   aboutTab?: HTMLElement;
   /** Clears this website's saved browser state, preserving API keys by default. */
   browserDataTab?: HTMLElement;
   /** The shared Bug report tab, separate from the activity-trail settings. */
   bugReportTab?: HTMLElement;
+  testFeedbackTab?: HTMLElement;
   onBugReportShow?(): void;
   /** The shared Interface tab: the log and place search. */
   interfaceSections: readonly PanelSection[];
@@ -308,17 +312,20 @@ function EngineDetailsHost({ attach, children }: {
   return <>{createPortal(children, settingsContent)}<div className="flight-engine-host" ref={ref} /></>;
 }
 
-/** `Label [switch]`: the shared switch, label first, with the native checkbox inside. */
-function Switch({ label, accessibleLabel, checked, disabled, onChange }: {
-  label: string; accessibleLabel: string; checked: boolean; disabled?: boolean; onChange(checked: boolean): void;
+/** `Label [switch]`: the shared switch, label first, with the native checkbox inside, and a reset on it while it is not `defaultChecked`. */
+function Switch({ label, accessibleLabel, checked, defaultChecked, disabled, onChange }: {
+  label: string; accessibleLabel: string; checked: boolean; defaultChecked: boolean; disabled?: boolean; onChange(checked: boolean): void;
 }) {
   return <label className="flight-panel__switch">
     <span>{label}</span>
-    <span className="foss-earth-choice foss-earth-switch">
-      <input type="checkbox" aria-label={accessibleLabel} checked={checked} disabled={disabled}
-        onChange={event => onChange(event.target.checked)} />
-      <span className="foss-earth-switch__knob" aria-hidden="true" />
-    </span>
+    <Resettable changed={!disabled && checked !== defaultChecked} label={`Reset ${accessibleLabel} to the default: ${defaultChecked ? "on" : "off"}`}
+      onReset={() => onChange(defaultChecked)}>
+      <span className="foss-earth-choice foss-earth-switch">
+        <input type="checkbox" aria-label={accessibleLabel} checked={checked} disabled={disabled}
+          onChange={event => onChange(event.target.checked)} />
+        <span className="foss-earth-switch__knob" aria-hidden="true" />
+      </span>
+    </Resettable>
   </label>;
 }
 
@@ -330,6 +337,9 @@ function Metric({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+/** Calm, as a flight without a saved one starts. */
+const DEFAULT_WEATHER: FlightWeatherState = { windDirectionDeg: 0, windSpeedKts: 0 };
 
 function WeatherPanel({
   initialWeather,
@@ -347,23 +357,31 @@ function WeatherPanel({
     <div className="flight-panel__content">
       <label className="flight-panel__field">
         <span>Wind direction <output>{weather.windDirectionDeg.toFixed(0)}°</output></span>
-        <input
-          type="range"
-          min="0"
-          max="359"
-          value={weather.windDirectionDeg}
-          onChange={(event) => updateWeather({ windDirectionDeg: Number(event.target.value) })}
-        />
+        <Resettable changed={weather.windDirectionDeg !== DEFAULT_WEATHER.windDirectionDeg}
+          label={`Reset Wind direction to the default: ${DEFAULT_WEATHER.windDirectionDeg}°`}
+          onReset={() => updateWeather({ windDirectionDeg: DEFAULT_WEATHER.windDirectionDeg })}>
+          <input
+            type="range"
+            min="0"
+            max="359"
+            value={weather.windDirectionDeg}
+            onChange={(event) => updateWeather({ windDirectionDeg: Number(event.target.value) })}
+          />
+        </Resettable>
       </label>
       <label className="flight-panel__field">
         <span>Wind speed <output>{weather.windSpeedKts.toFixed(0)} kt</output></span>
-        <input
-          type="range"
-          min="0"
-          max="50"
-          value={weather.windSpeedKts}
-          onChange={(event) => updateWeather({ windSpeedKts: Number(event.target.value) })}
-        />
+        <Resettable changed={weather.windSpeedKts !== DEFAULT_WEATHER.windSpeedKts}
+          label={`Reset Wind speed to the default: ${DEFAULT_WEATHER.windSpeedKts} kt`}
+          onReset={() => updateWeather({ windSpeedKts: DEFAULT_WEATHER.windSpeedKts })}>
+          <input
+            type="range"
+            min="0"
+            max="50"
+            value={weather.windSpeedKts}
+            onChange={(event) => updateWeather({ windSpeedKts: Number(event.target.value) })}
+          />
+        </Resettable>
       </label>
       <button className="flight-panel__command" type="button" aria-label="Calm: clear the wind" title="Clear the wind"
         onClick={() => updateWeather({ windDirectionDeg: 0, windSpeedKts: 0 })}>
@@ -446,7 +464,7 @@ function AircraftPanel({
       <div className="flight-panel__aircraft-edit" hidden={switchMode}>
         <ParameterSection settings={settings} tab="aircraft" section="camera">
           {/* "View [Cockpit / Chase] ?" */}
-          <ChoiceTrack heading="View" value={snapshot.viewMode} onChange={mode => onViewModeChange(mode as FlightViewMode)}
+          <ChoiceTrack heading="View" value={snapshot.viewMode} defaultValue="third" onChange={mode => onViewModeChange(mode as FlightViewMode)}
             choices={[{ id: "first", label: "Cockpit" }, { id: "third", label: "Chase" }]}
             help="Cockpit shows the view from the pilot's seat. Chase follows the aircraft from outside." />
         </ParameterSection>
@@ -658,7 +676,7 @@ function DebugPanel({ snapshot, settings, onCollisionDebugChange, onWheelSpinMod
         <legend>Collision geometry</legend>
         {/* "Show [switch] ?" */}
         <div className="flight-panel__row">
-          <Switch label="Show" accessibleLabel="Show aircraft collision geometry" checked={snapshot.collisionDebugEnabled}
+          <Switch label="Show" accessibleLabel="Show aircraft collision geometry" checked={snapshot.collisionDebugEnabled} defaultChecked={false}
             onChange={onCollisionDebugChange} />
           <HelpTip label="Explain collision geometry">
             <p>Visible through the aircraft in either camera view. Off by default; resets when the game reloads.</p>
@@ -681,7 +699,7 @@ function DebugPanel({ snapshot, settings, onCollisionDebugChange, onWheelSpinMod
         <legend>Wheel spin experiment</legend>
         {/* "[Off / A / B] ?  Tire sound [switch]" */}
         <div className="flight-panel__row">
-          <ChoiceTrack heading="Wheel spin experiment" hideHeading value={snapshot.wheelSpinMode}
+          <ChoiceTrack heading="Wheel spin experiment" hideHeading value={snapshot.wheelSpinMode} defaultValue="off"
             onChange={mode => onWheelSpinModeChange(mode as WheelSpinMode | "off")}
             choices={[
               { id: "off", label: "Off" },
@@ -701,7 +719,7 @@ function DebugPanel({ snapshot, settings, onCollisionDebugChange, onWheelSpinMod
                 Spin-up sound fades as the tread matches ground speed.
               </p>
             </>} />
-          <Switch label="Tire sound" accessibleLabel="Enable tire sound" checked={snapshot.tireSoundEnabled}
+          <Switch label="Tire sound" accessibleLabel="Enable tire sound" checked={snapshot.tireSoundEnabled} defaultChecked={false}
             disabled={snapshot.wheelSpinMode === "off"} onChange={onTireSoundChange} />
         </div>
         {snapshot.tireAudioStatus && <p className="flight-panel__hint" role="status">{snapshot.tireAudioStatus}</p>}
@@ -755,7 +773,8 @@ export function FlightControlPanel(props: FlightControlPanelProps) {
   };
 
   return (
-    <SectionFactory.Provider value={props.createSection ?? createParameterSection}>
+    // Hand-drawn controls of registry parameters reset against the registry ParameterSettings provides.
+    <SectionFactory.Provider value={props.createSection ?? createParameterSection}><ParameterSettings.Provider value={props.settings}>
       <WindowOverlay<FlightPanelTab>
         overlayApiRef={props.overlayApiRef}
         mapTab={props.mapTab}
@@ -765,9 +784,11 @@ export function FlightControlPanel(props: FlightControlPanelProps) {
         settingsSections={props.settingsSections}
         nativeSections={props.nativeSections}
         interfaceSections={props.interfaceSections}
+        headsetTab={props.headsetTab}
         aboutTab={props.aboutTab}
         browserDataTab={props.browserDataTab}
         bugReportTab={props.bugReportTab}
+        testFeedbackTab={props.testFeedbackTab}
         onBugReportShow={props.onBugReportShow}
         getViewState={() => props.snapshot.flightState}
         setViewState={props.onLocationApply}
@@ -863,19 +884,14 @@ export function FlightControlPanel(props: FlightControlPanelProps) {
                 </EngineDetailsHost>
                 : tabId === "gforces" ? <div className="flight-panel__content">
                   <ParameterSection settings={props.settings} tab="gforces" section="indicator" />
+                  <ParameterSection settings={props.settings} tab="gforces" section="pilot" afterControls>
+                    <GResponsePreview parameters={props.parameters} />
+                  </ParameterSection>
                   <ParameterSection settings={props.settings} tab="gforces" section="vision">
-                    <p className="flight-panel__hint">
-                      A load that stays on takes the pilot's sight: black from the edges inward in a pull, red in a push.
-                      Each vignette starts at one end of its range and covers the view at the other, and follows the load
-                      over the onset and recovery times. The aircraft flies the same.
-                    </p>
+                    <GVisionHint parameters={props.parameters} />
                   </ParameterSection>
                   <ParameterSection settings={props.settings} tab="gforces" section="pass-out">
-                    <p className="flight-panel__hint">
-                      A pilot whose sight goes completely black loses consciousness: a load at or above the top of the
-                      blackout range, held for about three onset times. While out, the screen is black in every view and the
-                      stick, pedals and brakes are let go. Each time out is drawn at random around the mean.
-                    </p>
+                    <PassOutHint parameters={props.parameters} />
                   </ParameterSection>
                 </div>
                 : tabId === "logging" ? <LoggingPanel state={props.snapshot.logging} onAction={props.onLoggingAction} />
@@ -884,6 +900,6 @@ export function FlightControlPanel(props: FlightControlPanelProps) {
           </>;
         }}
       />
-    </SectionFactory.Provider>
+    </ParameterSettings.Provider></SectionFactory.Provider>
   );
 }

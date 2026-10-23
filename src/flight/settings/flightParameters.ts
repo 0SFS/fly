@@ -50,22 +50,26 @@ const MAP_DETAIL = { tab: "map", section: "detail" } as const;
 const MODEL = { tab: "aircraft", section: "model" } as const;
 const MESH_INSPECTOR = { tab: "aircraft", section: "mesh-inspector" } as const;
 const INSTRUMENTS = { tab: "renderer", section: "instruments" } as const;
+const HUD = { tab: "interface", section: "hud" } as const;
 const EXHAUST = { tab: "exhaust", section: "gas" } as const;
 const EXHAUST_SMOKE = { tab: "exhaust", section: "smoke" } as const;
 const EXTERNAL_TANKS = { tab: "renderer", section: "external-tanks" } as const;
 const FORCES = { tab: "debug", section: "forces" } as const;
 const CAMERA = { tab: "aircraft", section: "camera" } as const;
+const COCKPIT_SCREEN = { tab: "aircraft", section: "cockpit-screen" } as const;
 const START = { tab: "aircraft", section: "start" } as const;
 const ENGINE_TEST = { tab: "engine", section: "test" } as const;
 const ENGINE_SIMULATION = { tab: "engine", section: "simulation" } as const;
 const GROUND = { tab: "aircraft", section: "ground" } as const;
 const G_INDICATOR = { tab: "gforces", section: "indicator" } as const;
+const G_PILOT = { tab: "gforces", section: "pilot" } as const;
 const G_VISION = { tab: "gforces", section: "vision" } as const;
 const G_PASS_OUT = { tab: "gforces", section: "pass-out" } as const;
 
 /** Section titles for the sections 0sfs adds, by tab and section id. */
 export const FLIGHT_SECTION_TITLES: readonly (readonly [tab: string, section: string, title: string])[] = [
   ["renderer", "instruments", "Instruments"],
+  ["interface", "hud", "Flight instruments"],
   ["exhaust", "gas", "Gas and luminance"],
   ["exhaust", "smoke", "Smoke"],
   ...SOUND_SECTION_TITLES_1,
@@ -73,6 +77,7 @@ export const FLIGHT_SECTION_TITLES: readonly (readonly [tab: string, section: st
   ["aircraft", "model", "Aircraft"],
   ["aircraft", "mesh-inspector", "Mesh inspector"],
   ["aircraft", "camera", "Camera"],
+  ["aircraft", "cockpit-screen", "Cockpit screen"],
   ["aircraft", "start", "Start"],
   ...REMOTE_CONTROL_SECTION_TITLES,
   ...SOUND_SECTION_TITLES_2,
@@ -83,6 +88,7 @@ export const FLIGHT_SECTION_TITLES: readonly (readonly [tab: string, section: st
   ["aircraft", "ground", "Ground handling"],
   ...AIRCRAFT_SECTION_TITLES_1,
   ["gforces", "indicator", "Indicator"],
+  ["gforces", "pilot", "Pilot"],
   ["gforces", "vision", "Vision"],
   ["gforces", "pass-out", "Passing out"],
   ...AUTOPILOT_SECTION_TITLES,
@@ -294,6 +300,52 @@ export const OSFS_PARAMETERS = [
     defaultReason: "The load is what the wings and the pilot are being asked to bear, and nothing else on the HUD shows it.",
     home: main(G_INDICATOR), appliesLive: true, source: "g-forces/src/gMeter.ts",
   },
+  // "Response [Curve / Exposure / Perfusion] ?". The model is the flight's:
+  // the three keep different states, so a change waits for the next flight.
+  {
+    id: "osfs.gForce.response",
+    label: "Response",
+    description: "How the pilot's sight and consciousness follow the load. Curve follows the load alone, after a lag; Exposure and Perfusion also remember the loads before it, so a pull soon after another costs more, and they set when a pilot who passes out comes to. A change applies to the next flight (New flight, Apply & reload or a change of aircraft), never mid-flight. The fit and the comparison: g-forces/docs/g-response-comparison.md.",
+    unit: "none", kind: "choice",
+    choices: [
+      { id: "curve", label: "Curve", description: "The vignettes follow the load between the blackout and redout ranges, over the onset and recovery times below; a pilot who passes out stays out for a time drawn around the mean. Not fitted: 3.6 standard deviations from the held-out measurements, and no pilot passes out below the top of the blackout range." },
+      { id: "exposure", label: "Exposure", description: "Two buffers, the eyes' and the brain's, that a load drains and rest refills: sight goes first, consciousness after, and a pilot comes to only once the brain's has refilled and the load is off. Fitted to published onset, recovery and threshold measurements: 0.5 standard deviations from those held out. About twice Curve's work a step." },
+      { id: "perfusion", label: "Perfusion", description: "Blood pressure at the eyes and the brain: the heart's pressure less the column of blood the load pulls down, with the heart and vessel reflexes, the suit and straining; sight and consciousness fade as the tissue's reserve runs out. Fitted to the same measurements, and as close to those held out as Exposure, for about three times Curve's work a step." },
+    ],
+    default: "curve",
+    defaultReason: "Curve keeps every flight as it was, with the settings people already tuned. Exposure fits the measurements far better at a cost that does not matter, and is the proposed default; it waits for that choice to be made.",
+    home: main(G_PILOT), appliesLive: false, source: "src/flight/createFlightPilot.ts",
+  },
+  {
+    id: "osfs.gForce.exposure.pilot",
+    label: "Pilot",
+    description: "What protects the pilot from a pull. The suit squeezes the legs and belly so less blood pools there; straining is the tensing and breathing a fighter pilot does through a pull. Edits keep what the pilot has already used up.",
+    unit: "none", kind: "choice",
+    choices: [
+      { id: "relaxed", label: "Relaxed", description: "No suit, no straining: sight starts to go at 4.2 g held for 15 s, and consciousness at 5.4 g." },
+      { id: "suit", label: "G-suit", shortLabel: "Suit", description: "A suit worth about 2.9 g: sight starts to go at 7.1 g held for 15 s, and consciousness at 8.3 g." },
+      { id: "suit-strain", label: "G-suit and straining", shortLabel: "Suit + strain", description: "Sight starts to go at 9 g held for 15 s, and consciousness at 10.2 g. Straining is measured only up to 9 g and never tires here, so loads beyond that are a guess." },
+    ],
+    default: "suit-strain",
+    defaultReason: "The pilot of a fighter that can pull 9 g wears a suit and strains; Curve's default ranges stand for the same pilot.",
+    home: main(G_PILOT), appliesLive: true, source: "g-forces/src/exposureResponse.ts",
+    visibleWhen: { id: "osfs.gForce.response", value: "exposure" },
+  },
+  {
+    id: "osfs.gForce.perfusion.pilot",
+    label: "Pilot",
+    description: "What protects the pilot from a pull. The suit squeezes the legs and belly so less blood pools there; straining is the tensing and breathing a fighter pilot does through a pull. Edits keep the pilot's pressures and reserves.",
+    unit: "none", kind: "choice",
+    choices: [
+      { id: "relaxed", label: "Relaxed", description: "No suit, no straining: sight starts to go at 4.1 g held for 15 s, and consciousness at 5.3 g." },
+      { id: "suit", label: "G-suit", shortLabel: "Suit", description: "Sight starts to go at 7.0 g held for 15 s, and consciousness at 8.2 g, before sight has gone completely." },
+      { id: "suit-strain", label: "G-suit and straining", shortLabel: "Suit + strain", description: "Sight starts to go at 9 g held for 15 s, and consciousness at 9.3 g. Straining is measured only up to 9 g and never tires here, so loads beyond that are a guess." },
+    ],
+    default: "suit-strain",
+    defaultReason: "The pilot of a fighter that can pull 9 g wears a suit and strains; Curve's default ranges stand for the same pilot.",
+    home: main(G_PILOT), appliesLive: true, source: "g-forces/src/perfusionResponse.ts",
+    visibleWhen: { id: "osfs.gForce.response", value: "perfusion" },
+  },
   {
     id: "osfs.gForce.vision",
     label: "Dim vision under load",
@@ -305,15 +357,16 @@ export const OSFS_PARAMETERS = [
   {
     id: "osfs.gForce.blackoutRange",
     label: "Blackout",
-    description: "The loads between which sight is lost to a pull: the black vignette starts at the lower one and covers the view at the higher, once the load has stayed on for the onset time.",
+    description: "The loads between which sight is lost to a pull, in the Curve response: the black vignette starts at the lower one and covers the view at the higher, once the load has stayed on for the onset time.",
     unit: G_UNIT, kind: "range", step: 0.1, bounds: within(1.5, 15), default: { min: 5, max: 9 },
     defaultReason: "Chosen, not measured: it spreads the vignette over the loads a fighter holds, for a pilot in a G-suit who is straining. A relaxed pilot without one loses sight at lower loads; lower both ends to fly as one.",
     home: main(G_VISION), appliesLive: true, source: "g-forces/src/gForce.ts",
+    visibleWhen: { id: "osfs.gForce.response", value: "curve" },
   },
   {
     id: "osfs.gForce.redoutRange",
     label: "Redout",
-    description: "The negative loads between which sight is lost to a push: the red vignette starts at the one nearer zero and covers the view at the other.",
+    description: "The negative loads between which sight is lost to a push: the red vignette starts at the one nearer zero and covers the view at the other. Every response uses it: none is fitted to a push.",
     unit: G_UNIT, kind: "range", step: 0.1, bounds: within(-10, -0.5), default: { min: -3, max: -2 },
     defaultReason: "Chosen, not measured: people bear far less negative load than positive, and no G-suit helps with it.",
     home: main(G_VISION), appliesLive: true, source: "g-forces/src/gForce.ts",
@@ -325,6 +378,7 @@ export const OSFS_PARAMETERS = [
     unit: "s", kind: "number", step: 0.1, bounds: within(0, 20), default: 5,
     defaultReason: "Chosen, not measured: the eyes keep working for a few seconds after their blood supply falls, so a brief pull costs nothing and a touchdown's jolt is not seen.",
     home: main(G_VISION), appliesLive: true, source: "g-forces/src/gForce.ts",
+    visibleWhen: { id: "osfs.gForce.response", value: "curve" },
   },
   {
     id: "osfs.gForce.recoveryTime",
@@ -333,6 +387,7 @@ export const OSFS_PARAMETERS = [
     unit: "s", kind: "number", step: 0.1, bounds: within(0, 20), default: 2,
     defaultReason: "Chosen, not measured: sight returns faster than it goes once the load is off.",
     home: main(G_VISION), appliesLive: true, source: "g-forces/src/gForce.ts",
+    visibleWhen: { id: "osfs.gForce.response", value: "curve" },
   },
   {
     id: "osfs.gForce.visionStrength",
@@ -371,7 +426,7 @@ export const OSFS_PARAMETERS = [
   {
     id: "osfs.gForce.passOut",
     label: "Pass out",
-    description: "Lose consciousness when the black vignette closes completely: the screen goes black and the pilot lets go of the stick, pedals and brakes for a time drawn at random around the mean time out. The throttle, trim and flaps stay where they were, and an engaged autopilot flies on. Coming to, sight returns over the recovery time.",
+    description: "Lose consciousness when the response says so: the screen goes black and the pilot lets go of the stick, pedals and brakes until they come to. The throttle, trim and flaps stay where they were, and an engaged autopilot flies on. Curve passes out when the black vignette closes completely, for a time drawn at random around the mean time out; Exposure and Perfusion pass out when the brain's reserve runs out and come to once it has refilled with the load off. Off, the pilot keeps the controls whatever the response says.",
     unit: "none", kind: "boolean", default: false,
     defaultReason: "Opt in: it takes the aircraft out of the person's hands.",
     home: main(G_PASS_OUT), appliesLive: true, source: "g-forces/src/gForce.ts",
@@ -383,6 +438,7 @@ export const OSFS_PARAMETERS = [
     unit: "s", kind: "number", step: 0.1, bounds: within(1, 120), default: 11.9,
     defaultReason: "Measured: 11.9 s of unconsciousness on average over 501 losses of consciousness on a centrifuge (Whinnery and Whinnery, Arch Neurol 1990;47:764–76). A further 16 s of confusion followed, which is not modelled; add it to fly that long without the pilot.",
     home: main(G_PASS_OUT), appliesLive: true, source: "g-forces/src/gForce.ts",
+    visibleWhen: { id: "osfs.gForce.response", value: "curve" },
   },
   {
     id: "osfs.gForce.unconsciousSpread",
@@ -391,6 +447,7 @@ export const OSFS_PARAMETERS = [
     unit: "s", kind: "number", step: 0.1, bounds: within(0, 60), default: 4,
     defaultReason: "Chosen, not measured: the study's spread was not read. Four seconds keeps most times between 4 and 20 s.",
     home: main(G_PASS_OUT), appliesLive: true, source: "g-forces/src/gForce.ts",
+    visibleWhen: { id: "osfs.gForce.response", value: "curve" },
   },
 
   // Exhaust → Gas and luminance. Shared across engines with an optical profile.
@@ -596,6 +653,24 @@ export const OSFS_PARAMETERS = [
     home: main(EXHAUST_SMOKE), appliesLive: true, source: "exhaust/src/createEngineSmoke.ts",
   },
 
+  // Interface → Flight instruments: where the instruments sit.
+  {
+    id: "osfs.hud.layout",
+    label: "Layout",
+    description: "Compact: the instruments sit flush in the two bottom corners on see-through backgrounds. Airspeed, vertical speed and angle of attack sit on the attitude indicator's corners and heading over its horizon; the load, gear and autopilot sit at the toolbar's right end; and the position splits into latitude and longitude, altitude, heading and pitch chips. Classic: the row of instruments above the attitude indicator and the one position readout.",
+    unit: "none",
+    kind: "choice",
+    choices: [
+      { id: "compact", label: "Compact", description: "Flush in the bottom corners and see-through, with the readings on the attitude indicator and the toolbar." },
+      { id: "classic", label: "Classic", description: "The row of instruments above the attitude indicator, on solid backgrounds." },
+    ],
+    default: "compact",
+    defaultReason: "Leaves the most of the view to the world, with every reading still beside the attitude indicator or in the toolbar.",
+    home: main(HUD),
+    appliesLive: true,
+    source: "src/flight/hud/flightHud.ts",
+  },
+
   // Renderer → Instruments.
   {
     id: "osfs.renderer.attitudeIndicator",
@@ -693,6 +768,92 @@ export const OSFS_PARAMETERS = [
     source: "src/flight/createFlightSimApp.ts",
   },
 
+  // Aircraft → Cockpit screen.
+  {
+    id: "osfs.cockpit.screen.content",
+    label: "Screen shows",
+    description: "What the cockpit's touchscreen shows.",
+    unit: "none", kind: "choice",
+    choices: [
+      { id: "flight", label: "Flight interface", description: "The instruments, toolbar and windows as the chase view shows them, and they can be pressed there." },
+      { id: "aircraft", label: "Aircraft displays", description: "The model's own picture, a stand-in for the aircraft's real displays until they are made." },
+    ],
+    default: "flight",
+    defaultReason: "The aircraft's real displays are not made yet, and the picture standing in for them shows nothing of the flight.",
+    home: main(COCKPIT_SCREEN), appliesLive: true, source: "src/flight/cockpit/cockpitScreen.ts",
+  },
+  {
+    id: "osfs.cockpit.screen.background",
+    label: "Background",
+    description: "What the screen shows behind the interface.",
+    unit: "none", kind: "choice",
+    choices: [
+      { id: "black", label: "Black", description: "Nothing: it costs nothing." },
+      { id: "chase", label: "Chase view", description: "The chase camera's view, as the chase view shows it. The world is drawn a second time for it, at the screen's refresh rate." },
+    ],
+    default: "black",
+    defaultReason: "The chase view behind the interface draws the world a second time, which only the fastest computers have the time for: they have it by default (src/flight/cockpit/cockpitScreenDefaults.ts).",
+    visibleWhen: { id: "osfs.cockpit.screen.content", value: "flight" },
+    home: main(COCKPIT_SCREEN), appliesLive: true, source: "src/flight/cockpit/cockpitScreen.ts",
+  },
+  {
+    id: "osfs.cockpit.screen.instruments",
+    label: "Instruments",
+    description: "Whether the attitude, speed, trim and throttle instruments are drawn on the screen, or left to the HUD: over the view, or around the head in a headset.",
+    unit: "none", kind: "choice",
+    choices: [
+      { id: "screen", label: "Screen", description: "On the screen, and in the HUD over the view. In a headset, only on the screen." },
+      { id: "hud", label: "HUD", description: "Only in the HUD over the view. In a headset, on panels around the head." },
+    ],
+    default: "screen", defaultReason: "Everything is on the screen until a part is moved off it.",
+    visibleWhen: { id: "osfs.cockpit.screen.content", value: "flight" },
+    home: main(COCKPIT_SCREEN), appliesLive: true, source: "src/flight/cockpit/cockpitScreen.ts",
+  },
+  {
+    id: "osfs.cockpit.screen.toolbar",
+    label: "Toolbar",
+    description: "Whether the toolbar along the bottom is drawn on the screen, or left to the HUD: over the view, or around the head in a headset.",
+    unit: "none", kind: "choice",
+    choices: [
+      { id: "screen", label: "Screen", description: "On the screen, and in the HUD over the view. In a headset, only on the screen." },
+      { id: "hud", label: "HUD", description: "Only in the HUD over the view. In a headset, on panels around the head." },
+    ],
+    default: "screen", defaultReason: "Everything is on the screen until a part is moved off it.",
+    visibleWhen: { id: "osfs.cockpit.screen.content", value: "flight" },
+    home: main(COCKPIT_SCREEN), appliesLive: true, source: "src/flight/cockpit/cockpitScreen.ts",
+  },
+  {
+    id: "osfs.cockpit.screen.windows",
+    label: "Windows",
+    description: "Whether the tab windows and their buttons are drawn on the screen, or left to the HUD: over the view, or around the head in a headset.",
+    unit: "none", kind: "choice",
+    choices: [
+      { id: "screen", label: "Screen", description: "On the screen, and in the HUD over the view. In a headset, only on the screen." },
+      { id: "hud", label: "HUD", description: "Only in the HUD over the view. In a headset, on panels around the head." },
+    ],
+    default: "screen", defaultReason: "Everything is on the screen until a part is moved off it.",
+    visibleWhen: { id: "osfs.cockpit.screen.content", value: "flight" },
+    home: main(COCKPIT_SCREEN), appliesLive: true, source: "src/flight/cockpit/cockpitScreen.ts",
+  },
+  {
+    id: "osfs.cockpit.screen.refreshRate",
+    label: "Screen refresh rate",
+    description: "How often the screen is drawn again: the interface when it has changed, its instruments' own drawings, and the chase view behind them.",
+    unit: "Hz", kind: "number", step: 1, bounds: within(1, 60), alwaysShowTrack: true,
+    default: 30, defaultReason: "Half a 60 Hz display's rate: the instruments move smoothly, and a chase view behind them costs half a view more.",
+    visibleWhen: { id: "osfs.cockpit.screen.content", value: "flight" },
+    home: all(COCKPIT_SCREEN), appliesLive: true, source: "src/flight/cockpit/cockpitScreen.ts",
+  },
+  {
+    id: "osfs.cockpit.screen.resolution",
+    label: "Screen resolution",
+    description: "The screen's width in pixels; its height follows its shape. More is sharper up close, and costs more to draw and to send to the GPU each time it is drawn.",
+    unit: "px", kind: "number", step: 64, bounds: within(256, 2560), alwaysShowTrack: true,
+    default: 1280, defaultReason: "Sharp at the pilot's seat on most displays, and about 2.8 MB to send each time the screen is drawn.",
+    visibleWhen: { id: "osfs.cockpit.screen.content", value: "flight" },
+    home: all(COCKPIT_SCREEN), appliesLive: true, source: "src/flight/cockpit/cockpitScreen.ts",
+  },
+
   ...REMOTE_CONTROL_PARAMETERS,
 
   // Aircraft → Start.
@@ -778,6 +939,26 @@ export const OSFS_PARAMETERS = [
     home: main(START),
     appliesLive: false,
     source: "src/flight/jsbsim/savedFlight.ts",
+  },
+  // "Physics [30 / 60 / 120 Hz] ?": a choice has no words after its track,
+  // so the unit ends the last segment; each segment's full name says Hz.
+  {
+    id: "osfs.physics.rate",
+    label: "Physics",
+    description: "How many steps a second the flight model takes. The aircraft, its ground contact, the controls, autopilot and trim, and the wheel and G effects advance together, one step at a time; the display draws at its own rate between steps. A change applies to the next flight (New flight, Apply & reload or a change of aircraft), never mid-flight.",
+    unit: "Hz",
+    kind: "choice",
+    choices: [
+      { id: "30", label: "30 Hz", shortLabel: "30", description: "Half the work of 60 Hz, and not validated: a C172 at rest keeps bouncing on its gear, and a quick pull peaks about 40 ms late." },
+      { id: "60", label: "60 Hz", shortLabel: "60", description: "Half the work of 120 Hz." },
+      { id: "120", label: "120 Hz", shortLabel: "120 Hz", description: "Twice the work of 60 Hz: the rate every flight ran at before this choice existed." },
+    ],
+    default: "60",
+    defaultReason: "Half the physics work of the earlier 120 Hz for each simulated second. 30 Hz is not validated yet, and 120 Hz is only ever chosen by hand, never by a preset or a device.",
+    persistDefault: true,
+    home: main(START),
+    appliesLive: false,
+    source: "src/flight/physics/physicsRate.ts",
   },
   {
     id: "osfs.start.saveInterval",

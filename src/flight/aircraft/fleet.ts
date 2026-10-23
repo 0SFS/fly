@@ -159,6 +159,10 @@ const AIRCRAFT_CATALOG: readonly AircraftDefinition[] = [
     // pilot-eye datum. The exported mesh's coordinates are ground-relative.
     cockpitOffset: { x: 0, y: 3.18098 + modelOffsetY("f-35b"), z: 6.30018 },
     cockpitMesh: true,
+    // AF267's canopy: dark gold, half opaque as authored.
+    windowMaterialNames: ["window"],
+    // The touchscreen across the instrument panel, 0.54 m by 0.23 m.
+    screenMaterialNames: ["panel"],
     nozzlePositionEngineIndex: 0,
     engineTestNodeNames: ["F135_Engine"],
     engineAssets: {

@@ -1,4 +1,4 @@
-import { NullEngine, Scene, TransformNode, Vector3 } from "@babylonjs/core";
+import { NullEngine, Scene, TransformNode, Vector3, type UniversalCamera } from "@babylonjs/core";
 import { describe, expect, it } from "vitest";
 import { flightAttitudeToQuaternion } from "@0sfs/ground-contact/ecefBridge";
 import { createPlaceholderAircraft } from "@0sfs/aircraft/createPlaceholderAircraft";
@@ -99,6 +99,47 @@ describe("aircraft chase camera", () => {
     aircraft.setModelLoaded(true);
     aircraft.setViewMode("first");
     expect(aircraft.modelRoot.isEnabled()).toBe(false);
+    aircraft.dispose(); scene.dispose(); engine.dispose();
+  });
+
+  it.each([true, false])("looks about the pilot eye as a 360 photograph does, in a right-handed scene: %s", (rightHanded) => {
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    scene.useRightHandedSystem = rightHanded;
+    const origin = new TransformNode("origin", scene);
+    origin.rotationQuaternion = flightAttitudeToQuaternion(0.2, 0.1, 1.3);
+    const aircraft = createPlaceholderAircraft(scene, origin);
+    // The camera's own forward, right and up in the world.
+    const axes = (camera: UniversalCamera) => {
+      const world = camera.getViewMatrix(true).clone().invert();
+      const along = (x: number, y: number, z: number) => Vector3.TransformNormal(new Vector3(x, y, z), world).normalize();
+      return { forward: along(0, 0, rightHanded ? -1 : 1), right: along(1, 0, 0), up: along(0, 1, 0) };
+    };
+    const camera = aircraft.firstPersonCamera;
+    const ahead = axes(camera);
+    const expectAlong = (actual: Vector3, expected: Vector3) => expect(Vector3.Dot(actual, expected.normalizeToNew())).toBeCloseTo(1, 5);
+
+    aircraft.lookFromCockpit({ headingDeg: 0, pitchDeg: 0, verticalFovDeg: 55 });
+    expectAlong(axes(camera).forward, ahead.forward);
+    expect(camera.fov).toBeCloseTo(55 * Math.PI / 180);
+
+    aircraft.lookFromCockpit({ headingDeg: 90, pitchDeg: 0, verticalFovDeg: 55 });
+    expectAlong(axes(camera).forward, ahead.right);
+    expectAlong(axes(camera).up, ahead.up);
+
+    aircraft.lookFromCockpit({ headingDeg: 0, pitchDeg: 30, verticalFovDeg: 55 });
+    expectAlong(axes(camera).forward, ahead.forward.scale(Math.cos(Math.PI / 6)).add(ahead.up.scale(Math.sin(Math.PI / 6))));
+    expectAlong(axes(camera).right, ahead.right);
+
+    // Looking right and up keeps the horizon level: no roll of its own.
+    aircraft.lookFromCockpit({ headingDeg: 135, pitchDeg: -40, verticalFovDeg: 100 });
+    expect(Vector3.Dot(axes(camera).right, ahead.up)).toBeCloseTo(0, 5);
+    expect(camera.fov).toBeCloseTo(100 * Math.PI / 180);
+
+    const turned = camera.rotationQuaternion!.clone();
+    aircraft.lookFromCockpit({ headingDeg: Number.NaN, pitchDeg: 0, verticalFovDeg: 60 });
+    expect(camera.rotationQuaternion!.equals(turned)).toBe(true);
+    expect(camera.fov).toBeCloseTo(100 * Math.PI / 180);
     aircraft.dispose(); scene.dispose(); engine.dispose();
   });
 });

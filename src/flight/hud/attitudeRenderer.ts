@@ -1,3 +1,4 @@
+import { noteCanvasDrawn } from "@foss-earth/ui/browser";
 import type { FrameProfiler } from "foss-earth/perf";
 import {
   computeAttitudeScene,
@@ -160,6 +161,8 @@ export function createAttitudeRenderer(host: HTMLElement, options: AttitudeRende
     if (projection?.size !== cssSize) projection = createAttitudeProjection(cssSize, cssSize * ATTITUDE_HALF_SHARE);
     if (backend.kind === "webgpu") {
       backend.gpu.render(computeAttitudeScene(state, projection, { lines: false, view }), stick, backing / cssSize);
+      // Its picture lasts only this task: a copy of the page, such as the cockpit screen's, takes it now.
+      noteCanvasDrawn(canvas);
     } else {
       backend.ctx.setTransform(backing / cssSize, 0, 0, backing / cssSize, 0, 0);
       backend.ctx.clearRect(0, 0, cssSize, cssSize);
