@@ -13,6 +13,8 @@ const appMocks = vi.hoisted(() => ({
   reportFailure: vi.fn(),
   isRecoveryPage: vi.fn(() => false),
   diagnosticsDestroy: vi.fn(),
+  addDiagnosticState: vi.fn(),
+  trailStep: vi.fn(),
   diagnosticLog: [] as string[],
   startDiagnostics: vi.fn((options: { log: import("foss-earth/shell").GameLog }) => ({
     log: { ...options.log, print: (entry: import("foss-earth/shell").GameLogEntry) => {
@@ -20,6 +22,8 @@ const appMocks = vi.hoisted(() => ({
       return options.log.print(entry);
     } },
     destroy: appMocks.diagnosticsDestroy,
+    addState: appMocks.addDiagnosticState,
+    trail: { step: appMocks.trailStep },
   })),
 }));
 
@@ -52,7 +56,12 @@ beforeEach(() => {
   document.body.innerHTML = '<div id="root"></div>';
 });
 
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => {
+  for (const call of appMocks.createFlightSimApp.mock.calls as unknown[][]) {
+    (call[1] as { loadingScreen?: FlightLoadingScreen } | undefined)?.loadingScreen?.destroy();
+  }
+  vi.restoreAllMocks(); vi.unstubAllGlobals();
+});
 
 describe("application route", () => {
   it("opens the retained report without starting the flight or replacing its trail", async () => {
@@ -195,7 +204,18 @@ describe("application route", () => {
     await vi.waitFor(() => expect(document.querySelector('#app-log [data-tone="error"]')).not.toBeNull());
     expect(document.getElementById("app-log")!.hidden).toBe(false);
     expect(document.querySelector('#app-log [data-tone="error"] .game-log__actions button')!.textContent).toBe("Reload and try again");
-    expect(document.querySelector('#app-log .game-log__line[data-tone="error"]')!.textContent).toContain("could not initialize. Check your connection and reload to try again.\nError: Offline");
+    expect(document.querySelector('#app-log .game-log__line[data-tone="error"]')!.textContent).toContain("could not initialize. Copy the loading report for details, then reload to try again.\nError: Offline");
+    expect(window.osfsLoadingDiagnostics?.()).toMatchObject({
+      version: 2, operations: [
+        { operation: expect.stringContaining("Import flight"), state: "ready" },
+        { operation: "Initialize flight application", state: "failed", error: { message: "Error: Offline" }, callerStack: expect.stringContaining("main.tsx:") },
+      ],
+    });
+    expect(appMocks.addDiagnosticState).toHaveBeenCalledOnce();
+    const readState = appMocks.addDiagnosticState.mock.calls[0][0] as () => string;
+    expect(readState()).toContain('"operation": "Initialize flight application"');
+    expect(appMocks.trailStep).toHaveBeenCalledWith("Startup failed: Initialize flight application");
+    expect(appMocks.trailStep).toHaveBeenCalledWith(expect.stringContaining("main.tsx:"));
     expect(appMocks.diagnosticsDestroy).toHaveBeenCalledOnce();
     expect(appMocks.reportFailure).toHaveBeenCalledExactlyOnceWith(document, "The application could not initialize.");
     expect(appMocks.markReady).not.toHaveBeenCalled();

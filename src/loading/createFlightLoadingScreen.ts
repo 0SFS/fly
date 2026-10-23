@@ -1,7 +1,7 @@
 import { createGameLog, type GameLog, type GameLogEntry, type GameLogLine } from "foss-earth/shell";
-import { describeError, redactIssueReport, reportSecrets } from "foss-earth/diagnostics";
-import { getAppSettings } from "foss-earth/settings";
 import type { TerrainPreparationProgress } from "foss-earth/runtime";
+import { createLoadingDiagnostics, describeLoadingCause, redactLoadingText } from "./loadingDiagnostics";
+import { createLoadingReportViewer } from "./createLoadingReportViewer";
 
 export type FlightLoadingPhase = "app" | "world" | "flight" | "assets" | "terrain";
 
@@ -24,6 +24,8 @@ export interface FlightLoadingScreen {
   show(options?: { title?: string; detail?: string; reset?: boolean }): void;
   setPhase(phase: FlightLoadingPhase, update: FlightLoadingPhaseUpdate): void;
   hide(): void;
+  /** Records the async boundary and its caller before module loading can lose the throw stack. */
+  trace?<T>(operation: string, run: () => Promise<T>): Promise<T>;
   /**
    * Stops loading with one line saying why. Until the next `show()`, a further call, such as
    * the boot's own catch hearing of a failure the flight already reported, prints nothing:
@@ -61,15 +63,6 @@ declare global {
     /** Always available while this loading screen exists; no debug URL flag. */
     osfsLoadingDiagnostics?: () => unknown;
   }
-}
-
-/** What was thrown, without the secrets a report must not carry (docs/bug-reporting.md). */
-function describeCause(cause: unknown): { message: string; stack: string | null } {
-  let secrets: string[] = [];
-  // Reporting a failure must not fail: the patterns below still apply without the settings.
-  try { secrets = reportSecrets(getAppSettings()); } catch { /* keep the patterns */ }
-  const { message, stack } = describeError(cause);
-  return { message: redactIssueReport(message, secrets), stack: stack === null ? null : redactIssueReport(stack, secrets) };
 }
 
 function describeTerrain(progress: TerrainPreparationProgress | undefined): string {
@@ -112,11 +105,12 @@ export function createFlightLoadingScreen(sharedLog?: GameLog): FlightLoadingScr
   let sessionStartedAt = performance.now();
   let stoppedAt: number | null = null;
   let failureMessage: string | null = null;
-  let failureCause: ReturnType<typeof describeCause> | null = null;
+  let failureCause: ReturnType<typeof describeLoadingCause> | null = null;
+  const diagnostics = createLoadingDiagnostics();
   const observations = new Map<FlightLoadingPhase, { update: FlightLoadingPhaseUpdate; recordedAt: number }>();
   const history: Array<{ elapsedMs: number; phase: FlightLoadingPhase; update: FlightLoadingPhaseUpdate }> = [];
-  const getReport = () => ({
-    version: 1,
+  const getReport = () => JSON.parse(JSON.stringify({
+    version: 2,
     capturedAt: new Date().toISOString(),
     outcome: failureMessage ? "failed" : visible ? "loading" : "ready",
     elapsedMs: (stoppedAt ?? performance.now()) - sessionStartedAt,
@@ -124,12 +118,19 @@ export function createFlightLoadingScreen(sharedLog?: GameLog): FlightLoadingScr
     cause: failureCause,
     phases: Object.fromEntries(Object.keys(PHASE_LABELS).map(key => {
       const phase = key as FlightLoadingPhase;
-      return [phase, observations.get(phase)?.update ?? { state: "waiting" }];
+      const update = observations.get(phase)?.update ?? { state: "waiting" };
+      return [phase, failureMessage && update.state === "loading" ? { ...update, state: "failed" } : update];
     })),
     history: history.slice(),
-  });
+    ...diagnostics.snapshot(),
+  }, (_key, value: unknown) => typeof value === "string" ? redactLoadingText(value) : value));
   const previousReport = window.osfsLoadingDiagnostics;
   window.osfsLoadingDiagnostics = getReport;
+  let reportViewer: ReturnType<typeof createLoadingReportViewer> | null = null;
+  const viewReportAction = { label: "View report", onClick: () => {
+    reportViewer ??= createLoadingReportViewer();
+    reportViewer.show(JSON.stringify(getReport(), null, 2));
+  } };
   const copyReport = async (): Promise<void> => {
     const text = JSON.stringify(getReport(), null, 2);
     try {
@@ -231,6 +232,7 @@ export function createFlightLoadingScreen(sharedLog?: GameLog): FlightLoadingScr
     if (!visible) return;
     visible = false;
     stoppedAt ??= performance.now();
+    diagnostics.stop();
     log.element.removeAttribute("data-loading-details");
     observer?.disconnect();
     for (const element of Array.from(held.keys())) releaseElement(element);
@@ -243,6 +245,7 @@ export function createFlightLoadingScreen(sharedLog?: GameLog): FlightLoadingScr
 
   const show: FlightLoadingScreen["show"] = (options = {}) => {
     if (destroyed) return;
+    reportViewer?.close();
     // Keep a failure in the history, without its now-stale button.
     failure?.line.update({ ...failure.entry, actions: [] });
     failure = null;
@@ -254,10 +257,12 @@ export function createFlightLoadingScreen(sharedLog?: GameLog): FlightLoadingScr
       observations.clear();
       history.length = 0;
       sessionStartedAt = performance.now();
+      diagnostics.reset();
     }
+    diagnostics.start();
     if (!visible || options.title !== undefined) {
       const title = options.title ?? DEFAULT_TITLE;
-      log.print({ text: options.detail ? `${title}: ${options.detail}` : title, actions: [reportAction] });
+      log.print({ text: options.detail ? `${title}: ${options.detail}` : title, actions: [viewReportAction, reportAction] });
     }
     holdRoot();
   };
@@ -267,19 +272,22 @@ export function createFlightLoadingScreen(sharedLog?: GameLog): FlightLoadingScr
     show,
     setPhase,
     hide,
+    trace: diagnostics.trace,
     fail(message, { retry: onRetry, cause } = {}) {
       if (destroyed) return;
       if (failure) {
         if (failureCause === null && cause !== undefined) {
-          failureCause = describeCause(cause);
+          failureCause = describeLoadingCause(cause);
           failure.entry = { ...failure.entry, text: `${failure.entry.text}\n${failureCause.message}` };
           failure.line.update(failure.entry);
         }
         return;
       }
+      message = redactLoadingText(message);
       failureMessage = message;
-      failureCause = cause === undefined ? null : describeCause(cause);
+      failureCause = cause === undefined ? null : describeLoadingCause(cause);
       stoppedAt = performance.now();
+      diagnostics.stop();
       holdRoot();
       // Preserve the last measured state, but do not leave a stale loading
       // indicator suggesting that a failed or cancelled request is running.
@@ -300,13 +308,15 @@ export function createFlightLoadingScreen(sharedLog?: GameLog): FlightLoadingScr
       const entry: GameLogEntry = {
         text: `Flight paused. ${message}` + (failureCause ? `\n${failureCause.message}` : ""),
         tone: "error",
-        actions: [{ label, onClick: retry }, reportAction],
+        actions: [{ label, onClick: retry }, viewReportAction, reportAction],
       };
       failure = { line: log.print(entry), entry };
       failure.line.focusAction();
     },
     destroy() {
       hide();
+      diagnostics.stop();
+      reportViewer?.destroy();
       destroyed = true;
       if (window.osfsLoadingDiagnostics === getReport) {
         if (previousReport) window.osfsLoadingDiagnostics = previousReport;

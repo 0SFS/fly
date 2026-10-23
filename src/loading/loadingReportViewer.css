@@ -1,0 +1,46 @@
+.osfs-loading-report {
+  --report-key: #9cc5ff;
+  --report-string: #b0dca4;
+  --report-number: #f4c48b;
+  --report-literal: #d6afff;
+  box-sizing: border-box;
+  width: min(1000px, calc(100vw - 24px));
+  height: min(760px, calc(100dvh - 24px));
+  max-width: none;
+  max-height: calc(100dvh - 24px);
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--ui-border, #4b5d70);
+  border-radius: 12px;
+  background: var(--ui-surface, #101923);
+  color: var(--ui-text, #edf2f7);
+  box-shadow: 0 16px 60px #0008;
+  font: 14px/1.5 var(--ui-font, system-ui, sans-serif);
+}
+
+.osfs-loading-report[open] { display: flex; flex-direction: column; }
+.osfs-loading-report::backdrop { background: #0009; }
+.osfs-loading-report__header { display: flex; align-items: center; gap: 8px; padding: 8px; border-bottom: 1px solid var(--ui-border, #4b5d70); }
+.osfs-loading-report__header h2 { margin: 0; min-width: 0; font: inherit; font-weight: 650; }
+.osfs-loading-report__actions { display: flex; align-items: center; gap: 4px; margin-inline-start: auto; }
+.osfs-loading-report .foss-earth-parameter__icon-action { box-sizing: border-box; flex: none; min-width: 32px; min-height: 32px; }
+.osfs-loading-report__status { margin: 0; padding: 6px 12px 0; font-size: 12px; }
+.osfs-loading-report__status:empty { display: none; }
+.osfs-loading-report__content { flex: 1; min-height: 0; margin: 8px; padding: 10px; overflow: auto; overscroll-behavior: contain; border: 1px solid var(--ui-border, #4b5d70); border-radius: 6px; background: var(--ui-page, #090f16); white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 2; }
+.osfs-loading-report__content code { font: 12px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.osfs-loading-report__key { color: var(--report-key); }
+.osfs-loading-report__string { color: var(--report-string); }
+.osfs-loading-report__number { color: var(--report-number); }
+.osfs-loading-report__literal { color: var(--report-literal); }
+.osfs-loading-report :focus-visible { outline: 2px solid var(--ui-accent, #efbf4a); outline-offset: 2px; }
+
+[data-theme="light"] .osfs-loading-report {
+  --report-key: #1556a0;
+  --report-string: #236226;
+  --report-number: #874400;
+  --report-literal: #7938a1;
+  background: var(--ui-surface, #fff);
+  color: var(--ui-text, #172b3a);
+}
+
+[data-theme="light"] .osfs-loading-report__content { background: var(--ui-page, #f5f7fa); }

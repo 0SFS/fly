@@ -22,11 +22,43 @@ the renderer or flight simulation.
 If loading stops, the log says so in one line: what stopped, and under it what was thrown,
 such as `AbortError: Terrain preparation was replaced by another destination.` The visit's
 trail keeps that line for the report. **Copy loading report**, on that line and on the
-loading title, copies the loading screen's own record as JSON: each phase's last state, their
-history, the failure and its `cause`, with the top of its stack; `window.osfsLoadingDiagnostics()`
-returns the same in a console. Known secret settings, recognized credentials and URL queries
-are removed from the cause. Until 2026-10-08 a failure that both the flight and the page's
-boot caught printed two lines, and neither said what was thrown.
+loading title, copies the loading screen's own record as version 2 JSON;
+`window.osfsLoadingDiagnostics()` returns the same in a console.
+
+**View report** opens the same redacted JSON in a scrollable viewer with syntax
+highlighting. Its top-right Copy and Download icons export the exact snapshot being
+viewed; the file is `osfs-loading-report.json`. Close with Escape or the top-left ×.
+The viewer stays usable even while loading has made the application inert.
+
+The report includes:
+
+- Each phase's last state and history; phases stopped by a failure say `failed`.
+- The thrown error's name, supplied stack (up to 32 KiB), source location, nested
+  `cause` chain and aggregate errors. Missing module exports have a structured module
+  URL and export name.
+- Separate import and initialization operations, with durations and a `callerStack`
+  captured **before** awaiting each operation. Some module-link errors have no throw
+  stack; `stackUnavailable` explains that absence, and `callerStack` locates the code
+  that requested the operation. It is not the location inside the failing dependency.
+- Build revision, bundle, browser, page, online/isolation state and controlling service
+  worker, plus recent browser errors, resource failures and resource timings/statuses
+  when the browser exposes them. Zero transferred bytes or an unavailable status do
+  not establish a network failure.
+
+Capture starts when the loading screen is created, before the flight's dynamic import,
+and stops on success, failure or destruction. A reset starts a new attempt. The report
+retains at most 40 operations, 40 browser events and 80 resources; causes are limited to
+six levels and eight aggregate children. The current visit's full bug report also includes
+this snapshot. Copy the loading JSON while the failed page is open; `/fly/?report` uses
+the separate retained activity trail, which now also records the failed startup operation,
+its error and its throw/caller stack lines (up to 40 lines per operation, subject to the
+trail's own retention settings and limits). Failures that prevent `main.tsx` and its static
+dependencies from running still belong to the earlier boot terminal.
+
+Known secret settings, recognized credentials and URL queries/fragments are removed from
+every string in the loading report, while stack line and column numbers are retained.
+Until 2026-10-08 a failure that both the flight and the page's boot caught printed two
+lines, and neither said what was thrown.
 
 Known secret settings, recognized credentials, email addresses, URL queries and fragments
 are removed from the public draft. Coordinate settings are omitted. Review the draft and

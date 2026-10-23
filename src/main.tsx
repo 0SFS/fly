@@ -6,6 +6,7 @@ import { attachBootLog, isBrowserRecoveryPage, markBrowserAppReady, reportBrowse
 import { appRouteFrom, canonicalAppLocation, flightHref, FOSS_EARTH_URL, type AppRoute } from "@0sfs/rc/appRoute";
 import { offerFullscreen } from "./fullscreen/fullscreen";
 import { createFlightLoadingScreen, type FlightLoadingScreen } from "./loading/createFlightLoadingScreen";
+import type { LoadingDiagnosticsSnapshot } from "./loading/loadingDiagnostics";
 
 function appRoute(): AppRoute {
   return appRouteFrom(new URL(window.location.href));
@@ -31,6 +32,7 @@ function clearBootShell(): void {
 
 async function bootApp(rootElement: HTMLElement, loading: FlightLoadingScreen | null, log: GameLog | null, diagnostics: AppDiagnostics | null): Promise<void> {
   const route = appRoute();
+  const trace = <T,>(operation: string, run: () => Promise<T>): Promise<T> => loading?.trace ? loading.trace(operation, run) : run();
 
   if (route === "remote") {
     const { createPhoneControllerApp } = await import("@0sfs/rc/createPhoneControllerApp");
@@ -41,9 +43,9 @@ async function bootApp(rootElement: HTMLElement, loading: FlightLoadingScreen | 
   }
 
   if (route === "flight") {
-    const { createFlightSimApp } = await import("./flight/createFlightSimApp");
+    const { createFlightSimApp } = await trace("Import flight application (src/flight/createFlightSimApp.ts)", () => import("./flight/createFlightSimApp"));
     loading?.setPhase("app", { state: "ready" });
-    await createFlightSimApp(rootElement, { loadingScreen: loading ?? undefined, log: log ?? undefined, diagnostics: diagnostics ?? undefined });
+    await trace("Initialize flight application", () => createFlightSimApp(rootElement, { loadingScreen: loading ?? undefined, log: log ?? undefined, diagnostics: diagnostics ?? undefined }));
     markBrowserAppReady(document);
     return;
   }
@@ -105,6 +107,7 @@ function startPage(rootElement: HTMLElement): void {
   // The log's history starts with the boot terminal's lines, and the log takes over from it at the first frame.
   if (log) attachBootLog(log);
   const loading = log ? createFlightLoadingScreen(log) : null;
+  if (loading) diagnostics?.addState(() => `Loading diagnostics:\n${JSON.stringify(window.osfsLoadingDiagnostics?.(), null, 2)}`);
   loading?.setPhase("app", { state: "loading", detail: "Downloading application code" });
   if (log) offerFullscreen(log);
 
@@ -112,7 +115,19 @@ function startPage(rootElement: HTMLElement): void {
     reportBrowserAppFailure(document, "The application could not initialize.");
     console.error("Failed to bootstrap application.", error);
     if (loading) {
-      loading.fail("The application could not initialize. Check your connection and reload to try again.", { cause: error });
+      loading.fail("The application could not initialize. Copy the loading report for details, then reload to try again.", { cause: error });
+      // Retain the useful frames before end() disposes the visit. A report-only
+      // page after a reload can then identify the failed operation too.
+      try {
+        const snapshot = window.osfsLoadingDiagnostics?.() as LoadingDiagnosticsSnapshot | undefined;
+        for (const operation of snapshot?.operations ?? []) {
+          if (operation.state !== "failed") continue;
+          const lines = [`Startup failed: ${operation.operation}`, operation.error?.message,
+            ...(operation.error?.stack?.split("\n") ?? []), "Startup operation requested from:",
+            ...(operation.callerStack?.split("\n") ?? [])];
+          for (const line of lines.slice(0, 40)) if (line) diagnostics?.trail.step(line);
+        }
+      } catch { /* Retention must not hide the failure or prevent cleanup. */ }
       recorded?.end();
       return;
     }

@@ -180,6 +180,29 @@ describe("flight loading log", () => {
     expect(reported).toContain("https://0sfs.test/assets/app.js");
   });
 
+  it("copies the complete traceback and redacts phase history as well as the thrown error", async () => {
+    const writeText = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    screen = createFlightLoadingScreen();
+    screen.setPhase("app", { state: "loading", detail: "Importing https://app.test/app.js?token=phase-secret" });
+    const error = new SyntaxError("The requested module '/src/fixedStepLoop.ts?t=123' doesn't provide an export named: 'FIXED_DT'");
+    error.stack = "";
+    await expect(screen.trace!("Import flight application", async () => { throw error; })).rejects.toBe(error);
+    screen.fail("Application failed", { cause: error });
+    const copy = [...newestLine().querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Copy loading report")!;
+    copy.click();
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledOnce());
+    const report = JSON.parse(writeText.mock.calls[0][0]);
+    expect(report).toMatchObject({ version: 2, outcome: "failed", phases: { app: { state: "failed" } },
+      cause: { stack: null, module: { exportName: "FIXED_DT" } },
+      operations: [{ state: "failed", callerStack: expect.stringContaining("createFlightLoadingScreen.test.ts:") }],
+    });
+    expect(writeText.mock.calls[0][0]).not.toContain("phase-secret");
+    screen.show({ reset: true });
+    expect(window.osfsLoadingDiagnostics?.()).toMatchObject({ outcome: "loading", operations: [], browserEvents: [], history: [], cause: null });
+    Reflect.deleteProperty(navigator, "clipboard");
+  });
+
   it("preserves existing root state and leaves a shared log to its owner", () => {
     const root = document.getElementById("root")!;
     root.setAttribute("inert", "");
