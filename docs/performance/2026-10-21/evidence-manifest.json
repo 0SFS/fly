@@ -1,0 +1,323 @@
+{
+  "checkpointDate": "2026-10-21",
+  "archive": "retained-evidence.tar.gz",
+  "note": "Selected evidence and reference source snapshots. Extract into separate scratch storage; do not overwrite worktrees.",
+  "excludes": [
+    "browser profiles",
+    ".env files",
+    "credentials",
+    "terrain downloads",
+    "compiled bundles",
+    "dependencies"
+  ],
+  "members": [
+    {
+      "path": "local-evidence/baseline-createJsbsimRuntime.ts",
+      "bytes": 3754,
+      "sha256": "0867bfa108dc47068658467ecbfebdaeb21455a1d748b92321df5dae24828293"
+    },
+    {
+      "path": "local-evidence/baseline-engineExhaustDepth.ts",
+      "bytes": 11716,
+      "sha256": "41dcf5edbef3cbfa404e1e48a8ca5903c9613e1ebb6f8779d164ed965a89f584"
+    },
+    {
+      "path": "local-evidence/baseline-fixedStepLoop.ts",
+      "bytes": 7398,
+      "sha256": "f3fee845bfdaeece89fcda779ef24d0d390bb7ce2f4ffb074cdcb51eb782c753"
+    },
+    {
+      "path": "local-evidence/baseline-ground-contact/src/ecefBridge.ts",
+      "bytes": 1439,
+      "sha256": "d630a81cc76bd78789ec0e1d83fa75e9e15a5f851bbb829016dc42e7bc313483"
+    },
+    {
+      "path": "local-evidence/baseline-ground-contact/src/flightState.ts",
+      "bytes": 2095,
+      "sha256": "dd4537687cd4ec0eba2ba265f3322c994eb3f52c6be35a6677fd79e7198bd91c"
+    },
+    {
+      "path": "local-evidence/baseline-ground-contact/src/safeFlightState.ts",
+      "bytes": 12501,
+      "sha256": "315d74ab8c701ae9ccef632aaeae3d3342e5858c5607121c987d0ebdd97bd8e9"
+    },
+    {
+      "path": "local-evidence/build.log",
+      "bytes": 25185,
+      "sha256": "c5d334045dcabc0628bcbff60151c214ba49df6a4b4fc8e1d79f9121218a5419"
+    },
+    {
+      "path": "local-evidence/ci.log",
+      "bytes": 56214,
+      "sha256": "ebb0a4982d329e58059cd564359407e17e580cedb17d9fbdc0f55c5b2e14ba20"
+    },
+    {
+      "path": "local-evidence/compare-snapshot-batches.mjs",
+      "bytes": 5843,
+      "sha256": "43d39722ad612a69580cdd65ba9c84cbf069bf0a0fca8aa8fc5c8a7292342b8f"
+    },
+    {
+      "path": "local-evidence/controlled-after/cessna-172.cpuprofile",
+      "bytes": 1089240,
+      "sha256": "3eb17d7f780ce0833c5702200907662461b8ebc196930110cbccf82f8717b537"
+    },
+    {
+      "path": "local-evidence/controlled-after/f-35b.cpuprofile",
+      "bytes": 1516429,
+      "sha256": "65cec8ac9da8c303882f0a614222eea2b0f0863082d42d962d18d98dd1d11f21"
+    },
+    {
+      "path": "local-evidence/controlled-after/report.json",
+      "bytes": 38423,
+      "sha256": "ab9916205a840b0bd406b736d3247debc43d656235b7a42f93d809d40350b368"
+    },
+    {
+      "path": "local-evidence/controlled-before/cessna-172.cpuprofile",
+      "bytes": 1111504,
+      "sha256": "676ab1941064fbebc5bf7ca3f4fc343b960f96616a061b6e234a03423ddc8b61"
+    },
+    {
+      "path": "local-evidence/controlled-before/f-35b.cpuprofile",
+      "bytes": 1629041,
+      "sha256": "66470b85b438b3314f69f62cd0821bc3462e218f782633a4156c49212dd08c5f"
+    },
+    {
+      "path": "local-evidence/controlled-before/report.json",
+      "bytes": 38501,
+      "sha256": "04da608877b8bbae5aea7f60793be99141bde89b5bf084d972b01cb744638b6f"
+    },
+    {
+      "path": "local-evidence/dynamics/aggregate-baseline.json",
+      "bytes": 101812,
+      "sha256": "c21610c6ee2634b2c2e48619a5ec447fe43e000d35dc77d337693fb25970aa95"
+    },
+    {
+      "path": "local-evidence/dynamics/aggregate-baseline.md",
+      "bytes": 6434,
+      "sha256": "76d89db5787959cbc88126b9345af54dfe4c8fe50972b1433a2676022437f9e2"
+    },
+    {
+      "path": "local-evidence/dynamics/aggregate-paired.json",
+      "bytes": 213617,
+      "sha256": "2bd4a71ba13e5a9ccb7e96460997e4a6d366766916033dd7a98bbd4afc59f22a"
+    },
+    {
+      "path": "local-evidence/dynamics/aggregate-paired.md",
+      "bytes": 7601,
+      "sha256": "94ab9dcda8b7eeea0a9a32ee762b90a28cf8cf8ac043fb56721c942238121895"
+    },
+    {
+      "path": "local-evidence/dynamics/aggregate.mjs",
+      "bytes": 13849,
+      "sha256": "4574663c55bf074eeb28ef427918233e3c27ed3e246605aca1f628f130a25378"
+    },
+    {
+      "path": "local-evidence/dynamics/baseline.mjs",
+      "bytes": 36687,
+      "sha256": "005396a9419d6a36d4e1a811f0ab980f5992f1c92004622c0cd085b1192b689f"
+    },
+    {
+      "path": "local-evidence/dynamics/baseline.pre-shadow.mjs",
+      "bytes": 29630,
+      "sha256": "884e8b3c340abfb3dcde50b35471fc5a8fae5d8171ebf3d8b0a1916de3edf727"
+    },
+    {
+      "path": "local-evidence/dynamics/shadow/dynamicsShadow.ts",
+      "bytes": 17954,
+      "sha256": "c2bc02f958324aed66bc45b6ced939d32dc060dae7eb1f3808ed21a3b0ed9e33"
+    },
+    {
+      "path": "local-evidence/dynamics/shadow/dynamicsShadow.worker.ts",
+      "bytes": 8963,
+      "sha256": "1974d3cb4347acfe661d3084f13b447ee9eba97be91c3109f33da73ccac461a1"
+    },
+    {
+      "path": "local-evidence/dynamics/shadow/protocol.ts",
+      "bytes": 3553,
+      "sha256": "987b1ec314642e2a3acec3afe75e0f2413bca946dc304e92003ebdff547ff245"
+    },
+    {
+      "path": "local-evidence/dynamics/shadow/shadowSession.ts",
+      "bytes": 5384,
+      "sha256": "28122824c8dba087147b2dd00992ec4e0cadfa62d7f908545065496a7c859b8d"
+    },
+    {
+      "path": "local-evidence/dynamics/shadow/tsconfig.json",
+      "bytes": 179,
+      "sha256": "d0f2aa70c23b5704ba158e0b3ef6c373e4e5929bd099c022f36da36a95472e26"
+    },
+    {
+      "path": "local-evidence/final-typecheck.log",
+      "bytes": 239,
+      "sha256": "21f888450f96ad7f3fc12324005e92fd951f46b8e556411d2ec31923288ac141"
+    },
+    {
+      "path": "local-evidence/gas-optics-before/engineGasOptics.ts",
+      "bytes": 43241,
+      "sha256": "a2ed5be59fcc40e2f6d984fa949d2cc5908c14696d1fac94c09591aac9f43634"
+    },
+    {
+      "path": "local-evidence/gas-optics-before/engineReactionEmission.ts",
+      "bytes": 4203,
+      "sha256": "1d0e736b8a5b816a66d68a57c5674ce7f0af0a9a457fe4faaeaa6eccca8cec91"
+    },
+    {
+      "path": "local-evidence/gas-optics-benchmark.mjs",
+      "bytes": 4166,
+      "sha256": "27d17d46f1b271e400bd8bdefcfedb75f532c5d03249892c05605ff0075e73b2"
+    },
+    {
+      "path": "local-evidence/gas-optics-report.json",
+      "bytes": 1727,
+      "sha256": "4a0b18d3ad47c6a9c25da54a108522f62cf9bde48b4809439ff7ca41c6795df1"
+    },
+    {
+      "path": "local-evidence/gear-hitch.log",
+      "bytes": 388,
+      "sha256": "ae0b4e0dc6fb5033184aa0c829a247c1fae8ea5b5e7393196bf4618eb2d7243b"
+    },
+    {
+      "path": "local-evidence/profile.mjs",
+      "bytes": 11980,
+      "sha256": "6c76090476c494161a751fa7fc20f5043cfb5b4dd98ab71e588af75614bb69f1"
+    },
+    {
+      "path": "local-evidence/render-audit-depth.mjs",
+      "bytes": 11816,
+      "sha256": "fb220e78b191fdd69c49cf47f9c0ddf8e3a68dfa9639cabd2a5ced6d8d664fc7"
+    },
+    {
+      "path": "local-evidence/render-audit-geometry.mjs",
+      "bytes": 2571,
+      "sha256": "3fbb89cd0751bfcfa5ee5e88ddb1dbb41067442d8345cced422d41b818b1a211"
+    },
+    {
+      "path": "local-evidence/render-audit-nozzle.mjs",
+      "bytes": 7507,
+      "sha256": "2a933dcb9d3e92e6e3a941d708381212e7b2ea6d50f679f6a70689d08ef47111"
+    },
+    {
+      "path": "local-evidence/render-audit-report.json",
+      "bytes": 1514,
+      "sha256": "5e985a7183fe44ce6a9661498e8dc02a42ec520caafaa87efd691a7d8744ced8"
+    },
+    {
+      "path": "local-evidence/render-audit-rig.mjs",
+      "bytes": 40192,
+      "sha256": "d4d9234b19797f842b02796298383d636e32c2fbce134e98e8a9ee9c4c525d89"
+    },
+    {
+      "path": "local-evidence/render-audit-support.mjs",
+      "bytes": 15739,
+      "sha256": "392cfda661c93bf3b7b2c8240fcfc22a506041b966f736f38d570724e176893b"
+    },
+    {
+      "path": "local-evidence/render-audit.mjs",
+      "bytes": 5680,
+      "sha256": "302193f11c0942da16d769b41a5a7ab5978d4e6c2c76feef54d716380dfa76ae"
+    },
+    {
+      "path": "local-evidence/render-list-invalidation-report.json",
+      "bytes": 235,
+      "sha256": "cb78684935815398b4c0843136e8d8cdacc7b195f99347f9901dc26841ecfc51"
+    },
+    {
+      "path": "local-evidence/render-list-invalidation.mjs",
+      "bytes": 2084,
+      "sha256": "4513f296d05e21fbb3062a4a2b2e59204badd612fd0093ac18e09b2a5172a7be"
+    },
+    {
+      "path": "local-evidence/snapshot-batches-ab.json",
+      "bytes": 6014,
+      "sha256": "cfb97c9e1b979047fdf08506524fd823941ca36d871960399661fdd732680fb4"
+    },
+    {
+      "path": "local-evidence/snapshot-batches-entry.ts",
+      "bytes": 4552,
+      "sha256": "ee08d2f541474072981780566e2893bad628f9f539d3bc22657346fb8a5f4009"
+    },
+    {
+      "path": "workspace/exhaust/src/createEngineExhaust.ts",
+      "bytes": 47908,
+      "sha256": "da7fe1f710b77423a48775c9efc993d74a272ad0cf1932822c46f7cceaccd2da"
+    },
+    {
+      "path": "workspace/exhaust/src/engineExhaustDepth.ts",
+      "bytes": 12326,
+      "sha256": "595255ab2e82f5a842a7aad929970436f2b701eb69b8a28734e37325e9583d5c"
+    },
+    {
+      "path": "workspace/exhaust/src/engineGasOptics.ts",
+      "bytes": 46593,
+      "sha256": "0e2b70b1c94a2ea2426ed200133bf60d81a74ec0dfc9f2a81ff4a8ca29d3825a"
+    },
+    {
+      "path": "workspace/exhaust/tests/engineExhaustDepth.test.ts",
+      "bytes": 10748,
+      "sha256": "4a023b2dcc17745dd1f772351b020945a5aa08e761bacb3ee428ecff9f7c5019"
+    },
+    {
+      "path": "workspace/fly/src/flight/aircraft/createEngineExhaust.test.ts",
+      "bytes": 46653,
+      "sha256": "1bd7af9f70f506ab82f5e1ee9ad4a69a404957d584aa83cd48489e60da4e280a"
+    },
+    {
+      "path": "workspace/fly/src/flight/aircraft/engineGasOptics.test.ts",
+      "bytes": 20102,
+      "sha256": "ad8ca7644bfa8ee95d277300ac1afadf5fe3d0a55a0ce3b174f6c5c30eb4102e"
+    },
+    {
+      "path": "workspace/fly/src/flight/aircraft/stowedGearHitch.entry.ts",
+      "bytes": 9685,
+      "sha256": "4b17b48a3c673b0b7023e9ca4001886118df331b577c5aa70969a5f8b45afe1f"
+    },
+    {
+      "path": "workspace/fly/src/flight/aircraft/stowedGearHitch.test.ts",
+      "bytes": 10913,
+      "sha256": "9aa0b03160be6ae68f60680faabd542783e8e8bfb0dc98e5dbec09435a8dc46a"
+    },
+    {
+      "path": "workspace/fly/src/flight/jsbsim/createJsbsimRuntime.test.ts",
+      "bytes": 5459,
+      "sha256": "a9ec2b40fed1900c565c8c756d878b4394d1b000d07ddd2d1dd335116ba29226"
+    },
+    {
+      "path": "workspace/fly/src/flight/jsbsim/createJsbsimRuntime.ts",
+      "bytes": 4176,
+      "sha256": "9bfe0476273e7a0ce5a64398da483eddcfefd8d3a0557a8fc689d29f260aec21"
+    },
+    {
+      "path": "workspace/ground-contact/src/ecefBridge.ts",
+      "bytes": 1907,
+      "sha256": "48af91f1a213c80431bda67d0c15da3b9282c0dd247def39b13af28fb9082783"
+    },
+    {
+      "path": "workspace/ground-contact/src/propertyReadBatch.ts",
+      "bytes": 1331,
+      "sha256": "33378425348bd0e36cddaad7d8470cca22aa90e857e2b3c6e5ee9d14f0698f22"
+    },
+    {
+      "path": "workspace/ground-contact/src/safeFlightState.ts",
+      "bytes": 13857,
+      "sha256": "fbdff1a58fea7db0d1cb8c02848aef819c217eb74e1774b92d843820b9f6e607"
+    },
+    {
+      "path": "workspace/ground-contact/tests/ecefBridge.test.ts",
+      "bytes": 4047,
+      "sha256": "fd98b1784b54daa6d3c006a066a1582aa4d2bc4b1e396bbc9c45a7d1e2747e9b"
+    },
+    {
+      "path": "workspace/ground-contact/tests/safeFlightState.test.ts",
+      "bytes": 10079,
+      "sha256": "854bed0575537bd2df96d60bb6c1765df8fd3170b58d36a30e07922b3977d459"
+    }
+  ],
+  "archiveBytes": 745984,
+  "archiveSha256": "159c28976e527c656aecfab139c868bc1861796846b04fb755c1beacd941176f",
+  "summarySha256": "d7fd7b247bb658af44acd28eee6c7feebeb0543cb9dcae46c1010a53a0cdbdc8",
+  "repositoryHeads": {
+    "exhaust": "194d7fb59e54504e8396f02a7a0313ebd32ea3d3",
+    "ground-contact": "e941f4432334f96ff3959a78da3c9869eabb2f80",
+    "fly": "2d66a888a04d31a59634d868e8294e4d76986b79"
+  }
+}

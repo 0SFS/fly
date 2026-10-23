@@ -1,0 +1,1708 @@
+{
+  "checkpointDate": "2026-10-21",
+  "scope": "0SFS CPU optimizations; durable local checkpoint, uncommitted; see session-handoff.md",
+  "browser": {
+    "before": {
+      "scope": "Headless offline aircraft diagnostic, flat zero terrain, WebGL2, 1280x800 DPR1. Not a live Google FPS baseline.",
+      "runs": [
+        {
+          "id": "cessna-172",
+          "gl": {
+            "vendor": "Google Inc. (Apple)",
+            "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)",
+            "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+          },
+          "meshes": 31,
+          "running": true,
+          "summary": {
+            "frames": 482,
+            "frame": {
+              "meanMs": 16.80435684647305,
+              "p50Ms": 16.699999999999818,
+              "p95Ms": 16.700000000000728,
+              "p99Ms": 16.80000000000109,
+              "maxMs": 83.29999999999973
+            },
+            "measuredMeanMs": 1.2566390026407124,
+            "sections": [
+              {
+                "meanMs": 0.8377593346403842,
+                "p50Ms": 0.800000011920929,
+                "p95Ms": 1,
+                "p99Ms": 1.199999988079071,
+                "maxMs": 2.099999964237213,
+                "section": "flight",
+                "name": "flight",
+                "depth": 0,
+                "shareOfFrame": 0.04985369819828694,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 0.4039419079469942,
+                "p50Ms": 0.3999999761581421,
+                "p95Ms": 0.5,
+                "p99Ms": 0.5999999642372131,
+                "maxMs": 0.800000011920929,
+                "section": "flight/hud",
+                "name": "hud",
+                "depth": 1,
+                "shareOfFrame": 0.02403792728501685,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 0.35352696991560373,
+                "p50Ms": 0.30000001192092896,
+                "p95Ms": 0.40000003576278687,
+                "p99Ms": 0.5,
+                "maxMs": 0.800000011920929,
+                "section": "flight/hud/attitude",
+                "name": "attitude",
+                "depth": 2,
+                "shareOfFrame": 0.021037816153600848,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 0.28900414779473144,
+                "p50Ms": 0.30000001192092896,
+                "p95Ms": 0.40000003576278687,
+                "p99Ms": 0.5,
+                "maxMs": 1.0999999642372131,
+                "section": "flight/physics",
+                "name": "physics",
+                "depth": 1,
+                "shareOfFrame": 0.017198167739182982,
+                "activeFrames": 481
+              },
+              {
+                "meanMs": 0.017634854648123144,
+                "p50Ms": 0,
+                "p95Ms": 0.10000002384185791,
+                "p99Ms": 0.10000002384185791,
+                "maxMs": 0.19999998807907104,
+                "section": "flight/physics/collision",
+                "name": "collision",
+                "depth": 2,
+                "shareOfFrame": 0.001049421576156567,
+                "activeFrames": 81
+              },
+              {
+                "meanMs": 0.010165975548914359,
+                "p50Ms": 0,
+                "p95Ms": 0.10000002384185791,
+                "p99Ms": 0.10000002384185791,
+                "maxMs": 0.20000004768371582,
+                "section": "flight/physics/terrain contact",
+                "name": "terrain contact",
+                "depth": 2,
+                "shareOfFrame": 0.0006049607040478926,
+                "activeFrames": 48
+              },
+              {
+                "meanMs": 0.03589211521801612,
+                "p50Ms": 0,
+                "p95Ms": 0.10000002384185791,
+                "p99Ms": 0.10000002384185791,
+                "maxMs": 0.20000004768371582,
+                "section": "flight/input",
+                "name": "input",
+                "depth": 1,
+                "shareOfFrame": 0.0021358815184616404,
+                "activeFrames": 168
+              },
+              {
+                "meanMs": 0.03506224073809707,
+                "p50Ms": 0,
+                "p95Ms": 0.10000002384185791,
+                "p99Ms": 0.19999998807907104,
+                "maxMs": 0.20000004768371582,
+                "section": "flight/instruments",
+                "name": "instruments",
+                "depth": 1,
+                "shareOfFrame": 0.0020864970351695458,
+                "activeFrames": 163
+              },
+              {
+                "meanMs": 0.030082988293833754,
+                "p50Ms": 0,
+                "p95Ms": 0.10000002384185791,
+                "p99Ms": 0.10000002384185791,
+                "maxMs": 0.2999999523162842,
+                "section": "flight/view",
+                "name": "view",
+                "depth": 1,
+                "shareOfFrame": 0.0017901898042677943,
+                "activeFrames": 140
+              },
+              {
+                "meanMs": 0.028630705666245267,
+                "p50Ms": 0,
+                "p95Ms": 0.10000002384185791,
+                "p99Ms": 0.10000002384185791,
+                "maxMs": 0.20000004768371582,
+                "section": "flight/terrain",
+                "name": "terrain",
+                "depth": 1,
+                "shareOfFrame": 0.00170376682236752,
+                "activeFrames": 134
+              },
+              {
+                "meanMs": 0.009336100079706595,
+                "p50Ms": 0,
+                "p95Ms": 0.10000002384185791,
+                "p99Ms": 0.10000002384185791,
+                "maxMs": 0.19999998807907104,
+                "section": "flight/panels",
+                "name": "panels",
+                "depth": 1,
+                "shareOfFrame": 0.000555576161884832,
+                "activeFrames": 42
+              },
+              {
+                "meanMs": 0.0031120331950207467,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0.10000002384185791,
+                "maxMs": 0.10000002384185791,
+                "section": "flight/camera",
+                "name": "camera",
+                "depth": 1,
+                "shareOfFrame": 0.0001851920441497831,
+                "activeFrames": 15
+              },
+              {
+                "meanMs": 0.0010373446456624265,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0,
+                "maxMs": 0.10000002384185791,
+                "section": "flight/feedback",
+                "name": "feedback",
+                "depth": 1,
+                "shareOfFrame": 6.173069610100238e-05,
+                "activeFrames": 5
+              },
+              {
+                "meanMs": 0.5501217468879664,
+                "p50Ms": 0.546374,
+                "p95Ms": 1.069458,
+                "p99Ms": 1.5835,
+                "maxMs": 3.087208,
+                "section": "gpu",
+                "name": "gpu",
+                "depth": 0,
+                "shareOfFrame": 0.032736852229094844,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 0.5501217468879664,
+                "p50Ms": 0.546374,
+                "p95Ms": 1.069458,
+                "p99Ms": 1.5835,
+                "maxMs": 3.087208,
+                "section": "gpu/globe",
+                "name": "globe",
+                "depth": 1,
+                "shareOfFrame": 0.032736852229094844,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 0.3676348549943742,
+                "p50Ms": 0.30000001192092896,
+                "p95Ms": 0.6000000238418579,
+                "p99Ms": 1,
+                "maxMs": 1.0999999642372131,
+                "section": "render",
+                "name": "render",
+                "depth": 0,
+                "shareOfFrame": 0.021877353495473678,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 0.15062240409158573,
+                "p50Ms": 0.10000002384185791,
+                "p95Ms": 0.30000001192092896,
+                "p99Ms": 0.5,
+                "maxMs": 0.6000000238418579,
+                "section": "render/draw",
+                "name": "draw",
+                "depth": 1,
+                "shareOfFrame": 0.008963294785256768,
+                "activeFrames": 455
+              },
+              {
+                "meanMs": 0.027800828589443348,
+                "p50Ms": 0,
+                "p95Ms": 0.10000002384185791,
+                "p99Ms": 0.10000002384185791,
+                "maxMs": 0.19999998807907104,
+                "section": "render/active meshes",
+                "name": "active meshes",
+                "depth": 1,
+                "shareOfFrame": 0.0016543821845391407,
+                "activeFrames": 131
+              },
+              {
+                "meanMs": 0.008713693044986962,
+                "p50Ms": 0,
+                "p95Ms": 0.09999996423721313,
+                "p99Ms": 0.19999998807907104,
+                "maxMs": 0.30000001192092896,
+                "section": "render/render targets",
+                "name": "render targets",
+                "depth": 1,
+                "shareOfFrame": 0.0005185377295064892,
+                "activeFrames": 30
+              },
+              {
+                "meanMs": 0.043360995059191436,
+                "p50Ms": 0,
+                "p95Ms": 0.10000002384185791,
+                "p99Ms": 0.20000004768371582,
+                "maxMs": 2.100000023841858,
+                "section": "sky",
+                "name": "sky",
+                "depth": 0,
+                "shareOfFrame": 0.002580342434723539,
+                "activeFrames": 163
+              },
+              {
+                "meanMs": 0.004979253309890937,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0.10000002384185791,
+                "maxMs": 0.20000004768371582,
+                "section": "profiler",
+                "name": "profiler",
+                "depth": 0,
+                "shareOfFrame": 0.00029630728241384605,
+                "activeFrames": 21
+              },
+              {
+                "meanMs": 0.005000000198682149,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0.10000002384185791,
+                "maxMs": 0.20000004768371582,
+                "section": "profiler/streams",
+                "name": "streams",
+                "depth": 1,
+                "shareOfFrame": 0.00029630728241384605,
+                "activeFrames": 21
+              },
+              {
+                "meanMs": 0.002904564636871528,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0.10000002384185791,
+                "maxMs": 0.20000004768371582,
+                "section": "map",
+                "name": "map",
+                "depth": 0,
+                "shareOfFrame": 0.00017284592700619466,
+                "activeFrames": 13
+              },
+              {
+                "meanMs": 0.0008298757165299412,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0,
+                "maxMs": 0.10000002384185791,
+                "section": "map/google tiles",
+                "name": "google tiles",
+                "depth": 1,
+                "shareOfFrame": 4.93845568808019e-05,
+                "activeFrames": 4
+              },
+              {
+                "meanMs": 0.0008298755928688524,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0,
+                "maxMs": 0.10000002384185791,
+                "section": "map/terrain preparation",
+                "name": "terrain preparation",
+                "depth": 1,
+                "shareOfFrame": 4.9384549521931235e-05,
+                "activeFrames": 4
+              },
+              {
+                "meanMs": 0.0008298754692077637,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0,
+                "maxMs": 0.10000002384185791,
+                "section": "map/camera",
+                "name": "camera",
+                "depth": 1,
+                "shareOfFrame": 4.938454216306056e-05,
+                "activeFrames": 4
+              },
+              {
+                "meanMs": 0.0004149378582649706,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0,
+                "maxMs": 0.10000002384185791,
+                "section": "map/raster tiles",
+                "name": "raster tiles",
+                "depth": 1,
+                "shareOfFrame": 2.469227844040095e-05,
+                "activeFrames": 2
+              }
+            ]
+          }
+        },
+        {
+          "id": "f-35b",
+          "gl": {
+            "vendor": "Google Inc. (Apple)",
+            "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)",
+            "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+          },
+          "meshes": 281,
+          "running": true,
+          "summary": {
+            "frames": 482,
+            "frame": {
+              "meanMs": 16.87365145228217,
+              "p50Ms": 16.699999999999818,
+              "p95Ms": 16.700000000000728,
+              "p99Ms": 16.800000000000182,
+              "maxMs": 116.70000000000027
+            },
+            "measuredMeanMs": 7.7039419073781525,
+            "sections": [
+              {
+                "meanMs": 5.124481327800829,
+                "p50Ms": 5.100000023841858,
+                "p95Ms": 5.5,
+                "p99Ms": 5.699999988079071,
+                "maxMs": 8.5,
+                "section": "render",
+                "name": "render",
+                "depth": 0,
+                "shareOfFrame": 0.3036972372158215,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 3.5288381755846663,
+                "p50Ms": 3.5,
+                "p95Ms": 3.700000047683716,
+                "p99Ms": 3.900000035762787,
+                "maxMs": 6.100000023841858,
+                "section": "render/draw",
+                "name": "draw",
+                "depth": 1,
+                "shareOfFrame": 0.20913304897662732,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 0.4562240654749494,
+                "p50Ms": 0.5,
+                "p95Ms": 0.5999999642372131,
+                "p99Ms": 0.699999988079071,
+                "maxMs": 0.9000000357627869,
+                "section": "render/render targets",
+                "name": "render targets",
+                "depth": 1,
+                "shareOfFrame": 0.02703766086226967,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 0.21078838055559213,
+                "p50Ms": 0.19999998807907104,
+                "p95Ms": 0.30000001192092896,
+                "p99Ms": 0.30000001192092896,
+                "maxMs": 0.40000003576278687,
+                "section": "render/active meshes",
+                "name": "active meshes",
+                "depth": 1,
+                "shareOfFrame": 0.01249216159002045,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 3.983282072614106,
+                "p50Ms": 3.055249,
+                "p95Ms": 7.707708,
+                "p99Ms": 10.338958,
+                "maxMs": 10.57975,
+                "section": "gpu",
+                "name": "gpu",
+                "depth": 0,
+                "shareOfFrame": 0.23606520994454727,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 3.983282072614106,
+                "p50Ms": 3.055249,
+                "p95Ms": 7.707708,
+                "p99Ms": 10.338958,
+                "maxMs": 10.57975,
+                "section": "gpu/globe",
+                "name": "globe",
+                "depth": 1,
+                "shareOfFrame": 0.23606520994454727,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 2.530912861660803,
+                "p50Ms": 2.5,
+                "p95Ms": 2.800000011920929,
+                "p99Ms": 3,
+                "maxMs": 4.899999976158142,
+                "section": "flight",
+                "name": "flight",
+                "depth": 0,
+                "shareOfFrame": 0.14999200788389494,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 1.259958506867104,
+                "p50Ms": 1.2999999523162842,
+                "p95Ms": 1.399999976158142,
+                "p99Ms": 1.4000000357627869,
+                "maxMs": 2.400000035762787,
+                "section": "flight/view",
+                "name": "view",
+                "depth": 1,
+                "shareOfFrame": 0.07467017500214478,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 0.6721991706191257,
+                "p50Ms": 0.699999988079071,
+                "p95Ms": 0.800000011920929,
+                "p99Ms": 1,
+                "maxMs": 2.199999988079071,
+                "section": "flight/physics",
+                "name": "physics",
+                "depth": 1,
+                "shareOfFrame": 0.03983720847381912,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 0.016597510868088337,
+                "p50Ms": 0,
+                "p95Ms": 0.10000002384185791,
+                "p99Ms": 0.10000002384185791,
+                "maxMs": 0.20000004768371582,
+                "section": "flight/physics/terrain contact",
+                "name": "terrain contact",
+                "depth": 2,
+                "shareOfFrame": 0.0009836348057221196,
+                "activeFrames": 78
+              },
+              {
+                "meanMs": 0.015352697416954515,
+                "p50Ms": 0,
+                "p95Ms": 0.10000002384185791,
+                "p99Ms": 0.10000002384185791,
+                "maxMs": 0.19999998807907104,
+                "section": "flight/physics/collision",
+                "name": "collision",
+                "depth": 2,
+                "shareOfFrame": 0.0009098621872314456,
+                "activeFrames": 73
+              },
+              {
+                "meanMs": 0.4184647315023351,
+                "p50Ms": 0.40000003576278687,
+                "p95Ms": 0.5,
+                "p99Ms": 0.6000000238418579,
+                "maxMs": 1,
+                "section": "flight/hud",
+                "name": "hud",
+                "depth": 1,
+                "shareOfFrame": 0.024799891871995345,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 0.35477178633460366,
+                "p50Ms": 0.3999999761581421,
+                "p95Ms": 0.40000003576278687,
+                "p99Ms": 0.5,
+                "maxMs": 0.9000000357627869,
+                "section": "flight/hud/attitude",
+                "name": "attitude",
+                "depth": 2,
+                "shareOfFrame": 0.021025193470297774,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 0.0782157660025284,
+                "p50Ms": 0.09999996423721313,
+                "p95Ms": 0.30000001192092896,
+                "p99Ms": 0.30000001192092896,
+                "maxMs": 0.30000001192092896,
+                "section": "flight/instruments",
+                "name": "instruments",
+                "depth": 1,
+                "shareOfFrame": 0.004635378787082252,
+                "activeFrames": 269
+              },
+              {
+                "meanMs": 0.042946057695570826,
+                "p50Ms": 0,
+                "p95Ms": 0.10000002384185791,
+                "p99Ms": 0.19999998807907104,
+                "maxMs": 0.20000004768371582,
+                "section": "flight/input",
+                "name": "input",
+                "depth": 1,
+                "shareOfFrame": 0.0025451549605027754,
+                "activeFrames": 201
+              },
+              {
+                "meanMs": 0.04107883646775083,
+                "p50Ms": 0,
+                "p95Ms": 0.10000002384185791,
+                "p99Ms": 0.19999998807907104,
+                "maxMs": 0.20000004768371582,
+                "section": "flight/terrain",
+                "name": "terrain",
+                "depth": 1,
+                "shareOfFrame": 0.002434495970473237,
+                "activeFrames": 188
+              },
+              {
+                "meanMs": 0.00933609958506224,
+                "p50Ms": 0,
+                "p95Ms": 0.09999996423721313,
+                "p99Ms": 0.10000002384185791,
+                "maxMs": 0.20000004768371582,
+                "section": "flight/panels",
+                "name": "panels",
+                "depth": 1,
+                "shareOfFrame": 0.0005532945617292295,
+                "activeFrames": 40
+              },
+              {
+                "meanMs": 0.0035269705586413627,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0.10000002384185791,
+                "maxMs": 0.10000002384185791,
+                "section": "flight/camera",
+                "name": "camera",
+                "depth": 1,
+                "shareOfFrame": 0.00020902236653491725,
+                "activeFrames": 17
+              },
+              {
+                "meanMs": 0.001659751062076616,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0.09999996423721313,
+                "maxMs": 0.10000002384185791,
+                "section": "flight/feedback",
+                "name": "feedback",
+                "depth": 1,
+                "shareOfFrame": 9.836347910648194e-05,
+                "activeFrames": 8
+              },
+              {
+                "meanMs": 0.03838174310957248,
+                "p50Ms": 0,
+                "p95Ms": 0.10000002384185791,
+                "p99Ms": 0.19999998807907104,
+                "maxMs": 0.30000001192092896,
+                "section": "sky",
+                "name": "sky",
+                "depth": 0,
+                "shareOfFrame": 0.0022746554424283383,
+                "activeFrames": 169
+              },
+              {
+                "meanMs": 0.00892116172679727,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0.30000001192092896,
+                "maxMs": 0.30000001192092896,
+                "section": "profiler",
+                "name": "profiler",
+                "depth": 0,
+                "shareOfFrame": 0.0005287036864561214,
+                "activeFrames": 23
+              },
+              {
+                "meanMs": 0.008995815799824862,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0.30000001192092896,
+                "maxMs": 0.30000001192092896,
+                "section": "profiler/streams",
+                "name": "streams",
+                "depth": 1,
+                "shareOfFrame": 0.0005287036864561214,
+                "activeFrames": 23
+              },
+              {
+                "meanMs": 0.0012448130801505568,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0.09999996423721313,
+                "maxMs": 0.10000002384185791,
+                "section": "map",
+                "name": "map",
+                "depth": 0,
+                "shareOfFrame": 7.377259650472364e-05,
+                "activeFrames": 6
+              },
+              {
+                "meanMs": 0.00041493773460388184,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0,
+                "maxMs": 0.10000002384185791,
+                "section": "map/camera",
+                "name": "camera",
+                "depth": 1,
+                "shareOfFrame": 2.459086794445794e-05,
+                "activeFrames": 2
+              },
+              {
+                "meanMs": 0.00041493773460388184,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0,
+                "maxMs": 0.10000002384185791,
+                "section": "map/terrain preparation",
+                "name": "terrain preparation",
+                "depth": 1,
+                "shareOfFrame": 2.459086794445794e-05,
+                "activeFrames": 2
+              },
+              {
+                "meanMs": 0.0004149376109427931,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0,
+                "maxMs": 0.09999996423721313,
+                "section": "map/google tiles",
+                "name": "google tiles",
+                "depth": 1,
+                "shareOfFrame": 2.459086061580776e-05,
+                "activeFrames": 2
+              },
+              {
+                "meanMs": 0,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0,
+                "maxMs": 0,
+                "section": "map/raster tiles",
+                "name": "raster tiles",
+                "depth": 1,
+                "shareOfFrame": 0,
+                "activeFrames": 0
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "after": {
+      "scope": "Headless offline aircraft diagnostic, flat zero terrain, WebGL2, 1280x800 DPR1. Not a live Google FPS baseline.",
+      "runs": [
+        {
+          "id": "cessna-172",
+          "gl": {
+            "vendor": "Google Inc. (Apple)",
+            "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)",
+            "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+          },
+          "meshes": 31,
+          "running": true,
+          "summary": {
+            "frames": 482,
+            "frame": {
+              "meanMs": 16.804564315352717,
+              "p50Ms": 16.699999999999818,
+              "p95Ms": 16.700000000000728,
+              "p99Ms": 16.800000000000182,
+              "maxMs": 83.40000000000009
+            },
+            "measuredMeanMs": 1.181950206825842,
+            "sections": [
+              {
+                "meanMs": 0.7678423230826112,
+                "p50Ms": 0.7999999523162842,
+                "p95Ms": 1,
+                "p99Ms": 1.100000023841858,
+                "maxMs": 1.699999988079071,
+                "section": "flight",
+                "name": "flight",
+                "depth": 0,
+                "shareOfFrame": 0.04569248620037756,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 0.4039419100492327,
+                "p50Ms": 0.3999999761581421,
+                "p95Ms": 0.5,
+                "p99Ms": 0.6000000238418579,
+                "maxMs": 1,
+                "section": "flight/hud",
+                "name": "hud",
+                "depth": 1,
+                "shareOfFrame": 0.02403763063825402,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 0.35311203415957726,
+                "p50Ms": 0.30000001192092896,
+                "p95Ms": 0.5,
+                "p99Ms": 0.5,
+                "maxMs": 1,
+                "section": "flight/hud/attitude",
+                "name": "attitude",
+                "depth": 2,
+                "shareOfFrame": 0.021012864572571673,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 0.21659751279720132,
+                "p50Ms": 0.19999998807907104,
+                "p95Ms": 0.30000001192092896,
+                "p99Ms": 0.40000003576278687,
+                "maxMs": 1,
+                "section": "flight/physics",
+                "name": "physics",
+                "depth": 1,
+                "shareOfFrame": 0.012889207285149128,
+                "activeFrames": 474
+              },
+              {
+                "meanMs": 0.011410787887098383,
+                "p50Ms": 0,
+                "p95Ms": 0.10000002384185791,
+                "p99Ms": 0.10000002384185791,
+                "maxMs": 0.19999998807907104,
+                "section": "flight/physics/terrain contact",
+                "name": "terrain contact",
+                "depth": 2,
+                "shareOfFrame": 0.0006790290823948016,
+                "activeFrames": 53
+              },
+              {
+                "meanMs": 0.007883817699440286,
+                "p50Ms": 0,
+                "p95Ms": 0.09999996423721313,
+                "p99Ms": 0.10000002384185791,
+                "maxMs": 0.10000002384185791,
+                "section": "flight/physics/collision",
+                "name": "collision",
+                "depth": 2,
+                "shareOfFrame": 0.0004691474025445336,
+                "activeFrames": 38
+              },
+              {
+                "meanMs": 0.03796680376737444,
+                "p50Ms": 0,
+                "p95Ms": 0.10000002384185791,
+                "p99Ms": 0.10000002384185791,
+                "maxMs": 0.19999998807907104,
+                "section": "flight/input",
+                "name": "input",
+                "depth": 1,
+                "shareOfFrame": 0.0022593149726998765,
+                "activeFrames": 180
+              },
+              {
+                "meanMs": 0.03755186689839818,
+                "p50Ms": 0,
+                "p95Ms": 0.10000002384185791,
+                "p99Ms": 0.19999998807907104,
+                "maxMs": 0.19999998807907104,
+                "section": "flight/instruments",
+                "name": "instruments",
+                "depth": 1,
+                "shareOfFrame": 0.0022346230579801847,
+                "activeFrames": 175
+              },
+              {
+                "meanMs": 0.02717842291499569,
+                "p50Ms": 0,
+                "p95Ms": 0.10000002384185791,
+                "p99Ms": 0.10000002384185791,
+                "maxMs": 0.20000004768371582,
+                "section": "flight/terrain",
+                "name": "terrain",
+                "depth": 1,
+                "shareOfFrame": 0.0016173238654075294,
+                "activeFrames": 129
+              },
+              {
+                "meanMs": 0.02717842204936807,
+                "p50Ms": 0,
+                "p95Ms": 0.10000002384185791,
+                "p99Ms": 0.10000002384185791,
+                "maxMs": 0.3999999761581421,
+                "section": "flight/view",
+                "name": "view",
+                "depth": 1,
+                "shareOfFrame": 0.0016173238138960707,
+                "activeFrames": 126
+              },
+              {
+                "meanMs": 0.009751036948682856,
+                "p50Ms": 0,
+                "p95Ms": 0.09999996423721313,
+                "p99Ms": 0.19999998807907104,
+                "maxMs": 0.20000004768371582,
+                "section": "flight/panels",
+                "name": "panels",
+                "depth": 1,
+                "shareOfFrame": 0.0005802612174702006,
+                "activeFrames": 41
+              },
+              {
+                "meanMs": 0.002074688673019409,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0.09999996423721313,
+                "maxMs": 0.10000002384185791,
+                "section": "flight/camera",
+                "name": "camera",
+                "depth": 1,
+                "shareOfFrame": 0.00012345983115575126,
+                "activeFrames": 10
+              },
+              {
+                "meanMs": 0.0018672196202258351,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0.09999996423721313,
+                "maxMs": 0.10000002384185791,
+                "section": "flight/feedback",
+                "name": "feedback",
+                "depth": 1,
+                "shareOfFrame": 0.0001111138370020064,
+                "activeFrames": 9
+              },
+              {
+                "meanMs": 0.5486090871369297,
+                "p50Ms": 0.527249,
+                "p95Ms": 0.721916,
+                "p99Ms": 2.014124,
+                "maxMs": 3.863624,
+                "section": "gpu",
+                "name": "gpu",
+                "depth": 0,
+                "shareOfFrame": 0.03264643324526529,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 0.5486090871369297,
+                "p50Ms": 0.527249,
+                "p95Ms": 0.721916,
+                "p99Ms": 2.014124,
+                "maxMs": 3.863624,
+                "section": "gpu/globe",
+                "name": "globe",
+                "depth": 1,
+                "shareOfFrame": 0.03264643324526529,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 0.3624481323843675,
+                "p50Ms": 0.30000001192092896,
+                "p95Ms": 0.6000000238418579,
+                "p99Ms": 0.8999999761581421,
+                "maxMs": 1.300000011920929,
+                "section": "render",
+                "name": "render",
+                "depth": 0,
+                "shareOfFrame": 0.021568433764940484,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 0.14647302958975195,
+                "p50Ms": 0.10000002384185791,
+                "p95Ms": 0.30000001192092896,
+                "p99Ms": 0.5,
+                "maxMs": 0.5,
+                "section": "render/draw",
+                "name": "draw",
+                "depth": 1,
+                "shareOfFrame": 0.008716264631504525,
+                "activeFrames": 451
+              },
+              {
+                "meanMs": 0.03485476871743737,
+                "p50Ms": 0,
+                "p95Ms": 0.10000002384185791,
+                "p99Ms": 0.19999998807907104,
+                "maxMs": 0.20000004768371582,
+                "section": "render/active meshes",
+                "name": "active meshes",
+                "depth": 1,
+                "shareOfFrame": 0.002074125104546383,
+                "activeFrames": 162
+              },
+              {
+                "meanMs": 0.00912863115057411,
+                "p50Ms": 0,
+                "p95Ms": 0.09999996423721313,
+                "p99Ms": 0.20000004768371582,
+                "maxMs": 0.40000003576278687,
+                "section": "render/render targets",
+                "name": "render targets",
+                "depth": 1,
+                "shareOfFrame": 0.0005432233159555441,
+                "activeFrames": 28
+              },
+              {
+                "meanMs": 0.04585062270342562,
+                "p50Ms": 0,
+                "p95Ms": 0.10000002384185791,
+                "p99Ms": 0.20000004768371582,
+                "maxMs": 2,
+                "section": "sky",
+                "name": "sky",
+                "depth": 0,
+                "shareOfFrame": 0.0027284624488322085,
+                "activeFrames": 166
+              },
+              {
+                "meanMs": 0.004771784380758452,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0.10000002384185791,
+                "maxMs": 0.19999998807907104,
+                "section": "profiler",
+                "name": "profiler",
+                "depth": 0,
+                "shareOfFrame": 0.0002839576374139573,
+                "activeFrames": 22
+              },
+              {
+                "meanMs": 0.004791666815678278,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0.10000002384185791,
+                "maxMs": 0.19999998807907104,
+                "section": "profiler/streams",
+                "name": "streams",
+                "depth": 1,
+                "shareOfFrame": 0.0002839576374139573,
+                "activeFrames": 22
+              },
+              {
+                "meanMs": 0.0010373442746791602,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0,
+                "maxMs": 0.10000002384185791,
+                "section": "map",
+                "name": "map",
+                "depth": 0,
+                "shareOfFrame": 6.172991189848572e-05,
+                "activeFrames": 5
+              },
+              {
+                "meanMs": 0.0006224065400752784,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0,
+                "maxMs": 0.10000002384185791,
+                "section": "map/camera",
+                "name": "camera",
+                "depth": 1,
+                "shareOfFrame": 3.7037945667335466e-05,
+                "activeFrames": 3
+              },
+              {
+                "meanMs": 0.00041493773460388184,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0,
+                "maxMs": 0.10000002384185791,
+                "section": "map/google tiles",
+                "name": "google tiles",
+                "depth": 1,
+                "shareOfFrame": 2.469196623115025e-05,
+                "activeFrames": 2
+              },
+              {
+                "meanMs": 0,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0,
+                "maxMs": 0,
+                "section": "map/raster tiles",
+                "name": "raster tiles",
+                "depth": 1,
+                "shareOfFrame": 0,
+                "activeFrames": 0
+              },
+              {
+                "meanMs": 0,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0,
+                "maxMs": 0,
+                "section": "map/terrain preparation",
+                "name": "terrain preparation",
+                "depth": 1,
+                "shareOfFrame": 0,
+                "activeFrames": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "f-35b",
+          "gl": {
+            "vendor": "Google Inc. (Apple)",
+            "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)",
+            "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+          },
+          "meshes": 281,
+          "running": true,
+          "summary": {
+            "frames": 482,
+            "frame": {
+              "meanMs": 16.8734439834025,
+              "p50Ms": 16.699999999999818,
+              "p95Ms": 16.799999999999272,
+              "p99Ms": 16.800000000000182,
+              "maxMs": 116.60000000000036
+            },
+            "measuredMeanMs": 3.849585062487986,
+            "sections": [
+              {
+                "meanMs": 3.049492151452285,
+                "p50Ms": 2.965458,
+                "p95Ms": 5.591958,
+                "p99Ms": 6.539999,
+                "maxMs": 6.820749,
+                "section": "gpu",
+                "name": "gpu",
+                "depth": 0,
+                "shareOfFrame": 0.1807273105864995,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 3.049492151452285,
+                "p50Ms": 2.965458,
+                "p95Ms": 5.591958,
+                "p99Ms": 6.539999,
+                "maxMs": 6.820749,
+                "section": "gpu/globe",
+                "name": "globe",
+                "depth": 1,
+                "shareOfFrame": 0.1807273105864995,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 2.2053941908713695,
+                "p50Ms": 2.100000023841858,
+                "p95Ms": 2.400000035762787,
+                "p99Ms": 5.400000035762787,
+                "maxMs": 5.699999988079071,
+                "section": "render",
+                "name": "render",
+                "depth": 0,
+                "shareOfFrame": 0.13070207795401445,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 0.6821576781045352,
+                "p50Ms": 0.6000000238418579,
+                "p95Ms": 0.7000000476837158,
+                "p99Ms": 3.699999988079071,
+                "maxMs": 3.800000011920929,
+                "section": "render/draw",
+                "name": "draw",
+                "depth": 1,
+                "shareOfFrame": 0.04042788649285452,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 0.4556016610371127,
+                "p50Ms": 0.40000003576278687,
+                "p95Ms": 0.6000000238418579,
+                "p99Ms": 0.6000000238418579,
+                "maxMs": 1,
+                "section": "render/render targets",
+                "name": "render targets",
+                "depth": 1,
+                "shareOfFrame": 0.027001106678948505,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 0.2064315334147932,
+                "p50Ms": 0.19999998807907104,
+                "p95Ms": 0.30000001192092896,
+                "p99Ms": 0.30000001192092896,
+                "maxMs": 0.40000003576278687,
+                "section": "render/active meshes",
+                "name": "active meshes",
+                "depth": 1,
+                "shareOfFrame": 0.012234107845312956,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 1.5914937759830743,
+                "p50Ms": 1.5999999642372131,
+                "p95Ms": 1.899999976158142,
+                "p99Ms": 2.100000023841858,
+                "maxMs": 3.600000023841858,
+                "section": "flight",
+                "name": "flight",
+                "depth": 0,
+                "shareOfFrame": 0.09431943932421509,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 0.5672199172103058,
+                "p50Ms": 0.5999999642372131,
+                "p95Ms": 0.699999988079071,
+                "p99Ms": 0.7000000476837158,
+                "maxMs": 1.0999999642372131,
+                "section": "flight/view",
+                "name": "view",
+                "depth": 1,
+                "shareOfFrame": 0.033616131820406646,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 0.43340248982441376,
+                "p50Ms": 0.40000003576278687,
+                "p95Ms": 0.5,
+                "p99Ms": 0.6000000238418579,
+                "maxMs": 1.300000011920929,
+                "section": "flight/physics",
+                "name": "physics",
+                "depth": 1,
+                "shareOfFrame": 0.02568547892479618,
+                "activeFrames": 481
+              },
+              {
+                "meanMs": 0.01473029062955706,
+                "p50Ms": 0,
+                "p95Ms": 0.10000002384185791,
+                "p99Ms": 0.10000002384185791,
+                "maxMs": 0.19999998807907104,
+                "section": "flight/physics/terrain contact",
+                "name": "terrain contact",
+                "depth": 2,
+                "shareOfFrame": 0.0008729866080716217,
+                "activeFrames": 67
+              },
+              {
+                "meanMs": 0.006016597213586831,
+                "p50Ms": 0,
+                "p95Ms": 0.09999996423721313,
+                "p99Ms": 0.10000002384185791,
+                "maxMs": 0.10000002384185791,
+                "section": "flight/physics/collision",
+                "name": "collision",
+                "depth": 2,
+                "shareOfFrame": 0.0003565719730663778,
+                "activeFrames": 29
+              },
+              {
+                "meanMs": 0.4151452269049601,
+                "p50Ms": 0.3999999761581421,
+                "p95Ms": 0.5,
+                "p99Ms": 0.5999999642372131,
+                "maxMs": 1,
+                "section": "flight/hud",
+                "name": "hud",
+                "depth": 1,
+                "shareOfFrame": 0.024603467277534815,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 0.3510373436316415,
+                "p50Ms": 0.3999999761581421,
+                "p95Ms": 0.40000003576278687,
+                "p99Ms": 0.5,
+                "maxMs": 0.800000011920929,
+                "section": "flight/hud/attitude",
+                "name": "attitude",
+                "depth": 2,
+                "shareOfFrame": 0.020804131271419047,
+                "activeFrames": 482
+              },
+              {
+                "meanMs": 0.07448132886431524,
+                "p50Ms": 0.09999996423721313,
+                "p95Ms": 0.30000001192092896,
+                "p99Ms": 0.30000001192092896,
+                "maxMs": 0.40000003576278687,
+                "section": "flight/instruments",
+                "name": "instruments",
+                "depth": 1,
+                "shareOfFrame": 0.0044141153956227626,
+                "activeFrames": 244
+              },
+              {
+                "meanMs": 0.04481327731579666,
+                "p50Ms": 0,
+                "p95Ms": 0.10000002384185791,
+                "p99Ms": 0.19999998807907104,
+                "maxMs": 0.20000004768371582,
+                "section": "flight/terrain",
+                "name": "terrain",
+                "depth": 1,
+                "shareOfFrame": 0.0026558465100472123,
+                "activeFrames": 209
+              },
+              {
+                "meanMs": 0.03921161808413589,
+                "p50Ms": 0,
+                "p95Ms": 0.10000002384185791,
+                "p99Ms": 0.10000002384185791,
+                "maxMs": 0.19999998807907104,
+                "section": "flight/input",
+                "name": "input",
+                "depth": 1,
+                "shareOfFrame": 0.0023238657219419017,
+                "activeFrames": 185
+              },
+              {
+                "meanMs": 0.009128630779590844,
+                "p50Ms": 0,
+                "p95Ms": 0.10000002384185791,
+                "p99Ms": 0.10000002384185791,
+                "maxMs": 0.20000004768371582,
+                "section": "flight/panels",
+                "name": "panels",
+                "depth": 1,
+                "shareOfFrame": 0.0005410057833226097,
+                "activeFrames": 43
+              },
+              {
+                "meanMs": 0.0045643156989481435,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0.10000002384185791,
+                "maxMs": 0.10000002384185791,
+                "section": "flight/camera",
+                "name": "camera",
+                "depth": 1,
+                "shareOfFrame": 0.00027050290998315555,
+                "activeFrames": 22
+              },
+              {
+                "meanMs": 0.0008298755928688524,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0,
+                "maxMs": 0.10000002384185791,
+                "section": "flight/feedback",
+                "name": "feedback",
+                "depth": 1,
+                "shareOfFrame": 4.918234793591376e-05,
+                "activeFrames": 4
+              },
+              {
+                "meanMs": 0.04087136964085686,
+                "p50Ms": 0,
+                "p95Ms": 0.10000002384185791,
+                "p99Ms": 0.19999998807907104,
+                "maxMs": 0.2999999523162842,
+                "section": "sky",
+                "name": "sky",
+                "depth": 0,
+                "shareOfFrame": 0.00242223043979995,
+                "activeFrames": 178
+              },
+              {
+                "meanMs": 0.010165975054270004,
+                "p50Ms": 0,
+                "p95Ms": 0.09999996423721313,
+                "p99Ms": 0.2999999523162842,
+                "maxMs": 0.30000001192092896,
+                "section": "profiler",
+                "name": "profiler",
+                "depth": 0,
+                "shareOfFrame": 0.0006024837054172063,
+                "activeFrames": 30
+              },
+              {
+                "meanMs": 0.010251045975226239,
+                "p50Ms": 0,
+                "p95Ms": 0.09999996423721313,
+                "p99Ms": 0.2999999523162842,
+                "maxMs": 0.30000001192092896,
+                "section": "profiler/streams",
+                "name": "streams",
+                "depth": 1,
+                "shareOfFrame": 0.0006024837054172063,
+                "activeFrames": 30
+              },
+              {
+                "meanMs": 0.0016597509384155273,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0.09999996423721313,
+                "maxMs": 0.10000002384185791,
+                "section": "map",
+                "name": "map",
+                "depth": 0,
+                "shareOfFrame": 9.836468121434694e-05,
+                "activeFrames": 8
+              },
+              {
+                "meanMs": 0.0008298755928688524,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0,
+                "maxMs": 0.10000002384185791,
+                "section": "map/raster tiles",
+                "name": "raster tiles",
+                "depth": 1,
+                "shareOfFrame": 4.918234793591376e-05,
+                "activeFrames": 4
+              },
+              {
+                "meanMs": 0.00041493773460388184,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0,
+                "maxMs": 0.10000002384185791,
+                "section": "map/camera",
+                "name": "camera",
+                "depth": 1,
+                "shareOfFrame": 2.4591170303586736e-05,
+                "activeFrames": 2
+              },
+              {
+                "meanMs": 0.0004149376109427931,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0,
+                "maxMs": 0.09999996423721313,
+                "section": "map/google tiles",
+                "name": "google tiles",
+                "depth": 1,
+                "shareOfFrame": 2.4591162974846447e-05,
+                "activeFrames": 2
+              },
+              {
+                "meanMs": 0,
+                "p50Ms": 0,
+                "p95Ms": 0,
+                "p99Ms": 0,
+                "maxMs": 0,
+                "section": "map/terrain preparation",
+                "name": "terrain preparation",
+                "depth": 1,
+                "shareOfFrame": 0,
+                "activeFrames": 0
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "snapshotAndFixedStep": {
+    "scope": "Paired Node native JSBSim/WASM benchmark, hold-down at 5000 ft, 120 Hz; full snapshot records and actual fixedStepLoop including guards, ground clearance, SDK run and interpolation. No renderer/GPU.",
+    "runs": [
+      {
+        "aircraft": "cessna-172",
+        "initialFields": 13,
+        "controlFields": 17,
+        "equalSnapshots": true,
+        "plantRestore": true,
+        "capture": {
+          "beforeMs": 0.03840458333333335,
+          "afterMs": 0.0015662149999999997,
+          "speedup": 24.52063307613154,
+          "savedMsPerSecond120Hz": 4.420604200000002,
+          "samples": {
+            "before": [
+              0.04544526041666667,
+              0.039146701250000054,
+              0.038794166666666664,
+              0.03840458333333335,
+              0.0388457116666667,
+              0.038044548749999955,
+              0.03806923583333334,
+              0.03798533000000001,
+              0.03778038166666666
+            ],
+            "after": [
+              0.0030528820833333253,
+              0.0031146179166666363,
+              0.0016918575000000639,
+              0.001552552083333391,
+              0.0016476562500000113,
+              0.0015662149999999997,
+              0.0015509204166665805,
+              0.0015511112500000005,
+              0.0014883504166667194
+            ]
+          }
+        },
+        "flightState": {
+          "beforeMs": 0.010687083333333382,
+          "afterMs": 0.0003205554166666502,
+          "speedup": 33.33926921112371,
+          "savedMsPerSecond120Hz": 1.2439833500000077,
+          "samples": {
+            "before": [
+              0.010687083333333382,
+              0.010520017499999975,
+              0.010512708333333289,
+              0.010590416666666727,
+              0.010644739583333281,
+              0.010718246249999955,
+              0.010723229166666688,
+              0.01089661458333334,
+              0.010796111249999948
+            ],
+            "after": [
+              0.0004319270833333159,
+              0.0003328124999999697,
+              0.0003205554166666502,
+              0.0003145137499999843,
+              0.0003204862499999687,
+              0.0003162845833332994,
+              0.00032788208333329295,
+              0.0003567883333333081,
+              0.0002646699999999669
+            ]
+          }
+        },
+        "fixedStep": {
+          "beforeMs": 0.1149471516666669,
+          "afterMs": 0.055198889999999966,
+          "speedup": 2.08241781069632,
+          "savedMsPerSecond120Hz": 7.169791400000032,
+          "samples": {
+            "before": [
+              0.11579819333333338,
+              0.11599360999999969,
+              0.12551312499999995,
+              0.11698243166666696,
+              0.11423750000000003,
+              0.1149471516666669,
+              0.11437194499999957,
+              0.11476020833333299,
+              0.11435757000000042
+            ],
+            "after": [
+              0.05760437500000004,
+              0.05798784666666658,
+              0.05692055666666647,
+              0.05617006833333335,
+              0.05469944499999959,
+              0.0541986116666673,
+              0.05425625000000006,
+              0.05333992999999964,
+              0.055198889999999966
+            ]
+          }
+        }
+      },
+      {
+        "aircraft": "f-35b",
+        "initialFields": 13,
+        "controlFields": 79,
+        "equalSnapshots": true,
+        "plantRestore": true,
+        "capture": {
+          "beforeMs": 0.22740635416666655,
+          "afterMs": 0.005362795416666586,
+          "speedup": 42.40444329834572,
+          "savedMsPerSecond120Hz": 26.645227049999995,
+          "samples": {
+            "before": [
+              0.22441043416666673,
+              0.23365446166666648,
+              0.22689510416666658,
+              0.22740635416666655,
+              0.2219639408333334,
+              0.22993892374999972,
+              0.22653538208333315,
+              0.22755526041666674,
+              0.2318867708333331
+            ],
+            "after": [
+              0.007365816250000042,
+              0.005428437500000124,
+              0.0053498783333331325,
+              0.00540319416666686,
+              0.005309253750000001,
+              0.00533441000000001,
+              0.005362795416666586,
+              0.005210625000000088,
+              0.005390815833333514
+            ]
+          }
+        },
+        "flightState": {
+          "beforeMs": 0.013504809166667353,
+          "afterMs": 0.00029673624999986713,
+          "speedup": 45.51115398497285,
+          "savedMsPerSecond120Hz": 1.5849687500000984,
+          "samples": {
+            "before": [
+              0.014002066250000098,
+              0.013757413333333563,
+              0.013657587083333358,
+              0.013640277916667097,
+              0.013465017500000159,
+              0.013504809166667353,
+              0.013373264166666558,
+              0.013391249999999673,
+              0.013409236249999594
+            ],
+            "after": [
+              0.00029673624999986713,
+              0.00029821166666655095,
+              0.00030220499999965495,
+              0.00029060749999947197,
+              0.0002874133333337644,
+              0.0002944445833334915,
+              0.00036387166666675813,
+              0.0003211112500002855,
+              0.00028703124999992726
+            ]
+          }
+        },
+        "fixedStep": {
+          "beforeMs": 0.4422861816666682,
+          "afterMs": 0.19297750000000027,
+          "speedup": 2.291905438026027,
+          "savedMsPerSecond120Hz": 29.917041800000153,
+          "samples": {
+            "before": [
+              0.44523215333333305,
+              0.44100416666666814,
+              0.4435554166666649,
+              0.4418481249999998,
+              0.4571542350000012,
+              0.4422861816666682,
+              0.44417569500000054,
+              0.4407074299999992,
+              0.43933881833333543
+            ],
+            "after": [
+              0.19297750000000027,
+              0.19120347166666762,
+              0.19429138833333126,
+              0.19244951333333118,
+              0.19368319500000022,
+              0.19243472166666833,
+              0.19343715166666697,
+              0.19354833333333468,
+              0.19294965333333192
+            ]
+          }
+        }
+      }
+    ],
+    "checksum": 167259963.8711869
+  },
+  "gasOptics": {
+    "correctness": {
+      "cases": 168,
+      "scalarValues": 2798908,
+      "ms": 414.613333,
+      "exact": true
+    },
+    "iterations": 160,
+    "results": [
+      {
+        "name": "changing-temperature-dry",
+        "beforeMs": 1.1052828125000005,
+        "afterMs": 0.4096645875,
+        "speedup": 2.698018931157921,
+        "beforeTrials": [
+          1.1635237000000003,
+          1.1702028625000005,
+          1.0964924499999995,
+          1.1051007812500004,
+          1.1052828125000005
+        ],
+        "afterTrials": [
+          0.4135502562500001,
+          0.4096645875,
+          0.4139229187500007,
+          0.4070401000000004,
+          0.406133593749999
+        ]
+      },
+      {
+        "name": "changing-temperature-afterburner",
+        "beforeMs": 1.5670747437499997,
+        "afterMs": 0.5878572875000003,
+        "speedup": 2.6657400989521607,
+        "beforeTrials": [
+          1.5670747437499997,
+          1.536215362500002,
+          1.5049200499999984,
+          1.6913669249999999,
+          1.677708337499999
+        ],
+        "afterTrials": [
+          0.5878572875000003,
+          0.607360937499999,
+          0.5765643249999982,
+          0.5818369749999988,
+          0.6556341124999989
+        ]
+      },
+      {
+        "name": "changing-temperature-and-geometry",
+        "beforeMs": 3.4888763062500003,
+        "afterMs": 1.570727343750002,
+        "speedup": 2.2211851854062408,
+        "beforeTrials": [
+          4.275129687500003,
+          3.4888763062500003,
+          3.924913281250002,
+          3.1692627562500038,
+          3.3785351562500012
+        ],
+        "afterTrials": [
+          1.9333953124999994,
+          1.6566015624999977,
+          1.570727343750002,
+          1.1903989562499988,
+          1.0087275999999918
+        ]
+      }
+    ],
+    "sink": 240222576.5517876,
+    "node": "v26.9.0"
+  },
+  "depthListInvalidation": [
+    {
+      "label": "before",
+      "frames": 120,
+      "dirtyFrames": 120,
+      "candidates": [
+        "hardware"
+      ]
+    },
+    {
+      "label": "after",
+      "frames": 120,
+      "dirtyFrames": 0,
+      "candidates": [
+        "hardware"
+      ]
+    }
+  ],
+  "validation": {
+    "passingTests": 2198,
+    "expectedFailures": 1,
+    "lint": "passed",
+    "typecheck": "passed",
+    "build": "passed",
+    "note": "Implementation-pass results; browser regression completed separately after sandbox port failure."
+  },
+  "laterWorkerDecision": {
+    "status": "gate-failed-no-shipping-migration",
+    "report": "flight-dynamics-worker-results.md",
+    "note": "Subsequent agent report present at checkpoint; includes method and one-machine limits."
+  }
+}
