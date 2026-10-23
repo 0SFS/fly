@@ -1,6 +1,6 @@
 import { headingDegFromRad, type FlightState } from "@0sfs/ground-contact/flightState";
 import type { FrameProfiler } from "foss-earth/perf";
-import { createThrottleLever, type ThrottleLeverEngine } from "@0sfs/engines/throttleLever";
+import { createThrottleLever, type ThrottleBrakeCommand, type ThrottleLeverEngine } from "@0sfs/engines/throttleLever";
 import {
   ATTITUDE_HALF_SHARE,
   createAttitudeRenderer,
@@ -20,6 +20,11 @@ export type FlightHudLayout = "compact" | "classic";
 export interface FlightHudOptions {
   onGearChange(down: boolean): void;
   onThrottleChange(value: number): void;
+  /** Present for an aircraft whose throttle lever includes a lower brake range. */
+  onPowerChange?(command: ThrottleBrakeCommand): void;
+  getKeepSliderBrakes?(): boolean;
+  /** The slider's own brake selection, before keyboard/button brakes are mixed in. */
+  getSliderBrake?(): number;
   onPitchTrimChange(value: number): void;
   onRollTrimChange(value: number): void;
   onPitchAutoTrimChange(enabled: boolean): void;
@@ -315,6 +320,7 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
   // The phone mounts this same lever; see throttleLever.ts.
   const throttle = createThrottleLever(throttleControl, {
     onThrottleChange: options.onThrottleChange,
+    onPowerChange: options.onPowerChange,
     onStartHold: options.engine?.onStartHold,
     onShutdown: options.engine?.onShutdown,
   });
@@ -719,6 +725,8 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
       if (!rudderDragging) setValue(rudderInput, String(controls.rudder));
       throttle.update({
         throttle: state.throttleNorm,
+        brake: options.getSliderBrake?.() ?? 0,
+        keepBrakes: options.getKeepSliderBrakes?.() ?? false,
         engine: options.engine?.getReading() ?? null,
         afterburner: options.afterburner?.getActive() ?? null,
       });

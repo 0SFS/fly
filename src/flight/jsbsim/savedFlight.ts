@@ -170,7 +170,11 @@ export function savedFlightTerrainRequest(flight: SavedFlight): {
 function savedControls(current: Record<string, number>, flight: SavedFlight): Record<string, number> {
   const controls: Record<string, number> = {};
   for (const [property, value] of Object.entries(current)) {
-    const saved = flight.simulation.controls[property];
+    // Before differential braking, saves recorded only equal wheel brakes.
+    const saved = flight.simulation.controls[property] ?? (property === "fcs/brake-cmd-norm"
+      ? Math.max(flight.simulation.controls["fcs/left-brake-cmd-norm"] ?? Number.NaN,
+        flight.simulation.controls["fcs/right-brake-cmd-norm"] ?? Number.NaN)
+      : undefined);
     const chosen = !SESSION_CONTROLS.test(property) && Number.isFinite(saved) ? saved : value;
     if (Number.isFinite(chosen)) controls[property] = chosen;
   }

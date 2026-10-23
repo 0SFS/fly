@@ -117,6 +117,8 @@ describe("engine models", () => {
       .toEqual(["dataPackage", "forceEngineLabels", "forceExternalForces", "initialProperties", "model"]);
     expect(empirical).toMatchObject({ model: "F-35B-jsbsim-empirical", dataPackage: "f-35b-empirical-engine" });
     expect(empirical.forceExternalForces?.map(force => force.name)).toEqual(["external-tank-0-drag", "external-tank-1-drag", "pushback"]);
+    expect(plant.forceExternalForces?.filter(force => force.name.startsWith("station-")).map(force => force.name))
+      .toEqual(Array.from({ length: 11 }, (_, index) => `station-${index + 1}-drag`));
     expect(empirical.initialProperties).toEqual({ ...plant.initialProperties, "fcs/throttle1": 0, "fcs/throttle2": 0, "fcs/throttle3": 0 });
   });
 });

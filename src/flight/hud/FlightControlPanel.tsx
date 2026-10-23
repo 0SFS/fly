@@ -12,6 +12,7 @@ import type { FlightLocationPanel } from "../location/flightLocation";
 import {
   Bug,
   CloudSun,
+  Crosshair,
   Fan,
   Flame,
   Fuel,
@@ -62,6 +63,7 @@ import {
 } from "@0sfs/ground-contact/GroundInteractionSettingsPanel";
 import { AutopilotPanel, type AutopilotPanelState } from "@0sfs/autopilot/AutopilotPanel";
 import { FuelPanel, type FuelPanelState } from "@0sfs/fuel/FuelPanel";
+import { ArmamentPanel, type ArmamentPanelState } from "@0sfs/stores/ArmamentPanel";
 import { SoundSettingsPanel, type SoundAction } from "@0sfs/sound/SoundSettingsPanel";
 import { AUDIO_PARAMETER_IDS } from "@0sfs/sound/audioSettings";
 import { FrameBudgetPanel } from "./FrameBudgetPanel";
@@ -75,12 +77,13 @@ import { AUTOPILOT_PARAMETER_IDS, type AutopilotSettingsV1 } from "@0sfs/autopil
 import { GROUND_PARAMETER_IDS } from "@0sfs/ground-contact/groundInteractionSettings";
 import type { FlightRecorder } from "@0sfs/logging/flightRecorder";
 
-export type FlightPanelTab = "weather" | "aircraft" | "fuel" | "autopilot" | "controls" | "remote" | "sound" | "exhaust" | "engine" | "gforces" | "logging" | "debug";
+export type FlightPanelTab = "weather" | "aircraft" | "fuel" | "armament" | "autopilot" | "controls" | "remote" | "sound" | "exhaust" | "engine" | "gforces" | "logging" | "debug";
 
 const TAB_DEFINITIONS: readonly WindowTabDefinition<FlightPanelTab>[] = [
   { id: "weather", label: "Weather" },
   { id: "aircraft", label: "Aircraft" },
   { id: "fuel", label: "Fuel" },
+  { id: "armament", label: "Armament" },
   { id: "autopilot", label: "Autopilot" },
   { id: "controls", label: "Controls" },
   { id: "remote", label: "Remote Control" },
@@ -92,10 +95,13 @@ const TAB_DEFINITIONS: readonly WindowTabDefinition<FlightPanelTab>[] = [
   { id: "debug", label: "Debug" },
 ];
 
+const TABS_WITHOUT_ARMAMENT = TAB_DEFINITIONS.filter(tab => tab.id !== "armament");
+
 const TAB_ICONS = {
   weather: CloudSun,
   aircraft: Plane,
   fuel: Fuel,
+  armament: Crosshair,
   autopilot: Navigation,
   controls: Gauge,
   remote: Smartphone,
@@ -143,11 +149,13 @@ export interface FlightControlPanelSnapshot {
   groundInteraction: GroundInteractionPanelState;
   autopilot: AutopilotPanelState;
   fuel: FuelPanelState;
+  /** Present when the loaded flight model has weapon stations. */
+  armament?: ArmamentPanelState;
   logging: LoggingPanelState;
 }
 
 /** Every tab the panel can show: the flight's own, and the shared globe tabs. */
-export type FlightOverlayTab = "location" | "map" | "renderer" | "sky" | "time" | "vr" | "bug-report" | "test-feedback" | "browser-data" | FlightPanelTab;
+export type FlightOverlayTab = "location" | "overview" | "map" | "renderer" | "sky" | "time" | "vr" | "bug-report" | "test-feedback" | "browser-data" | FlightPanelTab;
 
 export interface FlightControlPanelOptions {
   /** The app's settings registry, whose sections the tabs draw. */
@@ -158,7 +166,9 @@ export interface FlightControlPanelOptions {
   parameters: FlightParameterStore;
   /** The current aircraft hierarchy; the controller updates independently of flight telemetry. */
   meshInspector?: MeshInspectorHandle;
-  /** The shared Map tab's contents, from `createMapSourcePanel`. */
+  /** The shared map of the view. Flight-only marks are drawn by the host that builds it. */
+  overviewTab?: HTMLElement;
+  /** The shared Basemap tab's contents, from `createMapSourcePanel`. */
   mapTab: HTMLElement;
   /** The shared Renderer tab's contents, from `createRendererPanel`. */
   rendererTab: HTMLElement;
@@ -209,6 +219,10 @@ export interface FlightControlPanelOptions {
   /** New contents in pounds, by JSBSim tank number; tanks not listed keep theirs. */
   onFuelChange(contentsLbs: ReadonlyMap<number, number>): void;
   onFuelAttachmentChange?(index: number, attached: boolean): void;
+  onArmamentLoad?(load: readonly (string | null)[]): void;
+  onArmamentJettison?(station: number): void;
+  onArmamentDoor?(bay: 0 | 1, open: boolean): void;
+  onArmamentMasterArm?(armed: boolean): void;
   /** Hosts Engine's two sections, with the registry controls inside Settings. */
   attachEngineDetails(host: HTMLElement, settingsContent?: HTMLElement): () => void;
   /** The engine model this flight loaded, on an aircraft that offers a choice. */
@@ -777,6 +791,7 @@ export function FlightControlPanel(props: FlightControlPanelProps) {
     <SectionFactory.Provider value={props.createSection ?? createParameterSection}><ParameterSettings.Provider value={props.settings}>
       <WindowOverlay<FlightPanelTab>
         overlayApiRef={props.overlayApiRef}
+        overviewTab={props.overviewTab}
         mapTab={props.mapTab}
         rendererTab={props.rendererTab}
         skyTab={props.skyTab}
@@ -798,7 +813,7 @@ export function FlightControlPanel(props: FlightControlPanelProps) {
         locationHostDataCodec={props.location?.hostDataCodec}
         locationDraft={props.location?.draft}
         locationSearchSection={props.locationSearchSection}
-        additionalTabs={TAB_DEFINITIONS}
+        additionalTabs={props.snapshot.armament ? TAB_DEFINITIONS : TABS_WITHOUT_ARMAMENT}
         onBeforeCloseTab={(tabId) => {
           if (tabId !== "logging") return;
           if (!allowCloseLoggingTab(props.flightRecorder)) return false;
@@ -817,6 +832,13 @@ export function FlightControlPanel(props: FlightControlPanelProps) {
                 onAircraftFamilyChange={setSelectedAircraftFamily} />
                 : tabId === "fuel" ? <FuelPanel state={props.snapshot.fuel} onChange={props.onFuelChange}
                   onAttachmentChange={props.onFuelAttachmentChange} />
+                : tabId === "armament" && props.snapshot.armament ? <div className="flight-panel__content">
+                  <ArmamentPanel state={props.snapshot.armament}
+                    onLoad={props.onArmamentLoad ?? (() => {})}
+                    onJettison={props.onArmamentJettison ?? (() => {})}
+                    onDoor={props.onArmamentDoor ?? (() => {})}
+                    onMasterArm={props.onArmamentMasterArm ?? (() => {})} />
+                </div>
                 : tabId === "autopilot" ? <ParameterSection settings={props.settings} tab="autopilot" section="package"
                   covers={AUTOPILOT_PARAMETER_IDS}>
                   <AutopilotPanel
@@ -825,6 +847,8 @@ export function FlightControlPanel(props: FlightControlPanelProps) {
                     onEngageChange={props.onAutopilotEngageChange} />
                 </ParameterSection>
                 : tabId === "controls" ? <div className="flight-panel__content">
+                  {props.snapshot.aircraftId === "f-35b" &&
+                    <ParameterSection settings={props.settings} tab="controls" section="braking" />}
                   {getFdmProfile(props.snapshot.aircraftId).stovl &&
                     <ParameterSection settings={props.settings} tab="controls" section="stovl">
                       <p className="flight-panel__hint">Use the VTOL lever beside THR: 0% conventional flight; 100% lift fan and downward nozzle. Conversion takes time. Experimental STOVL handling.</p>

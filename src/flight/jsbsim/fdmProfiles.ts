@@ -191,6 +191,13 @@ const F35B_STORE_AND_PUSHBACK_FORCES: readonly ExternalForceTerms[] = [
   { name: "pushback", label: "Pushback", frame: "body" },
 ];
 
+// Weapon-station drag is plant-only. The empirical model has no station
+// properties, and its force list stays the tanks and pushback.
+const F35B_STATION_DRAG_FORCES: readonly ExternalForceTerms[] = Array.from({ length: 11 }, (_, index): ExternalForceTerms => {
+  const station = index + 1;
+  return { name: `station-${station}-drag`, label: `Station ${station} drag`, frame: "wind", magnitude: `stores/station[${station}]/drag-lbs` };
+});
+
 const F35B_INITIAL_PROPERTIES: Readonly<Record<string, number>> = {
   "fcs/stovl-cmd-norm": 0,
   "fcs/stovl-pos-norm": 0,
@@ -282,6 +289,7 @@ export const FDM_PROFILES: Record<AircraftId, FdmProfile> = {
       { name: "engine-ram-drag", label: "Engine inlet ram drag", frame: "wind", magnitude: "propulsion/engine-ram-drag-lbs" },
       { name: "lift-fan-ram-drag", label: "Lift-fan inlet ram drag", frame: "wind", magnitude: "propulsion/lift-fan-ram-drag-lbs" },
       ...F35B_STORE_AND_PUSHBACK_FORCES,
+      ...F35B_STATION_DRAG_FORCES,
     ],
     // One aileron position drives both ailerons' terms, and one rudder both fins'.
     // The model gives neither a force, only moments.

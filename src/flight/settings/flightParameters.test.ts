@@ -15,6 +15,16 @@ afterEach(() => { vi.unstubAllGlobals(); resetAppSettings(); });
 const FOSS_EARTH_SECTIONS = new Set(["map/detail", "controls/orbit"]);
 
 describe("flight parameter catalogue", () => {
+  it("requires holding the brake slider by default and saves persistence in Controls", () => {
+    const registry = createSettingsRegistry({ storage: null });
+    registry.register(OSFS_PARAMETERS);
+    expect(registry.get("osfs.input.keepSliderBrakes")).toBe(false);
+    expect(registry.inspect("osfs.input.keepSliderBrakes").spec.home).toEqual({
+      tab: "controls", section: "braking", level: "main",
+    });
+    expect(registry.set("osfs.input.keepSliderBrakes", true)).toEqual({ ok: true });
+    expect(registry.get("osfs.input.keepSliderBrakes")).toBe(true);
+  });
   it("restores the complete aircraft choice after the page's settings are recreated", () => {
     const saved = new Map<string, string>();
     vi.stubGlobal("localStorage", {

@@ -120,6 +120,17 @@ describe("saved flight", () => {
   describe("restoring", () => {
     const saved = (): SavedFlight => captureSavedFlight(asSdk(fakeSdk()), "cessna-172", true)!;
 
+    it("recovers the pilot brake from legacy saves with only equal wheel brakes", () => {
+      const flight = saved();
+      delete flight.simulation.controls["fcs/brake-cmd-norm"];
+      flight.simulation.controls["fcs/left-brake-cmd-norm"] = flight.simulation.controls["fcs/right-brake-cmd-norm"] = 0.6;
+      const sdk = fakeSdk({ "fcs/brake-cmd-norm": 0 });
+      applySavedControls(asSdk(sdk), flight, "cessna-172");
+      expect(sdk.properties["fcs/brake-cmd-norm"]).toBe(0.6);
+      restoreSavedFlight(asSdk(sdk), flight, "cessna-172", { groundHeightMeters: 0, altitudeMeters: 3000 });
+      expect(sdk.properties["fcs/brake-cmd-norm"]).toBe(0.6);
+    });
+
     it("keeps the height above the ground prepared this session, and the saved controls and engine", () => {
       const flight = saved();
       const sdk = fakeSdk({

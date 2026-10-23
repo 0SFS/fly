@@ -60,7 +60,7 @@ export interface PreviewTrace {
 }
 
 /** The private replay: passing out is followed whether or not it is on, at its mean time, so the markers show where it would come. */
-export function replayPreview(
+function replayPreview(
   kind: Parameters<typeof createPilotModel>[0], settings: FlightPilotSettings, protocol: LoadProtocol, hz: number,
 ): PreviewTrace {
   const meanSeconds = settings.passOut?.meanSeconds ?? 11.9;

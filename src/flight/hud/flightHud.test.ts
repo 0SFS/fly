@@ -145,6 +145,35 @@ describe("flight HUD automatic flaps", () => {
   });
 });
 
+describe("flight HUD combined throttle and brake lever", () => {
+  it("routes the brake range to persistent flight input and follows the brake command", () => {
+    const input = createFlightInputManager();
+    const t = mount({
+      onPowerChange: ({ throttle, brake }) => input.setThrottleBrake(throttle, brake),
+      getSliderBrake: () => input.getSliderBrake(),
+    });
+    const slider = t.host.querySelector<HTMLElement>('[data-control="throttle"]')!;
+    const box = slider.parentElement!;
+    try {
+      t.hud.update({ ...STATE, throttleNorm: 0 }, CONTROLS, true, AUTO_OFF);
+      slider.dispatchEvent(new KeyboardEvent("keydown", { key: "Home", bubbles: true }));
+      const controls = input.poll(1 / 60);
+      expect(controls).toMatchObject({ throttle: 0, brake: 1 });
+      t.hud.update({ ...STATE, throttleNorm: 0 }, controls, true, AUTO_OFF);
+      expect(box.querySelector("span")?.textContent).toBe("BRK");
+      expect(box.querySelector("output")?.value).toBe("100%");
+      slider.dispatchEvent(new KeyboardEvent("keyup", { key: "Home", bubbles: true }));
+      expect(input.poll(1 / 60)).toMatchObject({ throttle: 0, brake: 0 });
+      expect(box.querySelector("span")?.textContent).toBe("THR");
+      slider.dispatchEvent(new KeyboardEvent("keydown", { key: "End", bubbles: true }));
+      const powered = input.poll(1 / 60);
+      expect(powered).toMatchObject({ throttle: 1, brake: 0 });
+      t.hud.update({ ...STATE, throttleNorm: 1 }, powered, true, AUTO_OFF);
+      expect(box.querySelector("span")?.textContent).toBe("THR");
+    } finally { t.hud.destroy(); input.dispose(); }
+  });
+});
+
 describe("flight HUD observed afterburner", () => {
   it.each(["#9ab8ff", "#ff9a62"])("uses aircraft accent %s only while an engine reports augmentation", accentColor => {
     let active: boolean | null = false;

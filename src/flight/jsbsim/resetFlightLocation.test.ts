@@ -39,6 +39,7 @@ describe("resetFlightLocation", () => {
     expect(sdk.setPropertyValue).toHaveBeenCalledWith("ic/h-sl-ft", 301.5 / 0.3048);
     expect(sdk.setPropertyValue).toHaveBeenCalledWith("ic/psi-true-deg", 90);
     expect(sdk.setPropertyValue).toHaveBeenCalledWith("ic/vg-fps", 0);
+    expect(sdk.setPropertyValue).toHaveBeenCalledWith("fcs/brake-cmd-norm", 1);
     expect(sdk.setPropertyValue).toHaveBeenCalledWith("fcs/left-brake-cmd-norm", 1);
     expect(sdk.setPropertyValue).toHaveBeenCalledWith("fcs/throttle-cmd-norm", 0);
   });
@@ -49,6 +50,7 @@ describe("resetFlightLocation", () => {
     expect(sdk.setPropertyValue).toHaveBeenCalledWith("ic/h-sl-ft", 800 / 0.3048);
     expect(sdk.setPropertyValue).toHaveBeenCalledWith("ic/vc-kts", 75);
     expect(sdk.setPropertyValue).toHaveBeenCalledWith("ic/gamma-deg", -3);
+    expect(sdk.setPropertyValue).toHaveBeenCalledWith("fcs/brake-cmd-norm", 0);
     expect(sdk.setPropertyValue).toHaveBeenCalledWith("fcs/left-brake-cmd-norm", 0);
     expect(sdk.setPropertyValue).toHaveBeenCalledWith("fcs/throttle-cmd-norm", 0.35);
   });

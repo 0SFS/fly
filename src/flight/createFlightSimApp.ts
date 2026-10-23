@@ -38,6 +38,13 @@ import { readFuelTanks, writeFuelTanks } from "@0sfs/fuel/fuelTanks";
 import { readExternalFuelTanks, setExternalFuelTankAttached } from "@0sfs/fuel/externalFuelTanks";
 import { getExternalTankDefinitions } from "@0sfs/fuel/externalTankDefinitions";
 import { createExternalTankVisuals } from "@0sfs/fuel/createExternalTankVisuals";
+import { createStoreVisuals, type StoreVisualHandle } from "@0sfs/stores/createStoreVisuals";
+import { stationForFuelTank, tankOnStation as attachedTankStations } from "@0sfs/stores/stationTable";
+import {
+  aircraftHasWeaponStations, readBayDoorPositionsInto, readStoreMirror, writeBayDoor, writeMasterArm, writeStation,
+  type StoreMirror,
+} from "@0sfs/stores/storeAttachment";
+import { rearmRefusal } from "@0sfs/stores/storeCatalog";
 import { createEngineControl } from "@0sfs/engines/engineControl";
 import {
   applySavedControls,
@@ -214,6 +221,7 @@ import { maxCatchUpSteps, PHYSICS_RATE_PARAMETER_ID, physicsStepSeconds, readPhy
 import { readPilotG } from "@0sfs/g-forces/gForce";
 import { createFlightPilot, PILOT_PARAMETER_IDS, readFlightPilotSettings, type PilotTransition } from "./createFlightPilot";
 import { cameraAttitudeView } from "./hud/cameraAttitudeView";
+import { createFlightPathOverlay } from "./hud/flightPathOverlay";
 import { createFlightCompass } from "./hud/flightCompass";
 import type { AttitudeView } from "./hud/attitudeIndicator";
 import { createFlightLoadingScreen, type FlightLoadingScreen } from "../loading/createFlightLoadingScreen";
@@ -226,6 +234,7 @@ import {
   createGameLog,
   createMapDetailController,
   createMapSourcePanel,
+  createOverviewMap,
   createPresetsSection,
   createRendererPanel,
   reportRendererStart,
@@ -1285,6 +1294,12 @@ async function createFlightSimSession(
   const flightHud: FlightHudHandle = createFlightHud(hudRoot, {
     onGearChange: (down) => { inputManager.setGearDown(down); runtime.requestRender(); },
     onThrottleChange: (value) => { inputManager.setThrottle(value); runtime.requestRender(); },
+    onPowerChange: initialAircraftId === "f-35b" ? ({ throttle, brake }) => {
+      inputManager.setThrottleBrake(throttle, brake);
+      runtime.requestRender();
+    } : undefined,
+    getKeepSliderBrakes: () => parameters.get("osfs.input.keepSliderBrakes"),
+    getSliderBrake: () => inputManager.getSliderBrake(),
     engine: {
       getReading: () => engineControl.reading(),
       // Holding the lever is pilot input, like moving it: it takes the controls back from a phone.
@@ -1348,6 +1363,10 @@ async function createFlightSimSession(
     parameters.get("osfs.renderer.attitudeView") === "camera" ? cameraAttitudeView(runtime.scene.activeCamera) : null
   );
   stopWatching.push(parameters.watch("osfs.renderer.attitudeView", () => runtime.requestRender()));
+  stopWatching.push(parameters.watch("osfs.input.keepSliderBrakes", () => {
+    runtime.requestRender();
+    phoneSession?.syncStatus();
+  }));
   if (vtolProfile) stopWatching.push(parameters.watch("osfs.aircraft.stovlConversion", () => {
     flightHud.refreshVtolConversion();
     runtime.requestRender();
@@ -1384,6 +1403,20 @@ async function createFlightSimSession(
   let aircraftModel: AircraftModelHandle | null = null;
   let aircraftLights: AircraftLightsHandle | null = null;
   let externalTankVisuals: ReturnType<typeof createExternalTankVisuals> | null = null;
+  let storeVisuals: StoreVisualHandle | null = null;
+  let storeMirror: StoreMirror | null = null;
+  let doorsSettled = true;
+  let weaponStations: boolean | null = null;
+  const hasWeaponStations = (): boolean => {
+    if (weaponStations === null) weaponStations = aircraftHasWeaponStations(jsbsim.sdk);
+    return weaponStations;
+  };
+  const refreshStores = (): void => {
+    if (!hasWeaponStations()) return;
+    storeMirror = readStoreMirror(jsbsim.sdk);
+    storeVisuals?.sync(storeMirror);
+    doorsSettled = false;
+  };
   stopWatching.push(parameters.watch("osfs.externalTanks.debrisLifetimeSeconds", seconds => {
     externalTankVisuals?.setLifetimeSeconds(seconds);
   }));
@@ -1969,6 +2002,12 @@ async function createFlightSimSession(
         });
       });
     }
+    if (!engineTest && hasWeaponStations()) {
+      storeMirror = readStoreMirror(jsbsim.sdk);
+      storeVisuals = createStoreVisuals(runtime.scene, aircraft.modelRoot);
+      storeVisuals.sync(storeMirror);
+      doorsSettled = false;
+    }
     const limits = orbitPitchLimits();
     orbitStateYaw = orbitRestoreYaw();
     orbitStatePitch = engineTest ? orbitRestorePitch() : Math.asin(
@@ -2231,6 +2270,7 @@ async function createFlightSimSession(
     controlPanel?.update(createPanelSnapshot(physicsLoop.getLatestState() ?? initialState));
   }));
   const createPanelSnapshot = (flightState = initialState): FlightControlPanelSnapshot => {
+    const tanks = readFuelTanks(jsbsim.sdk);
     return {
       flightState,
       fps: runtime.engine.getFps(),
@@ -2275,7 +2315,15 @@ async function createFlightSimSession(
         blockedReason: autopilotBlockReason(),
         readOnlyReason: autopilotStore.readOnlyReason,
       },
-      fuel: { familyId: getAircraftFamilyForAircraft(aircraftId).id, tanks: readFuelTanks(jsbsim.sdk) },
+      fuel: { familyId: getAircraftFamilyForAircraft(aircraftId).id, tanks },
+      armament: storeMirror ? {
+        load: storeMirror.load,
+        onGround: aircraftOnGround(),
+        masterArm: storeMirror.masterArm,
+        bayCmd: storeMirror.bayCmd,
+        bayPos: storeMirror.bayPos,
+        tankOnStation: attachedTankStations(tanks.flatMap(tank => tank.attached ? [tank.index] : [])),
+      } : undefined,
       logging: loggingSnapshot(),
     };
   };
@@ -2335,10 +2383,13 @@ async function createFlightSimSession(
     jsbsim.sdk.setPropertyValue("atmosphere/wind-east-fps", -Math.sin(directionRad) * speedFps);
   };
 
-  const placeAircraftAtLocation = (location: FlightLocation, terrainHeightMeters: number): FlightState =>
-    engineTest
+  const placeAircraftAtLocation = (location: FlightLocation, terrainHeightMeters: number): FlightState => {
+    const placed = engineTest
       ? resetFlightLocation(jsbsim.sdk, location, terrainHeightMeters, aircraftId, { holdDown: true })
       : resetFlightLocation(jsbsim.sdk, location, terrainHeightMeters, aircraftId);
+    refreshStores();
+    return placed;
+  };
 
   const teleportToLocation = (location: FlightLocation): void => {
     if (disposed) return;
@@ -2462,6 +2513,8 @@ async function createFlightSimSession(
           // The same reading the HUD's engine chip is drawing from, so both
           // screens show one engine rather than two sampled at two times.
           engine: toEngineStatus(engineMonitor.getReading(), engineControl.reading()),
+          throttleBrakeRange: initialAircraftId === "f-35b",
+          keepSliderBrakes: parameters.get("osfs.input.keepSliderBrakes"),
         };
       },
       hasActiveLocalInput: () => inputManager.hasActiveFlightInput() || localStartHeld || flightHud.isPilotHolding(),
@@ -2554,6 +2607,21 @@ async function createFlightSimSession(
     // Saving a choice switches the map: the runtime follows map.source.*.
     onMapSourceChange: selected => setMapSourcePreference(selected, settings),
     onTerrainSourceChange: selected => setTerrainSourcePreference(selected, settings),
+  });
+  // The map of the view is the shared one. The predicted path is this flight's,
+  // so another app that mounts the same map does not load it.
+  const overviewMap = createOverviewMap({
+    document, sources: RASTER_BASE_MAP_SOURCES, settings,
+    basemap: () => ({ mode: runtime.status.mode, source: runtime.status.mode === "raster-basemap" ? runtime.status.rasterBaseMap : null }),
+    subscribeBasemap: listener => runtime.subscribeStatus(() => listener()),
+    view: () => runtime.getViewState(),
+    frames: { subscribe(listener) {
+      const observer = runtime.scene.onAfterRenderObservable.add(listener);
+      return () => { runtime.scene.onAfterRenderObservable.remove(observer); };
+    } },
+    overlay: createFlightPathOverlay(() => physicsLoop.getLatestState()),
+    // A fitted globe makes a sectional a speck. Start close enough to read the chart and the path.
+    initialZoomOffset: 9,
   });
   // Settings holds what spans every tab, the presets and the saved record; the
   // Interface tab the position readout, the log and place search, which the
@@ -2654,6 +2722,7 @@ async function createFlightSimSession(
     settings,
     parameters,
     meshInspector,
+    overviewTab: overviewMap.element,
     mapTab: mapPanel.element,
     rendererTab: rendererPanel.element,
     skyTab: skyPanel.element,
@@ -2737,7 +2806,23 @@ async function createFlightSimSession(
       controlPanel?.update(createPanelSnapshot(physicsLoop.getLatestState() ?? initialState));
     },
     onFuelAttachmentChange: (index, attached) => {
-      if (!setExternalFuelTankAttached(jsbsim.sdk, aircraftId, index, attached)) return;
+      const station = attached ? stationForFuelTank(index) : null;
+      let clearedWeapon = false;
+      if (station && storeMirror?.load[station]) {
+        writeStation(jsbsim.sdk, station, null);
+        const load = storeMirror.load.slice();
+        load[station] = null;
+        storeMirror = { ...storeMirror, load };
+        storeVisuals?.sync(storeMirror);
+        clearedWeapon = true;
+      }
+      if (!setExternalFuelTankAttached(jsbsim.sdk, aircraftId, index, attached)) {
+        if (clearedWeapon) {
+          saveFlight();
+          controlPanel?.update(createPanelSnapshot(physicsLoop.getLatestState() ?? initialState));
+        }
+        return;
+      }
       if (!attached) {
         const state = physicsLoop.getLatestState() ?? initialState;
         // Scene axes are east/up/south; retain the aircraft's ground-relative momentum.
@@ -2748,6 +2833,52 @@ async function createFlightSimSession(
         ));
       }
       externalTankVisuals?.sync(readExternalFuelTanks(jsbsim.sdk, aircraftId));
+      saveFlight();
+      controlPanel?.update(createPanelSnapshot(physicsLoop.getLatestState() ?? initialState));
+    },
+    onArmamentLoad: (next) => {
+      if (!storeMirror || rearmRefusal(next, {
+        onGround: aircraftOnGround(),
+        masterArm: storeMirror.masterArm,
+        tankOnStation: attachedTankStations(readExternalFuelTanks(jsbsim.sdk, aircraftId).flatMap(tank => tank.attached ? [tank.index] : [])),
+      })) return;
+      let gunRounds = storeMirror.gunRounds;
+      const load = storeMirror.load.slice();
+      for (let station = 1; station <= 11; station++) {
+        if ((next[station] ?? null) === load[station]) continue;
+        const written = writeStation(jsbsim.sdk, station, next[station] ?? null);
+        load[station] = next[station] ?? null;
+        if (written.gunRounds !== null) gunRounds = written.gunRounds;
+      }
+      storeMirror = { ...storeMirror, load, gunRounds };
+      storeVisuals?.sync(storeMirror);
+      saveFlight();
+      controlPanel?.update(createPanelSnapshot(physicsLoop.getLatestState() ?? initialState));
+    },
+    onArmamentJettison: (station) => {
+      if (!storeMirror?.load[station]) return;
+      const written = writeStation(jsbsim.sdk, station, null);
+      const load = storeMirror.load.slice();
+      load[station] = null;
+      storeMirror = { ...storeMirror, load, gunRounds: written.gunRounds ?? storeMirror.gunRounds };
+      storeVisuals?.sync(storeMirror);
+      saveFlight();
+      controlPanel?.update(createPanelSnapshot(physicsLoop.getLatestState() ?? initialState));
+    },
+    onArmamentDoor: (bay, open) => {
+      if (!storeMirror) return;
+      writeBayDoor(jsbsim.sdk, bay, open);
+      const bayCmd: [number, number] = [storeMirror.bayCmd[0], storeMirror.bayCmd[1]];
+      bayCmd[bay] = open ? 1 : 0;
+      storeMirror = { ...storeMirror, bayCmd };
+      doorsSettled = false;
+      saveFlight();
+      controlPanel?.update(createPanelSnapshot(physicsLoop.getLatestState() ?? initialState));
+    },
+    onArmamentMasterArm: (armed) => {
+      if (!storeMirror) return;
+      writeMasterArm(jsbsim.sdk, armed);
+      storeMirror = { ...storeMirror, masterArm: armed };
       saveFlight();
       controlPanel?.update(createPanelSnapshot(physicsLoop.getLatestState() ?? initialState));
     },
@@ -3100,6 +3231,11 @@ async function createFlightSimSession(
     externalTankVisuals?.sync(readExternalFuelTanks(jsbsim.sdk, aircraftId));
     externalTankVisuals?.update(externalTankStepSeconds);
     externalTankStepSeconds = 0;
+    // Two property reads, and only while a bay door is still moving.
+    if (storeVisuals && storeMirror && !doorsSettled) {
+      readBayDoorPositionsInto(jsbsim.sdk, storeMirror.bayPos);
+      doorsSettled = storeVisuals.poseDoors(storeMirror.bayPos, storeMirror.bayCmd);
+    }
     applyChaseFrame(displayState);
     flightCompass?.update(runtime.scene.activeCamera);
     const audioCamera = runtime.scene.activeCamera;
@@ -3289,6 +3425,7 @@ async function createFlightSimSession(
       for (const { handle } of interfaceParameterSections) handle.destroy();
       toolbarParameters.destroy();
       mapPanel.destroy();
+      overviewMap.destroy();
       detailRequirements?.releaseAll();
       disconnectMapDetail();
       mapDetail?.dispose();
@@ -3312,6 +3449,7 @@ async function createFlightSimSession(
       // Before jsbsim.dispose(): the audio adapter's property batch must not outlive the SDK.
       flightAudio.dispose();
       externalTankVisuals?.dispose();
+      storeVisuals?.dispose();
       aircraftLights?.dispose();
       runtime.sky.setGroundLightReceiver(null);
       aircraftModel?.dispose();
@@ -3345,6 +3483,8 @@ async function createFlightSimSession(
     if (resumeFlight && terrain) {
       try {
         state = restoreSavedFlight(jsbsim.sdk, resumeFlight, aircraftId, terrain);
+        refreshStores();
+        controlPanel?.update(createPanelSnapshot(state));
       } catch (error) {
         flightLog.warn("sim", "The saved flight could not be restored; it starts level where it was", {
           reason: error instanceof Error ? error.message : String(error),

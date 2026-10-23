@@ -5,6 +5,7 @@ import { readFlightState } from "@0sfs/ground-contact/ecefBridge";
 import type { FlightState } from "@0sfs/ground-contact/flightState";
 import { EMPTY_FLIGHT_STATE } from "@0sfs/ground-contact/flightState";
 import { captureSimulation, restoreEngineThermalState, validFlightState } from "@0sfs/ground-contact/safeFlightState";
+import { isPersistedStoreProperty } from "@0sfs/stores/persistedStores";
 import { getFdmProfile } from "./fdmProfiles";
 import { fuelTankContentsPath, fuelTankIndices } from "@0sfs/fuel/fuelTanks";
 
@@ -43,12 +44,12 @@ export function resetFlightLocation(
   const saved = captureSimulation(sdk);
   const controlEntries = Object.entries(saved.controls).filter(([property, value]) => Number.isFinite(value)
     && !/^propulsion\/engine(?:\[\d+\])?\/thermal\//.test(property));
-  const storeAttachments = Object.entries(saved.controls).filter(([property, value]) =>
-    /^stores\/external-tank(?:\[\d+\])?\/attached$/.test(property) && Number.isFinite(value));
+  const keptStores = Object.entries(saved.controls).filter(([property, value]) =>
+    isPersistedStoreProperty(property) && Number.isFinite(value));
   const restoreStoreAttachments = (): void => {
     // Runway presets replace flight controls, but keep the aircraft's stores.
     // Replay the native catalogue spelling (index zero may omit brackets).
-    for (const [property, value] of storeAttachments) sdk.setPropertyValue(property, value);
+    for (const [property, value] of keptStores) sdk.setPropertyValue(property, value);
   };
   const flapPosition = sdk.getPropertyValue(profile.flapPosition.property);
   const conversion = profile.stovl ? {
@@ -107,6 +108,7 @@ export function resetFlightLocation(
     sdk.setPropertyValue("gear/gear-pos-norm", 1);
     sdk.setPropertyValue("fcs/flap-cmd-norm", runway.flapsNorm);
     sdk.setPropertyValue(profile.flapPosition.property, runway.flapsNorm * profile.flapPosition.fullTravel);
+    sdk.setPropertyValue("fcs/brake-cmd-norm", departure ? 1 : 0);
     sdk.setPropertyValue("fcs/left-brake-cmd-norm", departure ? 1 : 0);
     sdk.setPropertyValue("fcs/right-brake-cmd-norm", departure ? 1 : 0);
     // The fuel the pilot loaded goes with them to the runway.

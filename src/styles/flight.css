@@ -1,5 +1,7 @@
 /* Control appearance is shared with the phone controller. */
 @import "@0sfs/rc/styles/flightControls.css";
+/* The shared map of the view. The flight does not load the rest of the globe stylesheet. */
+@import "foss-earth/overview-map.css";
 
 .flight-app {
   --flight-panel-bg: rgba(13, 17, 20, 0.94);

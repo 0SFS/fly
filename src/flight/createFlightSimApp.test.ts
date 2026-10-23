@@ -26,7 +26,7 @@ const mocks = vi.hoisted(() => {
     unregisterFocusPoint: vi.fn(),
     unsubscribeDetailLog: vi.fn(),
     runtime: {
-      renderer: { requested: "webgl2", mode: "webgl2", engine: { getInfo: () => ({ vendor: "Test GPU", renderer: "Test renderer", version: "WebGL 2" }) } }, status: { mode: "fallback" }, scene: { onAfterRenderObservable: { add: () => null, remove: () => true } },
+      renderer: { requested: "webgl2", mode: "webgl2", engine: { getInfo: () => ({ vendor: "Test GPU", renderer: "Test renderer", version: "WebGL 2" }) } }, status: { mode: "fallback" }, scene: { onAfterRenderObservable: { add: () => null, remove: () => true } }, getViewState: () => null,
       onDeviceLost: vi.fn(() => mocks.stopDeviceLost), onDeviceRestored: vi.fn(() => mocks.stopDeviceRestored),
       engine: { getFps: () => 60 }, geospatialCamera: null,
       prepareTerrain: vi.fn(async (request: { altitudeMeters?: number }) => ({ groundHeightMeters: 250, altitudeMeters: request.altitudeMeters ?? 1774 })),
@@ -1125,6 +1125,23 @@ it("boots an F-35B with a VTOL lever beside THR and routes its registry command 
       }),
     }));
     expect(t.root.textContent).toContain("Lockheed Martin F-35B Lightning II");
+    const throttle = t.root.querySelector<HTMLElement>('[data-control="throttle"]')!;
+    expect(throttle.parentElement?.dataset.brakeRange).toBe("true");
+    expect(getAppSettings().get("osfs.input.keepSliderBrakes")).toBe(false);
+    const runtime = await vi.mocked(createJsbsimRuntime).mock.results.at(-1)!.value;
+    const tick = mocks.runtime.setSimTick.mock.calls.at(-1)?.[0] as (dt: number) => void;
+    await act(async () => {
+      throttle.dispatchEvent(new KeyboardEvent("keydown", { key: "Home", bubbles: true }));
+      tick(1 / 60);
+    });
+    expect(runtime.sdk.setPropertyValue).toHaveBeenCalledWith("fcs/brake-cmd-norm", 1);
+    await act(async () => {
+      throttle.dispatchEvent(new KeyboardEvent("keyup", { key: "Home", bubbles: true }));
+      tick(1 / 60);
+    });
+    expect(runtime.sdk.setPropertyValue).toHaveBeenLastCalledWith("fcs/stovl-cmd-norm", 0);
+    const lastBrake = () => runtime.sdk.setPropertyValue.mock.calls.filter(([property]) => property === "fcs/brake-cmd-norm").at(-1)?.[1];
+    expect(lastBrake()).toBe(0);
     const conversion = t.root.querySelector<HTMLInputElement>('[data-control="vtol-conversion"]')!;
     expect(conversion.closest("label")?.previousElementSibling?.querySelector('[data-control="throttle"]')).not.toBeNull();
     await act(async () => {
@@ -1134,6 +1151,22 @@ it("boots an F-35B with a VTOL lever beside THR and routes its registry command 
     expect(getAppSettings().get("osfs.aircraft.stovlConversion")).toBe(0.75);
     expect(t.root.querySelector<HTMLOutputElement>('[data-output="vtol-conversion"]')?.value).toBe("75%");
     await openPanelTab(t.root, "Controls");
+    const braking = t.root.querySelector<HTMLElement>('[data-settings-section="controls/braking"]')!;
+    expect(braking.textContent).toContain("Keep slider brakes applied");
+    await act(async () => {
+      getAppSettings().set("osfs.input.keepSliderBrakes", true);
+      tick(1 / 60);
+      throttle.dispatchEvent(new KeyboardEvent("keydown", { key: "Home", bubbles: true }));
+      throttle.dispatchEvent(new KeyboardEvent("keyup", { key: "Home", bubbles: true }));
+      tick(1 / 60);
+    });
+    expect(lastBrake()).toBe(1);
+    await act(async () => {
+      getAppSettings().set("osfs.input.keepSliderBrakes", false);
+      tick(1 / 60);
+      tick(1 / 60);
+    });
+    expect(lastBrake()).toBe(0);
     const section = t.root.querySelector<HTMLElement>('[data-settings-section="controls/stovl"]')!;
     expect(section.querySelector('input[type="range"]')).toBeNull();
     expect(section.textContent).toContain("Use the VTOL lever beside THR");
@@ -1143,8 +1176,6 @@ it("boots an F-35B with a VTOL lever beside THR and routes its registry command 
       showAll.dispatchEvent(new Event("change", { bubbles: true }));
     });
     expect(section.textContent).toContain("STOVL conversion");
-    const runtime = await vi.mocked(createJsbsimRuntime).mock.results.at(-1)!.value;
-    const tick = mocks.runtime.setSimTick.mock.calls.at(-1)?.[0] as (dt: number) => void;
     tick(1 / 60);
     expect(runtime.sdk.setPropertyValue).toHaveBeenCalledWith("fcs/stovl-cmd-norm", 0.75);
     expect(runtime.sdk.setPropertyValue).not.toHaveBeenCalledWith("fcs/stovl-pos-norm", expect.anything());
@@ -1652,7 +1683,7 @@ it("opens Debug from the FPS control on the right when the left slot cannot fit"
   } finally { await act(async () => app.destroy()); }
 });
 
-it("toggles the Map, Renderer and Location tabs from their HUD chips", async () => {
+it("toggles the Basemap, Renderer and Location tabs from their HUD chips", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.stubGlobal("localStorage", { getItem: () => null, setItem: vi.fn() });
   Object.defineProperty(navigator, "getGamepads", { configurable: true, value: () => [] });
@@ -1663,16 +1694,16 @@ it("toggles the Map, Renderer and Location tabs from their HUD chips", async () 
   const tabs = () => Array.from(root.querySelectorAll(".foss-earth-tab-button"), (button) => button.textContent);
   try {
     await act(async () => mocks.hudBarOptions!.onMapClick());
-    expect(tabs()).toEqual(["Map"]);
+    expect(tabs()).toEqual(["Basemap"]);
     expect(root.querySelector('[role="radiogroup"][aria-label="Basemap"]')).not.toBeNull();
     await act(async () => mocks.hudBarOptions!.onRendererClick());
-    expect(tabs()).toEqual(["Map", "Renderer"]);
+    expect(tabs()).toEqual(["Basemap", "Renderer"]);
     expect(root.querySelector('input[name="foss-earth-renderer"]')).not.toBeNull();
     await act(async () => mocks.hudBarOptions!.onStatusClick());
-    expect(tabs()).toEqual(["Map", "Renderer", "Location"]);
+    expect(tabs()).toEqual(["Basemap", "Renderer", "Location"]);
     await act(async () => mocks.hudBarOptions!.onStatusClick());
     await act(async () => mocks.hudBarOptions!.onRendererClick());
-    expect(tabs()).toEqual(["Map"]);
+    expect(tabs()).toEqual(["Basemap"]);
   } finally { await act(async () => app.destroy()); }
 });
 
