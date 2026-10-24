@@ -44,7 +44,7 @@ const sound: FlightAudioStatus = {
     off: tierAvailability("off", CAPABLE), low: tierAvailability("low", CAPABLE),
     med: tierAvailability("med", CAPABLE), high: tierAvailability("high", CAPABLE),
   },
-  held: false, settings: DEFAULT_AUDIO_SETTINGS, readOnlyReason: null,
+  held: false, holdReasons: [], loading: false, contextState: null, settings: DEFAULT_AUDIO_SETTINGS, readOnlyReason: null,
   engine: null, core: null, running: null, telemetry: null,
 };
 

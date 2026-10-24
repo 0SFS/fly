@@ -211,7 +211,7 @@ describe("F-35B procedural sound (real JSBSim and shipped DSP, no physical route
   });
 
   it("leaves the C172 without turbine sound", () => {
-    expect(getAircraftAudioProfile("cessna-172")).toBeUndefined();
+    expect(getAircraftAudioProfile("cessna-172")).toMatchObject({ engineClass: "piston", rendererId: "procedural-piston-v1" });
   });
 
   it("reads genuine main augmentation through dry, afterburning, converted and cutoff states", async () => {
