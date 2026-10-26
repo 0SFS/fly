@@ -6,6 +6,7 @@ import {
   type FlightControlPanelOptions,
   type FlightControlPanelSnapshot,
   type FlightPanelTab,
+  type FlightOverlayTab,
 } from "./FlightControlPanel";
 
 export function createFlightControlPanel(
@@ -18,25 +19,49 @@ export function createFlightControlPanel(
   container.append(overlayHost);
   const root = createRoot(overlayHost);
   let snapshot = initialSnapshot;
-  const overlayApiRef: { current: WindowOverlayHandle<FlightPanelTab> | null } = { current: null };
+  let testFeedbackTab = options.testFeedbackTab;
+  let overlayApi: WindowOverlayHandle<FlightPanelTab> | null = null;
+  let pendingTab: FlightOverlayTab | null = null;
+  const overlayApiRef: { current: WindowOverlayHandle<FlightPanelTab> | null } = {
+    get current() { return overlayApi; },
+    set current(value) {
+      overlayApi = value;
+      if (value && pendingTab) queueMicrotask(() => {
+        if (!overlayApi || !pendingTab) return;
+        const tab = pendingTab;
+        pendingTab = null;
+        overlayApi.openOrSelectTab(tab);
+      });
+    },
+  };
 
   const render = () => root.render(
-    <FlightControlPanel {...options} snapshot={snapshot} overlayApiRef={overlayApiRef} />,
+    <FlightControlPanel {...options} testFeedbackTab={testFeedbackTab} snapshot={snapshot} overlayApiRef={overlayApiRef} />,
   );
   render();
 
   return {
+    setTestFeedbackTab(element): void {
+      if (testFeedbackTab === element) return;
+      // Close its workspace entry before unregistering the content, so the
+      // retiring built-in tab is never rendered as an additional flight tab.
+      if (!element) overlayApiRef.current?.closeTab("test-feedback");
+      testFeedbackTab = element;
+      render();
+    },
     update(nextSnapshot): void {
       snapshot = nextSnapshot;
       render();
     },
     openOrSelectTab(tabId): void {
-      overlayApiRef.current?.openOrSelectTab(tabId);
+      if (overlayApi) overlayApi.openOrSelectTab(tabId);
+      else pendingTab = tabId;
     },
     toggleTab(tabId): void {
       overlayApiRef.current?.toggleTab(tabId);
     },
     destroy(): void {
+      pendingTab = null;
       root.unmount();
       overlayHost.remove();
     },

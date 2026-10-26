@@ -33,7 +33,8 @@
     "verify:audio": "node ../sound/scripts/verify-audio-artifact.mjs",
     "verify:exhaust": "node ../F135/scripts/build-exhaust-optics.mjs --check",
     "build:engine-assets": "node ../F135/scripts/build-f135-engine.mjs --install",
-    "verify:engine-assets": "node ../F135/scripts/build-f135-engine.mjs --check"
+    "verify:engine-assets": "node ../F135/scripts/build-f135-engine.mjs --check",
+    "model-override": "node scripts/model-override.mjs"
   },
   "dependencies": {
     "@0sfs/aircraft": "file:../aircraft",

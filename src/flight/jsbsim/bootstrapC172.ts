@@ -1,4 +1,6 @@
 import type { JSBSimSdk } from "@felipegalind0/jsbsim";
+import { getExternalTankDefinitions } from "@0sfs/fuel/externalTankDefinitions";
+import { setExternalFuelTankAttached } from "@0sfs/fuel/externalFuelTanks";
 import type { AircraftId } from "@0sfs/aircraft/aircraftIds";
 import { physicsStepSeconds, type PhysicsHz } from "../physics/physicsRate";
 import { flightParameterDefaults } from "../settings/flightParameters";
@@ -125,6 +127,11 @@ export async function bootstrapAircraft(
     for (const [property, value] of Object.entries(profile.initialProperties ?? {})) sdk.setPropertyValue(property, value);
   };
   restoreAircraftControls();
+  // Fresh flights start clean. The Fuel tab can install tanks later; saved
+  // flights restore their chosen attachments after this initial bootstrap.
+  for (const tank of getExternalTankDefinitions(aircraftId)) {
+    setExternalFuelTankAttached(sdk, aircraftId, tank.index, false);
+  }
 
   if (!sdk.runIc()) {
     throw new Error(`JSBSim RunIC failed for ${aircraftId} initial conditions.`);

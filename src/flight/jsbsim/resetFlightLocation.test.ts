@@ -43,6 +43,13 @@ describe("resetFlightLocation", () => {
     expect(sdk.setPropertyValue).toHaveBeenCalledWith("fcs/left-brake-cmd-norm", 1);
     expect(sdk.setPropertyValue).toHaveBeenCalledWith("fcs/throttle-cmd-norm", 0);
   });
+  it("matches a multiplayer host's heading and speed without replacing aircraft configuration", () => {
+    const sdk = setup();
+    resetFlightLocation(sdk as unknown as JSBSimSdk, { latDeg: 45, lonDeg: -93, altMeters: 2500, headingDeg: 90, airspeedKts: 180 });
+    expect(sdk.setPropertyValue).toHaveBeenCalledWith("ic/psi-true-deg", 90);
+    expect(sdk.setPropertyValue).toHaveBeenCalledWith("ic/vc-kts", 180);
+    expect(sdk.setPropertyValue).toHaveBeenCalledWith("fcs/throttle-cmd-norm", 0.65);
+  });
   it("sets arrival altitude and C172 approach speed, releasing the departure brakes", () => {
     const sdk = setup();
     resetFlightLocation(sdk as unknown as JSBSimSdk, { latDeg: 45, lonDeg: -93, altMeters: 800,

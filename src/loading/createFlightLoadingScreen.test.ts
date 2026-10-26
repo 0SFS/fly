@@ -19,6 +19,22 @@ afterEach(() => {
 });
 
 describe("flight loading log", () => {
+  it("keeps map recovery choices usable while flight input is held and disables repeat activation", () => {
+    const useMap = vi.fn();
+    screen = createFlightLoadingScreen();
+    screen.fail("Both map providers are unavailable.", { actions: [{ label: "Use OpenStreetMap", onClick: useMap }] });
+    expect(document.getElementById("root")!.hasAttribute("inert")).toBe(true);
+    const recovery = [...newestLine().querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Use OpenStreetMap")!;
+    expect(recovery.disabled).toBe(false);
+    recovery.click();
+    expect(useMap).toHaveBeenCalledOnce();
+    const buttons = [...newestLine().querySelectorAll<HTMLButtonElement>("button")];
+    expect(buttons.find(button => button.textContent === "Use OpenStreetMap")!.disabled).toBe(true);
+    expect(buttons.find(button => button.textContent === "View report")!.disabled).toBe(false);
+    screen.show({ reset: true });
+    expect(document.querySelectorAll("button")).not.toContain(recovery);
+  });
+
   it("prints beside the renderer root without covering it and holds flight input until hidden", () => {
     const root = document.getElementById("root")!;
     screen = createFlightLoadingScreen();

@@ -1,0 +1,12 @@
+.aircraft-health {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.aircraft-health meter {
+  width: 10em;
+  max-width: 100%;
+  height: 1.2em;
+}
+.aircraft-health output { font-variant-numeric: tabular-nums; }

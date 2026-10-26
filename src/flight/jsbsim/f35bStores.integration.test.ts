@@ -5,6 +5,7 @@ import { JSBSimSdk } from "@felipegalind0/jsbsim";
 import { wasmBinaryUrl, wasmModuleUrl } from "@felipegalind0/jsbsim/wasm";
 import { afterEach, describe, expect, it } from "vitest";
 import { captureSimulation, restoreSimulation } from "@0sfs/ground-contact/safeFlightState";
+import { createBayGearInterlock } from "@0sfs/stores/bayGearInterlock";
 import { isWeaponStoreProperty } from "@0sfs/stores/persistedStores";
 import { STATIONS, stationDefinition } from "@0sfs/stores/stationTable";
 import { aircraftHasWeaponStations, readStoreMirror, writeBayDoor, writeMasterArm, writeStation } from "@0sfs/stores/storeAttachment";
@@ -63,11 +64,11 @@ describe("F-35B weapon station model", () => {
   it("adds the published load, shifts the CG by one bomb's arm, and clears one station", async () => {
     const sdk = await boot();
     expect(aircraftHasWeaponStations(sdk)).toBe(true);
-    expect(sdk.getPropertyValue("inertia/pointmass-weight-lbs[0]")).toBe(300);
-    expect(sdk.getPropertyValue("inertia/pointmass-weight-lbs[1]")).toBe(300);
+    expect(sdk.getPropertyValue("inertia/pointmass-weight-lbs[0]")).toBe(0);
+    expect(sdk.getPropertyValue("inertia/pointmass-weight-lbs[1]")).toBe(0);
     for (const station of STATIONS) expect(sdk.getPropertyValue(`inertia/pointmass-weight-lbs[${station.pointmassIndex}]`)).toBe(0);
     const clean = sample(sdk);
-    expect(clean.weight).toBeCloseTo(32000 + 600 + clean.fuel, 0);
+    expect(clean.weight).toBeCloseTo(32000 + clean.fuel, 0);
 
     const bay = stationDefinition(4)!;
     writeStation(sdk, 4, "gbu-32");
@@ -108,6 +109,46 @@ describe("F-35B weapon station model", () => {
     expect(sdk.getPropertyValue("stores/bay[1]/door-pos-norm")).toBe(0);
   });
 
+  it("never moves the gear and a bay door together on the plant's own kinematics", async () => {
+    const sdk = await boot();
+    const interlock = createBayGearInterlock(sdk, () => {});
+    const start = sdk.getPropertyValue("gear/gear-pos-norm") > 0.5 ? 1 : 0, target = 1 - start;
+    // As the flight writes it each step, through applyFlightControls.
+    const step = (requested: number) => {
+      sdk.setPropertyValue("gear/gear-cmd-norm", interlock.gearCommand(requested));
+      expect(sdk.run()).toBe(true);
+    };
+    for (let i = 0; i < 12; i++) step(start);
+    interlock.requestBay(0, true);
+    expect(sdk.getPropertyValue("stores/bay[0]/door-cmd-norm")).toBe(1);
+    for (let i = 0; i < 200; i++) step(start);
+    // Exactly: the door visuals stop reading only once the position equals its command.
+    expect(sdk.getPropertyValue("stores/bay[0]/door-pos-norm")).toBe(1);
+
+    let held = 0, queuedAt = -1, openedAt: number | null = null;
+    for (let i = 0; i < 120 * 9; i++) {
+      step(target);
+      const gear = sdk.getPropertyValue("gear/gear-pos-norm");
+      const doors = [0, 1].map(bay => sdk.getPropertyValue(`stores/bay[${bay}]/door-pos-norm`));
+      if (gear === start) held++;
+      // The gear leaves its endpoint only once both doors are shut, and stays alone while it moves.
+      if (gear !== start && gear !== target) expect(Math.max(...doors)).toBeLessThanOrEqual(0.001);
+      if (gear > 0.3 && gear < 0.7 && queuedAt < 0) {
+        queuedAt = i;
+        interlock.requestBay(1, true);
+        expect(interlock.queued(1)).toBe(true);
+      }
+      if (openedAt === null && sdk.getPropertyValue("stores/bay[1]/door-cmd-norm") === 1) openedAt = gear;
+    }
+    // Held about the 1.5 s the door takes to shut, at 120 Hz.
+    expect(held / 120).toBeGreaterThan(1.4);
+    expect(held / 120).toBeLessThan(1.6);
+    expect(queuedAt).toBeGreaterThan(0);
+    expect(openedAt).toBe(target);
+    expect(sdk.getPropertyValue("gear/gear-pos-norm")).toBe(target);
+    expect(sdk.getPropertyValue("stores/bay[0]/door-pos-norm")).toBe(0);
+  });
+
   it("keeps a hung load through restore and a runway change, and a pre-armament snapshot stays clean", async () => {
     const sdk = await boot();
     const strike = loadFromPreset("usmc-strike")!;
@@ -144,7 +185,7 @@ describe("F-35B weapon station model", () => {
     expect(sdk.queryPropertyCatalog("stores/")).not.toContain("station[");
     expect(sdk.run()).toBe(true);
     const flying = sample(sdk);
-    expect(flying.weight).toBeCloseTo(32000 + 600 + flying.fuel, 0);
+    expect(flying.weight).toBeCloseTo(32000 + flying.fuel, 0);
     for (const index of [2, 6, 12]) expect(sdk.getPropertyValue(`inertia/pointmass-weight-lbs[${index}]`)).toBe(0);
   });
 });

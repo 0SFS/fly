@@ -28,6 +28,19 @@
   touch-action: none;
 }
 
+/*
+ * Interface → Scale → UI scale (osfs.ui.scale): the layers drawn over the view
+ * zoom; the canvas and the g-vision layer keep the whole viewport. The toolbar
+ * publishes its height on the page already zoomed, so rules inside these
+ * layers divide it by the scale before their own zoom applies it again.
+ */
+.flight-hud-root,
+.flight-status-root,
+.flight-shell-root,
+.flight-panel-root {
+  zoom: var(--flight-ui-scale, 1);
+}
+
 .flight-hud {
   position: absolute;
   inset: 0;
@@ -38,7 +51,7 @@
    * Clears the bottom button bar so attitude / levers stay readable. The bar
    * publishes its height, which grows when it wraps on a narrow screen.
    */
-  --flight-controls-bottom: calc(var(--foss-hud-bottom, 16px) + var(--foss-hud-bar-height, 32px) + 8px);
+  --flight-controls-bottom: calc(var(--foss-hud-bottom, 16px) + var(--foss-hud-bar-height, 32px) / var(--flight-ui-scale, 1) + 8px);
   --flight-hud-left: env(safe-area-inset-left, 0px);
   --flight-attitude-size: 220px;
   --flight-auto-trim-size: 35px;
@@ -144,7 +157,7 @@
  * indicator's corners. The text keeps a shadow so it reads over a bright sky.
  */
 .flight-hud[data-layout="compact"] {
-  --flight-controls-bottom: calc(var(--foss-hud-bottom, 16px) + var(--foss-hud-bar-height, 32px) + 2px);
+  --flight-controls-bottom: calc(var(--foss-hud-bottom, 16px) + var(--foss-hud-bar-height, 32px) / var(--flight-ui-scale, 1) + 2px);
   --flight-hud-left: var(--foss-hud-left, env(safe-area-inset-left, 0px));
   --ctl-surface: rgba(0, 0, 0, 0.16);
   --ctl-surface-deep: transparent;

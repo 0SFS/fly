@@ -24,7 +24,9 @@ export function resetFlightLocation(
 ): FlightState {
   if (!Number.isFinite(location.latDeg) || Math.abs(location.latDeg) > 90
     || !Number.isFinite(location.lonDeg) || Math.abs(location.lonDeg) > 180
-    || (location.altMeters !== undefined && !Number.isFinite(location.altMeters))) {
+    || (location.altMeters !== undefined && !Number.isFinite(location.altMeters))
+    || (location.headingDeg !== undefined && !Number.isFinite(location.headingDeg))
+    || (location.airspeedKts !== undefined && (!Number.isFinite(location.airspeedKts) || location.airspeedKts < 0))) {
     throw new Error("Invalid geodetic location.");
   }
   const preset = location.flightPreset;
@@ -88,11 +90,11 @@ export function resetFlightLocation(
   // Geodetic, not geocentric latitude: the ECEF/ENU bridge uses WGS84.
   sdk.setPropertyValue("ic/lat-geod-deg", location.latDeg);
   sdk.setPropertyValue("ic/long-gc-deg", location.lonDeg);
-  sdk.setPropertyValue("ic/psi-true-deg", preset?.headingDeg ?? state.headingRad * 180 / Math.PI);
+  sdk.setPropertyValue("ic/psi-true-deg", preset?.headingDeg ?? location.headingDeg ?? state.headingRad * 180 / Math.PI);
   const pitchDeg = held ? 0 : runway?.pitchDeg ?? profile.initialPitchDeg ?? profile.stance.staticPitchRad * 180 / Math.PI;
   sdk.setPropertyValue("ic/theta-deg", pitchDeg);
   sdk.setPropertyValue("ic/phi-deg", 0);
-  sdk.setPropertyValue("ic/vc-kts", held ? 0 : runway?.airspeedKts ?? state.airspeedKts);
+  sdk.setPropertyValue("ic/vc-kts", held ? 0 : runway?.airspeedKts ?? location.airspeedKts ?? state.airspeedKts);
   sdk.setPropertyValue("ic/gamma-deg", held ? 0 : preset?.flightPathDeg ?? 0);
   if (held) sdk.setPropertyValue("ic/alpha-deg", 0);
   else if (preset?.mode === "arrival") sdk.setPropertyValue("ic/alpha-deg", 6);

@@ -50,10 +50,13 @@ const MAP_DETAIL = { tab: "map", section: "detail" } as const;
 const MODEL = { tab: "aircraft", section: "model" } as const;
 const MESH_INSPECTOR = { tab: "aircraft", section: "mesh-inspector" } as const;
 const INSTRUMENTS = { tab: "renderer", section: "instruments" } as const;
+const UI_SCALE = { tab: "interface", section: "scale" } as const;
 const HUD = { tab: "interface", section: "hud" } as const;
 const EXHAUST = { tab: "exhaust", section: "gas" } as const;
 const EXHAUST_SMOKE = { tab: "exhaust", section: "smoke" } as const;
 const EXTERNAL_TANKS = { tab: "renderer", section: "external-tanks" } as const;
+const RELEASED_STORES = { tab: "renderer", section: "released-stores" } as const;
+const REARM = { tab: "fuel", section: "rearm" } as const;
 const FORCES = { tab: "debug", section: "forces" } as const;
 const CAMERA = { tab: "aircraft", section: "camera" } as const;
 const COCKPIT_SCREEN = { tab: "aircraft", section: "cockpit-screen" } as const;
@@ -69,11 +72,14 @@ const G_PASS_OUT = { tab: "gforces", section: "pass-out" } as const;
 /** Section titles for the sections 0sfs adds, by tab and section id. */
 export const FLIGHT_SECTION_TITLES: readonly (readonly [tab: string, section: string, title: string])[] = [
   ["renderer", "instruments", "Instruments"],
+  ["interface", "scale", "Scale"],
   ["interface", "hud", "Flight instruments"],
   ["exhaust", "gas", "Gas and luminance"],
   ["exhaust", "smoke", "Smoke"],
   ...SOUND_SECTION_TITLES_1,
   ["renderer", "external-tanks", "Released fuel tanks"],
+  ["renderer", "released-stores", "Released weapons"],
+  ["fuel", "rearm", "Rearm"],
   ["aircraft", "model", "Aircraft"],
   ["aircraft", "mesh-inspector", "Mesh inspector"],
   ["aircraft", "camera", "Camera"],
@@ -286,6 +292,30 @@ export const OSFS_PARAMETERS = [
     unit: { id: "tanks", text: "tanks" }, kind: "number", step: 1, bounds: within(0, 2), default: 2,
     defaultReason: "One released tank per station shows both separations and bounds retained geometry and update work.",
     home: main(EXTERNAL_TANKS), appliesLive: true, source: "fuel/src/createExternalTankVisuals.ts",
+  },
+  {
+    id: "osfs.stores.debrisLifetimeSeconds",
+    label: "Released weapon lifetime",
+    description: "How long a jettisoned weapon or pod remains visible, in simulated seconds. Zero hides it as soon as it is released.",
+    unit: "s", kind: "number", step: 0.1, bounds: within(0, 120), default: 15,
+    defaultReason: "The released tank lifetime: it shows the separation while bounding the time spent updating falling stores.",
+    home: main(RELEASED_STORES), appliesLive: true, source: "stores/src/createStoreVisuals.ts",
+  },
+  {
+    id: "osfs.stores.maxDetachedStores",
+    label: "Released weapon limit",
+    description: "Maximum jettisoned weapons and pods kept visible at once, at most one per station. Zero hides them; hung stores still appear on the aircraft.",
+    unit: { id: "stores", text: "stores" }, kind: "number", step: 1, bounds: within(0, 11), default: 2,
+    defaultReason: "The released tank limit: it shows a pair separating and bounds retained geometry and update work.",
+    home: main(RELEASED_STORES), appliesLive: true, source: "stores/src/createStoreVisuals.ts",
+  },
+  {
+    id: "osfs.rearm.groundOnly",
+    label: "Rearm on the ground only",
+    description: "Weapon load changes, fuel quantity edits and tank respawn wait for weight on the wheels. Off, they work in the air. Jettison and the bay doors always work.",
+    unit: "none", kind: "boolean", default: false,
+    defaultReason: "Single-player flight changes the load in the air; a session that requires the ground sets it.",
+    home: main(REARM), appliesLive: true, source: "src/flight/settings/rearmRule.ts",
   },
 
   // Aircraft → Lights: navigation, anti-collision, landing and taxi lights.
@@ -651,6 +681,22 @@ export const OSFS_PARAMETERS = [
     unit: "ratio", kind: "number", step: 0.001, bounds: within(0, 1), default: 0.025,
     defaultReason: "Modern jet exhaust is not a dense rocket smoke trail; this is a restrained visual approximation.",
     home: main(EXHAUST_SMOKE), appliesLive: true, source: "exhaust/src/createEngineSmoke.ts",
+  },
+
+  // Interface → Scale: the size of everything drawn over the view.
+  {
+    id: "osfs.ui.scale",
+    label: "UI scale",
+    description: "The size of the flight's interface: the instruments, controls, toolbar, menus and panels drawn over the view. The view itself keeps its full size and resolution.",
+    unit: "ratio",
+    kind: "number",
+    step: 0.05,
+    bounds: within(0.5, 1.5),
+    default: 0.8,
+    defaultReason: "At its drawn size the interface covers much of a landscape phone's view; at 0.8× more of the world shows and the text stays readable.",
+    home: main(UI_SCALE),
+    appliesLive: true,
+    source: "src/styles/flight.css",
   },
 
   // Interface → Flight instruments: where the instruments sit.

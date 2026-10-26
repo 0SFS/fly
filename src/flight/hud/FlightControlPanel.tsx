@@ -23,6 +23,7 @@ import {
   Plane,
   Volume2,
   Weight,
+  Users,
 } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -76,17 +77,26 @@ import type { FlightAudioStatus } from "@0sfs/sound/createFlightAudio";
 import { AUTOPILOT_PARAMETER_IDS, type AutopilotSettingsV1 } from "@0sfs/autopilot/autopilotSettings";
 import { GROUND_PARAMETER_IDS } from "@0sfs/ground-contact/groundInteractionSettings";
 import type { FlightRecorder } from "@0sfs/logging/flightRecorder";
+import { MultiplayerTab, type MountMultiplayer } from "../multiplayer/MultiplayerTab";
+import { DamagePanel } from "../damage/DamagePanel";
+import type { DamageAction } from "../damage/aircraftHealth";
+import type { AircraftDamageSnapshot } from "../damage/aircraftDamage";
+import { SharedSettingsPanel, type SharedSettingsPanelState } from "../multiplayer/SharedSettingsPanel";
+import type { SharedSettingsPatch } from "@0sfs/multiplayer/sharedSettings";
 
-export type FlightPanelTab = "weather" | "aircraft" | "fuel" | "armament" | "autopilot" | "controls" | "remote" | "sound" | "exhaust" | "engine" | "gforces" | "logging" | "debug";
+export type FlightPanelTab = "weather" | "aircraft" | "fuel" | "armament" | "damage" | "shared-settings" | "autopilot" | "controls" | "remote" | "multiplayer" | "sound" | "exhaust" | "engine" | "gforces" | "logging" | "debug";
 
 const TAB_DEFINITIONS: readonly WindowTabDefinition<FlightPanelTab>[] = [
   { id: "weather", label: "Weather" },
   { id: "aircraft", label: "Aircraft" },
   { id: "fuel", label: "Fuel" },
   { id: "armament", label: "Armament" },
+  { id: "damage", label: "Damage" },
+  { id: "shared-settings", label: "Shared settings" },
   { id: "autopilot", label: "Autopilot" },
   { id: "controls", label: "Controls" },
   { id: "remote", label: "Remote Control" },
+  { id: "multiplayer", label: "Multiplayer" },
   { id: "sound", label: "Sound" },
   { id: "exhaust", label: "Exhaust" },
   { id: "engine", label: "Engine" },
@@ -102,9 +112,12 @@ const TAB_ICONS = {
   aircraft: Plane,
   fuel: Fuel,
   armament: Crosshair,
+  damage: Crosshair,
+  "shared-settings": Users,
   autopilot: Navigation,
   controls: Gauge,
   remote: Smartphone,
+  multiplayer: Users,
   sound: Volume2,
   exhaust: Flame,
   engine: Fan,
@@ -151,6 +164,8 @@ export interface FlightControlPanelSnapshot {
   fuel: FuelPanelState;
   /** Present when the loaded flight model has weapon stations. */
   armament?: ArmamentPanelState;
+  damage: AircraftDamageSnapshot;
+  sharedSettings: SharedSettingsPanelState;
   logging: LoggingPanelState;
 }
 
@@ -205,6 +220,8 @@ export interface FlightControlPanelOptions {
   onPausedChange(paused: boolean): void;
   /** Discards the saved flight and starts again at the start position. */
   onNewFlight(): void;
+  onDamageAction(action: DamageAction): void;
+  onSharedSettingsPatch(patch: SharedSettingsPatch): void;
   onViewModeChange(mode: FlightViewMode): void;
   /** Activate an aircraft or presentation choice; resolves when ready, or with an error report. */
   onAircraftApply(selection: AircraftSelection): string | null | Promise<string | null>;
@@ -235,11 +252,14 @@ export interface FlightControlPanelOptions {
   flightRecorder: FlightRecorder;
   /** Pairing for the Remote Control tab, loaded the first time the tab opens. */
   loadPhonePairing(): Promise<MountPhonePairing>;
+  loadMultiplayer?(): Promise<MountMultiplayer>;
   /** Leaves the simulator for the phone controller page on this device. */
   onUseAsRemote(): void;
 }
 
 export interface FlightControlPanelHandle {
+  /** Test feedback is available only while the current URL requests it. */
+  setTestFeedbackTab(element: HTMLElement | undefined): void;
   update(snapshot: FlightControlPanelSnapshot): void;
   openOrSelectTab(tabId: FlightOverlayTab): void;
   /** For a HUD button: shows the tab, or closes it when it is already showing. */
@@ -485,7 +505,7 @@ function AircraftPanel({
         {/* "[Ⅱ] W/S Pitch  A/D Roll  Q/E Rudder  ⇧/⌃ Throttle": the keymap wraps as a paragraph. */}
         <div className="flight-panel__row">
           <IconButton icon={snapshot.paused ? "play" : "pause"} label={snapshot.paused ? "Resume simulation" : "Pause simulation"}
-            disabled={snapshot.aircraftSwitching}
+            disabled={snapshot.aircraftSwitching || snapshot.damage?.destroyed}
             onClick={() => onPausedChange(!snapshot.paused)} />
           <div className="flight-panel__keymap" aria-label="Flight controls">
             <span><kbd>W/S</kbd> Pitch</span><span><kbd>A/D</kbd> Roll</span>
@@ -830,15 +850,23 @@ export function FlightControlPanel(props: FlightControlPanelProps) {
                 aircraftSelection={aircraftSelection}
                 onAircraftSelectionChange={onAircraftSelectionChange}
                 onAircraftFamilyChange={setSelectedAircraftFamily} />
-                : tabId === "fuel" ? <FuelPanel state={props.snapshot.fuel} onChange={props.onFuelChange}
-                  onAttachmentChange={props.onFuelAttachmentChange} />
-                : tabId === "armament" && props.snapshot.armament ? <div className="flight-panel__content">
-                  <ArmamentPanel state={props.snapshot.armament}
-                    onLoad={props.onArmamentLoad ?? (() => {})}
-                    onJettison={props.onArmamentJettison ?? (() => {})}
-                    onDoor={props.onArmamentDoor ?? (() => {})}
-                    onMasterArm={props.onArmamentMasterArm ?? (() => {})} />
-                </div>
+                // One "Rearm on the ground only" setting, drawn in both tabs it governs.
+                : tabId === "fuel" ? <ParameterSection settings={props.settings} tab="fuel" section="rearm" afterControls>
+                  <FuelPanel state={props.snapshot.fuel} onChange={props.onFuelChange}
+                    onAttachmentChange={props.onFuelAttachmentChange} />
+                </ParameterSection>
+                : tabId === "armament" && props.snapshot.armament ? <ParameterSection settings={props.settings} tab="fuel"
+                  section="rearm" afterControls>
+                  <div className="flight-panel__content">
+                    <ArmamentPanel state={props.snapshot.armament}
+                      onLoad={props.onArmamentLoad ?? (() => {})}
+                      onJettison={props.onArmamentJettison ?? (() => {})}
+                      onDoor={props.onArmamentDoor ?? (() => {})}
+                      onMasterArm={props.onArmamentMasterArm ?? (() => {})} />
+                  </div>
+                </ParameterSection>
+                : tabId === "damage" ? <DamagePanel state={props.snapshot.damage} onAction={props.onDamageAction} />
+                : tabId === "shared-settings" ? <SharedSettingsPanel state={props.snapshot.sharedSettings} onChange={props.onSharedSettingsPatch} />
                 : tabId === "autopilot" ? <ParameterSection settings={props.settings} tab="autopilot" section="package"
                   covers={AUTOPILOT_PARAMETER_IDS}>
                   <AutopilotPanel
@@ -875,6 +903,8 @@ export function FlightControlPanel(props: FlightControlPanelProps) {
                   cameraTuning={<ParameterSection settings={props.settings} tab="remote" section="camera">
                     <PhoneCameraTuningPanel parameters={props.parameters} />
                   </ParameterSection>} />
+                : tabId === "multiplayer" ? props.loadMultiplayer
+                  ? <MultiplayerTab load={props.loadMultiplayer} /> : <p>Multiplayer is unavailable.</p>
                 : tabId === "sound" ? <ParameterSection settings={props.settings} tab="sound" section="sound" covers={SOUND_PANEL_PARAMETER_IDS}>
                   <SoundSettingsPanel state={props.snapshot.sound} onAction={props.onSoundAction} />
                 </ParameterSection>

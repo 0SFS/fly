@@ -180,6 +180,47 @@ describe("aircraft model loader", () => {
     } finally { model.dispose(); catalog.mockRestore(); t.teardown(); }
   });
 
+  it("prepares a load on the parent's frame, waits for what it built, and reveals and disposes it with the model", async () => {
+    const t = setup();
+    const gate = readinessGate();
+    const definition = { ...aircraftCatalog.getAircraftDefinition("cessna-172"),
+      modelYawRad: 1.1, modelOffset: { x: 0.3, y: -1.2, z: 0.4 } };
+    const catalog = vi.spyOn(aircraftCatalog, "getAircraftDefinition").mockReturnValue(definition);
+    const events: string[] = [];
+    let built: Mesh | null = null;
+    const model = createAircraftModel(t.scene, t.parent, {
+      aircraftId: "cessna-172", lodId: "lod3", loadContainer: t.loadContainer, whenReady: gate.whenReady,
+      prepareModel: ({ meshes, frame, frameFromMesh }) => {
+        const source = meshes[0]!;
+        source.position.set(0.5, 0.25, -2);
+        built = new Mesh("prepared", t.scene);
+        built.parent = frame;
+        // The source's own origin, carried to the frame, lands where the placed model puts it.
+        frameFromMesh(source).decompose(undefined, undefined, built.position);
+        events.push("prepare");
+        return {
+          meshes: [built],
+          reveal: () => events.push(`reveal ${frame.isEnabled() ? "shown" : "hidden"}`),
+          dispose: () => events.push("dispose"),
+        };
+      },
+    });
+    try {
+      await vi.waitFor(() => expect(gate.waits).toHaveLength(1));
+      expect(gate.waits[0].meshes).toContain(built);
+      expect(built!.isEnabled()).toBe(false);
+      gate.releaseLast();
+      await vi.waitFor(() => expect(model.getState().status).toBe("ready"));
+      expect(events).toEqual(["prepare", "reveal hidden"]);
+      const source = t.scene.getMeshByName("mesh-1")!;
+      const expected = source.computeWorldMatrix(true).getTranslation();
+      expect(Vector3.Distance(built!.computeWorldMatrix(true).getTranslation(), expected)).toBeLessThan(1e-6);
+      model.dispose();
+      expect(events).toEqual(["prepare", "reveal hidden", "dispose"]);
+      expect(built!.isDisposed()).toBe(true);
+    } finally { model.dispose(); catalog.mockRestore(); t.teardown(); }
+  });
+
   it("releases an acquired airframe if its separate installed engine fails", async () => {
     const t = setup();
     const airframe = f35bVisibilityContainer(t.scene);

@@ -1,4 +1,5 @@
 import "./styles/earth.css";
+import { capturePendingMultiplayerInvitation } from "./flight/multiplayer/invitationHandoff";
 import { createGameLog, trackViewportInsets, type GameLog, type GameLogLine } from "foss-earth/shell";
 import { getAppIdentity, showReportOnly, startAppDiagnostics, wantsReportOnly, type AppDiagnostics } from "foss-earth/diagnostics";
 import { getAppSettings } from "foss-earth/settings";
@@ -7,6 +8,7 @@ import { appRouteFrom, canonicalAppLocation, flightHref, FOSS_EARTH_URL, type Ap
 import { offerFullscreen } from "./fullscreen/fullscreen";
 import { createFlightLoadingScreen, type FlightLoadingScreen } from "./loading/createFlightLoadingScreen";
 import type { LoadingDiagnosticsSnapshot } from "./loading/loadingDiagnostics";
+import { installGoogleTilesOutage, requestedGoogleTilesFault } from "./flight/testing/googleTilesOutage";
 
 function appRoute(): AppRoute {
   return appRouteFrom(new URL(window.location.href));
@@ -43,9 +45,17 @@ async function bootApp(rootElement: HTMLElement, loading: FlightLoadingScreen | 
   }
 
   if (route === "flight") {
+    const fault = requestedGoogleTilesFault(window.location.search);
+    if (fault) {
+      installGoogleTilesOutage(window, fault);
+      log?.print({ text: `Testing Google 3D Tiles outage: ${fault}. Remove googleTilesFault from the address to stop simulating it.`, tone: "warning" });
+    }
     const { createFlightSimApp } = await trace("Import flight application (src/flight/createFlightSimApp.ts)", () => import("./flight/createFlightSimApp"));
     loading?.setPhase("app", { state: "ready" });
-    await trace("Initialize flight application", () => createFlightSimApp(rootElement, { loadingScreen: loading ?? undefined, log: log ?? undefined, diagnostics: diagnostics ?? undefined }));
+    await trace("Initialize flight application", () => createFlightSimApp(rootElement, {
+      loadingScreen: loading ?? undefined, log: log ?? undefined, diagnostics: diagnostics ?? undefined,
+      ...(fault ? { googleApiKey: "0sfs-outage-test", preferGoogleTiles: true } : {}),
+    }));
     markBrowserAppReady(document);
     return;
   }
@@ -142,5 +152,8 @@ if (!isBrowserRecoveryPage(document)) {
   // (Firefox Android's URL bar, Chrome's dynamic toolbar).
   trackViewportInsets();
   // A first visit may reload once to be isolated (index.html's first script); until it knows, nothing starts.
-  void whenIsolationSettled(window).then(() => startPage(rootElement));
+  void whenIsolationSettled(window).then(() => {
+    capturePendingMultiplayerInvitation();
+    startPage(rootElement);
+  });
 }

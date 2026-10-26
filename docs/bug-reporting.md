@@ -15,6 +15,28 @@ simulation state and physics fault, and JSBSim's package and engine/SDK commits.
 starts using the same activity capture before the flight module is downloaded. The report
 does not switch on flight recording or performance traces.
 
+For a frozen world, the report also includes **Render health**, **Flight progress**
+and **Console diagnostics**. Render health records CPU frame starts, scene starts
+and completions, frame ends, their ages, the scheduler's current activity and native
+WebGPU validation errors. A completed CPU frame does not prove that the GPU presented
+it. Flight progress adds the last flight tick's age, native simulation time and physics
+time accounting. These observations run on existing frame callbacks; they add no
+render loop, GPU fences, readbacks or periodic sampling.
+
+GPU errors are captured directly from the device, including after Babylon stops
+printing console warnings. The first error and seven recent distinct errors retain
+up to 32,768 characters each, with repeat counts, arrival times and engine frame numbers.
+The first warning and seven recent distinct console warnings/errors retain up to
+16,384 characters each. Both records count evictions and flag shortened messages. These full
+records last for the open visit. The first four distinct GPU errors also write up
+to 8,192 characters each into numbered activity lines, so their causes can survive a reload;
+normal trail retention still applies. The ordinary short activity line remains
+limited to 300 characters.
+
+If the world freezes, open Bug report and download it while the page is still open,
+before reloading. The loading report describes startup and stops collecting when
+startup finishes; it cannot by itself diagnose a freeze later in the flight.
+
 If the flight stops before you can reach Settings, open `/fly/?report` on the same site.
 That page reads the previous visit's retained trail and offers the report without starting
 the renderer or flight simulation.

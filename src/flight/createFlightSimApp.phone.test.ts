@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => {
     sdk: {
       setPropertyValue: vi.fn(), run: vi.fn(),
       createPropertyBatch: vi.fn((paths: readonly string[]) => ({
+        missing: [],
         read: vi.fn((target = new Float64Array(paths.length)) => {
           paths.forEach((path, index) => { target[index] = engineVisualValues.get(path) ?? Number.NaN; });
           return target;
@@ -127,16 +128,16 @@ beforeEach(() => {
     return mocks.state;
   });
   mocks.phone.beforeStep.mockImplementation((local: ControlSurfaceState) => mocks.snapshot.owner === "phone" ? { ...mocks.phoneControls } : local);
-  mocks.phone.takeControl.mockImplementation(() => {
+  const revokePhone = () => {
     if (mocks.snapshot.owner === "local") return;
     const controls = options.getStatus().controls;
     mocks.snapshot.owner = "local";
-    options.onOwnershipChange("local", controls);
-  });
-  // Flight input here takes control, as the default Automatically does, unless the two blend.
-  mocks.phone.isBlending.mockImplementation(() => false);
-  mocks.phone.noteLocalInput.mockImplementation(() => { if (!mocks.phone.isBlending()) mocks.phone.takeControl(); });
-  mocks.phone.reset.mockImplementation(() => mocks.phone.takeControl());
+    options.onOwnershipChange("local", controls, false);
+  };
+  mocks.phone.takeControl.mockImplementation(() => options.setPriority?.("computer"));
+  mocks.phone.isBlending.mockImplementation(() => mocks.snapshot.owner === "phone");
+  mocks.phone.noteLocalInput.mockImplementation(() => {});
+  mocks.phone.reset.mockImplementation(revokePhone);
 });
 
 afterEach(() => {
@@ -165,10 +166,43 @@ async function mount(pair = true) {
 
 function grant() {
   mocks.snapshot.owner = "phone";
-  options.onOwnershipChange("phone", { ...mocks.phoneControls, elevator: 0, aileron: 0, rudder: 0, brake: 0 });
+  options.onOwnershipChange("phone", { ...mocks.phoneControls, elevator: 0, aileron: 0, rudder: 0, brake: 0 }, true);
 }
 
 describe("0SFS phone integration", () => {
+  it("distinguishes automatic trim and flap travel from deliberate desktop input during handoff", async () => {
+    const previousRead = mocks.sdk.getPropertyValue.getMockImplementation()!;
+    let flaps = 0;
+    mocks.sdk.getPropertyValue.mockImplementation(property => {
+      if (property === "aero/qbar-psf") return 40;
+      if (property === "velocities/vt-fps") return 120;
+      if (property === "accelerations/qdot-rad_sec2") return 0.3;
+      if (property === "accelerations/pdot-rad_sec2") return 0.2;
+      if (property === "fcs/flap-pos-deg") return flaps * 30;
+      return previousRead(property);
+    });
+    try {
+      await mount();
+      const revision = options.getLocalInputRevision!();
+      const baseline = options.getStatus().controls;
+      for (const position of [0.2, 0.4]) {
+        flaps = position;
+        mocks.engineVisualValues.set("fcs/flap-pos-deg", position * 30);
+        tick(1 / 60);
+      }
+      expect(options.getStatus().controls.pitchTrim).not.toBe(baseline.pitchTrim);
+      expect(options.getStatus().controls.rollTrim).not.toBe(baseline.rollTrim);
+      expect(options.getStatus().actualControls?.flaps).toBeCloseTo(0.4);
+      expect(options.getStatus().controls.flaps).not.toBeCloseTo(0.4);
+      expect(options.getLocalInputRevision!()).toBe(revision);
+      expect(mocks.phone.noteLocalInput).not.toHaveBeenCalled();
+
+      window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyD" }));
+      expect(options.getLocalInputRevision!()).toBeGreaterThan(revision);
+      expect(mocks.phone.noteLocalInput).toHaveBeenCalledOnce();
+    } finally { mocks.sdk.getPropertyValue.mockImplementation(previousRead); }
+  });
+
   it("keeps Auto flaps through unchanged phone packets as actual travel changes, then yields to fresh phone input", async () => {
     const previousRead = mocks.sdk.getPropertyValue.getMockImplementation()!;
     let actual = 0;
@@ -226,7 +260,7 @@ describe("0SFS phone integration", () => {
     expect(mocks.createPhoneSession).not.toHaveBeenCalled();
   });
 
-  it("selects fresh phone controls directly at the SDK boundary and keeps their applied settings for takeover", async () => {
+  it("keeps the phone active under Mac keys and selects priority without replacing either pilot's controls", async () => {
     await mount();
     getAppSettings().set("osfs.assist.autoFlaps", false);
     grant();
@@ -236,15 +270,26 @@ describe("0SFS phone integration", () => {
     expect(mocks.sdk.setPropertyValue).toHaveBeenCalledWith("fcs/rudder-cmd-norm", -0.5);
     expect(options.getStatus().controls).toEqual(mocks.phoneControls);
 
-    window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyD" }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyW" }));
     expect(mocks.phone.noteLocalInput).toHaveBeenCalledOnce();
-    expect(options.getStatus().owner).toBe("local");
-    expect(options.getStatus().controls).toEqual({ ...mocks.phoneControls, elevator: 0, aileron: 0, rudder: 0, brake: 0 });
+    expect(options.getStatus().owner).toBe("phone");
+    expect(mocks.phone.takeControl).not.toHaveBeenCalled();
+    const last = (property: string) => mocks.sdk.setPropertyValue.mock.calls.filter(([name]) => name === property).at(-1)?.[1];
     tick(0.1);
-    expect(options.getStatus().controls.aileron).toBeCloseTo(0.8);
+    // Phone priority: its -0.4 plus the key's 0.8 using the remaining travel.
+    expect(last("fcs/elevator-cmd-norm")).toBeCloseTo(-0.4 + 0.6 * 0.8);
+    options.setPriority!("computer");
+    expect(getAppSettings().get("osfs.remote.blendPriority")).toBe("computer");
+    tick(0);
+    expect(last("fcs/elevator-cmd-norm")).toBeCloseTo(0.8 + 0.2 * -0.4);
+    expect(options.getStatus().owner).toBe("phone");
+    options.setPriority!("phone");
+    tick(0);
+    expect(last("fcs/elevator-cmd-norm")).toBeCloseTo(-0.4 + 0.6 * 0.8);
     expect(options.getStatus().controls.throttle).toBe(0.83);
     expect(options.getStatus().controls.pitchTrim).toBe(-0.2);
     expect(options.getStatus().controls.flaps).toBe(1 / 3);
+    window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyW" }));
   });
 
   it("blends this computer's keys with a blending phone's frame at the SDK boundary, and its levers follow", async () => {
@@ -279,7 +324,7 @@ describe("0SFS phone integration", () => {
     await mount();
     grant();
     mocks.phone.beforeStep.mockImplementation(() => {
-      mocks.phone.takeControl();
+      mocks.phone.reset();
       options.setPaused(true);
       return false;
     });

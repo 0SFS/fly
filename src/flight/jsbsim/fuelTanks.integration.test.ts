@@ -12,7 +12,7 @@ import { resetFlightLocation } from "./resetFlightLocation";
 import { readExternalFuelTanks, setExternalFuelTankAttached } from "@0sfs/fuel/externalFuelTanks";
 import { getExternalTankDefinitions } from "@0sfs/fuel/externalTankDefinitions";
 import { windForceToBody } from "@0sfs/aircraft/aircraftForces";
-import { getFdmProfile } from "./fdmProfiles";
+import { getFdmProfile, type EngineModelId } from "./fdmProfiles";
 import { applySavedControls, captureSavedFlight, parseSavedFlight, restoreSavedFlight } from "./savedFlight";
 import { captureSimulation, restoreSimulation } from "@0sfs/ground-contact/safeFlightState";
 import { LEGACY_FIXED_DT_120, LEGACY_PHYSICS_HZ_120 } from "../physics/physicsRate";
@@ -23,15 +23,22 @@ afterEach(() => {
   for (const sdk of instances.splice(0)) sdk.destroy();
 });
 
-async function boot(aircraftId: AircraftId) {
+async function boot(aircraftId: AircraftId, engineModel?: EngineModelId) {
   const sdk = await JSBSimSdk.create({
     moduleUrl: wasmModuleUrl, wasmUrl: wasmBinaryUrl,
     persistence: { enabled: false }, log: { console: false },
   });
   instances.push(sdk);
   const manifest: unknown = JSON.parse(readFileSync("public/jsbsim-data/manifest.json", "utf8"));
-  for (const file of resolveAircraftDataFiles(manifest, aircraftId)) sdk.writeDataFile(file, readFileSync("public/jsbsim-data/" + file, "utf8"));
-  await bootstrapAircraft(sdk, aircraftId, LEGACY_PHYSICS_HZ_120, { altFt: 3000, airspeedKts: 120 });
+  for (const file of resolveAircraftDataFiles(manifest, getFdmProfile(aircraftId, engineModel).dataPackage ?? aircraftId)) sdk.writeDataFile(file, readFileSync("public/jsbsim-data/" + file, "utf8"));
+  await bootstrapAircraft(sdk, aircraftId, LEGACY_PHYSICS_HZ_120, { altFt: 3000, airspeedKts: 120, engineModel });
+  return sdk;
+}
+
+async function bootWithExternalTanks() {
+  const sdk = await boot("f-35b");
+  for (const tank of getExternalTankDefinitions("f-35b")) setExternalFuelTankAttached(sdk, "f-35b", tank.index, true);
+  expect(sdk.runIc()).toBe(true);
   return sdk;
 }
 
@@ -48,8 +55,19 @@ describe("fuel tanks in JSBSim", () => {
     expect(sdk.getPropertyValue("propulsion/total-fuel-lbs")).toBeCloseTo(expected.reduce((sum, tank) => sum + tank[1], 0), 6);
   });
 
+  it.each(["plant", "empirical"] as const)("spawns a fresh %s F-35B without external fuel, dry mass or drag", async engineModel => {
+    const sdk = await boot("f-35b", engineModel);
+    expect(readExternalFuelTanks(sdk, "f-35b").map(tank => tank.attached)).toEqual([false, false]);
+    expect(readFuelTanks(sdk).map(tank => tank.contentsLbs)).toEqual([2500, 2500, 0, 0]);
+    for (const [store, tank] of getExternalTankDefinitions("f-35b").entries()) {
+      expect(sdk.getPropertyValue(`inertia/pointmass-weight-lbs[${store}]`)).toBe(0);
+      expect(sdk.getPropertyValue(`propulsion/tank[${tank.index}]/priority`)).toBe(0);
+      expect(sdk.getPropertyValue(`stores/external-tank[${store}]/drag-lbs`)).toBe(0);
+    }
+  });
+
   it("keeps fuel in every tank through recovery, a relocation and a runway start", async () => {
-    const sdk = await boot("f-35b");
+    const sdk = await bootWithExternalTanks();
     writeFuelTanks(sdk, new Map([[0, 1000], [1, 2000], [2, 1500], [3, 500]]));
     // The mass model follows the new load on the next step, which burns a little of it.
     expect(sdk.run()).toBe(true);
@@ -71,7 +89,7 @@ describe("fuel tanks in JSBSim", () => {
   });
 
   it("releases fuel, mass and drag, blocks absent-tank filling and attaches an empty replacement", async () => {
-    const sdk = await boot("f-35b");
+    const sdk = await bootWithExternalTanks();
     expect(readExternalFuelTanks(sdk, "f-35b").map(tank => tank.attached)).toEqual([true, true]);
     const definitions = getExternalTankDefinitions("f-35b");
     for (const [store, definition] of definitions.entries()) {
@@ -118,7 +136,7 @@ describe("fuel tanks in JSBSim", () => {
   });
 
   it("feeds the running engine from an attached external tank", async () => {
-    const sdk = await boot("f-35b");
+    const sdk = await bootWithExternalTanks();
     writeFuelTanks(sdk, new Map([[0, 0], [1, 0], [2, 1000], [3, 0]]));
     for (let step = 0; step < 1 / LEGACY_FIXED_DT_120; step++) expect(sdk.run()).toBe(true);
     expect(readFuelTanks(sdk)[2]!.contentsLbs).toBeLessThan(1000);
@@ -126,7 +144,7 @@ describe("fuel tanks in JSBSim", () => {
   });
 
   it("keeps attachment, fuel and pilot controls through recovery, relocation and a new session", async () => {
-    const source = await boot("f-35b");
+    const source = await bootWithExternalTanks();
     setExternalFuelTankAttached(source, "f-35b", 2, false);
     writeFuelTanks(source, new Map([[0, 1200], [1, 1800], [3, 750]]));
     source.setPropertyValue("fcs/throttle-cmd-norm", 0.65);
@@ -149,7 +167,7 @@ describe("fuel tanks in JSBSim", () => {
   });
 
   it("resumes an older save without attachment flags using attached empty-store defaults", async () => {
-    const sdk = await boot("f-35b");
+    const sdk = await bootWithExternalTanks();
     const saved = captureSavedFlight(sdk, "f-35b", true)!;
     for (const path of Object.keys(saved.simulation.controls)) {
       if (path.startsWith("stores/")) delete saved.simulation.controls[path];
@@ -162,7 +180,7 @@ describe("fuel tanks in JSBSim", () => {
   });
 
   it.each(["departure", "arrival"] as const)("keeps a released tank absent on a runway %s reset", async mode => {
-    const sdk = await boot("f-35b");
+    const sdk = await bootWithExternalTanks();
     writeFuelTanks(sdk, new Map([[0, 1000], [1, 2000], [2, 1500], [3, 500]]));
     setExternalFuelTankAttached(sdk, "f-35b", 2, false);
     resetFlightLocation(sdk, {

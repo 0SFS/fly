@@ -94,12 +94,22 @@ const mocks = vi.hoisted(() => {
       ready: Promise.resolve(), sync: vi.fn(), jettison: vi.fn(), update: vi.fn(),
       setLifetimeSeconds: vi.fn(), setMaxDetachedTanks: vi.fn(), resetDetached: vi.fn(), dispose: vi.fn(),
     },
+    // The F-35B's weapon stations, only for the test that loads them.
+    weaponStations: false,
+    onGround: false,
+    storeVisuals: {
+      sync: vi.fn(), poseDoors: vi.fn(() => true), jettison: vi.fn(), update: vi.fn(),
+      fitAirframe: vi.fn(() => ({ meshes: [], reveal: vi.fn(), dispose: vi.fn() })),
+      setLifetimeSeconds: vi.fn(), setMaxDetachedStores: vi.fn(), resetDetached: vi.fn(), dispose: vi.fn(),
+    },
     useRealFlightHud: false,
     flightHud: { update: vi.fn(), destroy: vi.fn(), refreshVtolConversion: vi.fn(), refreshFlaps: vi.fn(), setLayout: vi.fn(), setReadingTints: vi.fn() },
     applyAircraftRig: vi.fn(),
     terrainContact: { reset: vi.fn(), update: vi.fn(() => true) },
     visibleMeshCollision: { reset: vi.fn(), update: vi.fn(() => false) },
-    physics: { reset: vi.fn(), setPaused: vi.fn(), update: vi.fn((_delta, applyInputs) => { applyInputs(); return state; }), getLatestState: () => state, getFault: () => null },
+    physics: { reset: vi.fn(), setPaused: vi.fn(), update: vi.fn((_delta, applyInputs) => { applyInputs(); return state; }), getLatestState: () => state, getFault: () => null,
+      getTimeAccounting: () => ({ physicsHz: 60, dtSeconds: 1 / 60, maxStepsPerUpdate: 3, receivedSeconds: 0,
+        acceptedSteps: 0, simulatedSeconds: 0, discardedSeconds: 0, catchUpDiscardedSeconds: 0, pendingSeconds: 0 }) },
     hudBarOptions: null as HudBarClicks | null,
     controlPanelOptions: null as import("./hud/FlightControlPanel").FlightControlPanelOptions | null,
     stopDeviceLost: vi.fn(), stopDeviceRestored: vi.fn(),
@@ -113,7 +123,7 @@ vi.mock("foss-earth/runtime", () => ({
     const scene = new Proxy({}, { get: () => ({ add: () => null, remove: () => true }) });
     return Object.assign(mocks.runtime, { frameProfile: createFrameProfileSession({ scene: scene as never, engine: { getCaps: () => ({}) } as never, now: () => performance.now() }) });
   },
-  RASTER_BASE_MAP_SOURCES: [], TERRAIN_SOURCES: [], resolveTerrainSource: vi.fn(), resolveRasterBaseMapSource: vi.fn(), resolveMapRuntimeConfig: () => ({}), applyRendererChoice: vi.fn(), setMapSourcePreference: vi.fn(), setTerrainSourcePreference: vi.fn(),
+  RASTER_BASE_MAP_SOURCES: [], TERRAIN_SOURCES: [], resolveTerrainSource: vi.fn(), resolveRasterBaseMapSource: vi.fn(), resolveMapRuntimeConfig: () => ({ rasterBaseMap: { id: "usgs-imagery", label: "USGS Imagery" } }), applyRendererChoice: vi.fn(), setMapSourcePreference: vi.fn(), setTerrainSourcePreference: vi.fn(),
 }));
 const shellCapture = vi.hoisted(() => ({ diagnosticsSource: null as null | Parameters<typeof import("foss-earth/shell").createDiagnosticsSection>[0], mapPanel: null as null | {
   onMapSourceChange(sourceId: string): void;
@@ -140,6 +150,10 @@ vi.mock("./jsbsim/createJsbsimRuntime", () => ({ createJsbsimRuntime: vi.fn(asyn
     native: { commit: "a".repeat(40), dirty: false }, sdk: { commit: "a".repeat(40), dirty: false },
   }, assets: { moduleUrl: "https://private.example.test/module.js?key=private-asset-key", wasmUrl: "https://private.example.test/module.wasm" } },
   sdk: {
+    getSimTime: () => 12.5,
+    ...(mocks.weaponStations ? {
+      queryPropertyCatalog: vi.fn((check: string) => check === "stores/station[1]/occupied" ? check : ""),
+    } : {}),
     createPropertyBatch: vi.fn((paths: readonly string[]) => ({
       read: vi.fn((target = new Float64Array(paths.length)) => {
         paths.forEach((path, index) => { target[index] = mocks.engineVisualValues.get(path) ?? Number.NaN; });
@@ -148,7 +162,8 @@ vi.mock("./jsbsim/createJsbsimRuntime", () => ({ createJsbsimRuntime: vi.fn(asyn
       dispose: vi.fn(),
     })),
     setPropertyValue: vi.fn(),
-    getPropertyValue: vi.fn((property: string) => property === "fcs/throttle-cmd-norm"
+    getPropertyValue: vi.fn((property: string) => property.endsWith("/WOW") ? Number(mocks.onGround)
+      : property === "fcs/throttle-cmd-norm"
       ? options.aircraftId === "cirrus-vision-jet" ? 0.35 : 0.65
       : property === "gear/gear-cmd-norm" ? options.aircraftId === "cirrus-vision-jet" ? 0 : 1
         // The engine runs, as a flight starts: an engine that is off holds the throttle at idle.
@@ -183,6 +198,7 @@ vi.mock("foss-earth/diagnosticDrawing", async importOriginal => ({
   createMeshInspector: vi.fn(() => mocks.meshInspector),
 }));
 vi.mock("@0sfs/fuel/createExternalTankVisuals", () => ({ createExternalTankVisuals: vi.fn(() => mocks.externalTanks) }));
+vi.mock("@0sfs/stores/createStoreVisuals", () => ({ createStoreVisuals: vi.fn(() => mocks.storeVisuals) }));
 vi.mock("@0sfs/fuel/externalFuelTanks", () => ({
   readExternalFuelTanks: (_sdk: unknown, aircraftId: string) => aircraftId === "f-35b"
     ? [...mocks.externalTankAttached].map(([index, attached]) => ({ index, attached })) : [],
@@ -232,7 +248,9 @@ vi.mock("./hud/createFlightControlPanel", async importOriginal => {
 
 import type { FrameProfileSession } from "foss-earth/perf";
 import { getAppSettings, resetAppSettings, SETTINGS_STORAGE_KEY } from "foss-earth/settings";
-import { issueReporterFromBuild, startAppDiagnostics } from "foss-earth/diagnostics";
+import { getAppIdentity, issueReporterFromBuild, startAppDiagnostics } from "foss-earth/diagnostics";
+import { createGameLog } from "foss-earth/shell";
+import { createFlightLoadingScreen } from "../loading/createFlightLoadingScreen";
 import { flightLog } from "@0sfs/logging/flightLog";
 import { cameraAttitudeView } from "./hud/cameraAttitudeView";
 import { setMapSourcePreference } from "foss-earth/runtime";
@@ -240,6 +258,9 @@ import { createFlightSimApp } from "./createFlightSimApp";
 import { createAircraftModel } from "@0sfs/aircraft/createAircraftModel";
 import { createJsbsimRuntime } from "./jsbsim/createJsbsimRuntime";
 import { createExternalTankVisuals } from "@0sfs/fuel/createExternalTankVisuals";
+import { createStoreVisuals } from "@0sfs/stores/createStoreVisuals";
+import { loadFromPreset } from "@0sfs/stores/storeCatalog";
+import { setRearmRule } from "./settings/rearmRule";
 import * as fuelTanks from "@0sfs/fuel/fuelTanks";
 import { setExternalFuelTankAttached } from "@0sfs/fuel/externalFuelTanks";
 import { createCollisionDebugOverlay } from "@0sfs/ground-contact/createCollisionDebugOverlay";
@@ -251,7 +272,7 @@ import { createFlightAudio } from "@0sfs/sound/createFlightAudio";
 import { captureSavedFlight, restoreSavedFlight, SAVED_FLIGHT_STORAGE_KEY, type SavedFlight } from "./jsbsim/savedFlight";
 
 // Each test is a fresh page: the app registry reads the stubbed storage again.
-afterEach(() => { mocks.sky.environment = null; mocks.sky.listener = null; mocks.useRealFlightHud = false; mocks.engineVisualValues.clear(); mocks.externalTankAttached.set(2, true); mocks.externalTankAttached.set(3, true); mocks.physics.getFault = () => null; vi.clearAllMocks(); vi.unstubAllGlobals(); document.body.replaceChildren(); resetAppSettings(); });
+afterEach(() => { mocks.sky.environment = null; mocks.sky.listener = null; mocks.useRealFlightHud = false; mocks.engineVisualValues.clear(); mocks.externalTankAttached.set(2, true); mocks.externalTankAttached.set(3, true); mocks.weaponStations = false; mocks.onGround = false; mocks.physics.getFault = () => null; vi.clearAllMocks(); vi.unstubAllGlobals(); document.body.replaceChildren(); resetAppSettings(); });
 
 const savedSettings = (storage: Map<string, string>): Record<string, unknown> =>
   (JSON.parse(storage.get(SETTINGS_STORAGE_KEY) ?? "{\"values\":{}}") as { values: Record<string, unknown> }).values;
@@ -301,6 +322,9 @@ it("homes bug reporting in its own tab, captures flight context, and releases it
     expect(report).toContain("GPU: Test GPU, Test renderer, WebGL 2");
     expect(report).toContain("Aircraft: cessna-172;");
     expect(report).toContain("Flight: running; view third; physics fault none.");
+    expect(report).toContain("Flight progress:");
+    expect(report).toContain('"nativeTimeSeconds":12.5');
+    expect(report).toContain('"acceptedSteps":0');
     expect(report).toContain(`JSBSim: @felipegalind0/jsbsim 1.2.4-fork.20; native ${"a".repeat(40)}; SDK ${"a".repeat(40)}.`);
     expect(report).toContain("report-check: Flaps changed");
     expect(report).not.toContain("private-detail");
@@ -540,8 +564,16 @@ it("keeps autopilot configuration on the Autopilot tab, and shared preferences a
     expect(root.querySelector('[data-preset="osfs-low-and-slow"]')).not.toBeNull();
     expect(root.querySelector('[data-preset="sharpest"]')).not.toBeNull();
     await openTab(root, "Interface");
-    expect(sectionTitles()).toEqual(["hud", "toolbar", "position", "log"].map(section => getAppSettings().getSectionTitle("interface", section)));
+    expect(sectionTitles()).toEqual(["scale", "hud", "toolbar", "position", "log"].map(section => getAppSettings().getSectionTitle("interface", section)));
     expect(root.querySelector('[data-parameter="osfs.hud.layout"]')).not.toBeNull();
+    // The UI scale zooms the layers over the view, live.
+    expect(root.querySelector('[data-parameter="osfs.ui.scale"]')).not.toBeNull();
+    const flightApp = root.querySelector<HTMLElement>(".flight-app")!;
+    expect(flightApp.style.getPropertyValue("--flight-ui-scale")).toBe("0.8");
+    getAppSettings().set("osfs.ui.scale", 1.25);
+    expect(flightApp.style.getPropertyValue("--flight-ui-scale")).toBe("1.25");
+    getAppSettings().reset("osfs.ui.scale");
+    expect(flightApp.style.getPropertyValue("--flight-ui-scale")).toBe("0.8");
     expect(root.querySelector('[data-parameter="interface.toolbar.bugReport"]')).not.toBeNull();
     expect(root.querySelector('[data-parameter="interface.toolbar.renderer"]')).toBeNull();
     expect(root.querySelector('[data-parameter="interface.toolbar.activityOutline"]')).not.toBeNull();
@@ -729,7 +761,8 @@ async function openPanelTab(root: HTMLElement, label: string, initiallyClosed = 
     await act(async () => existing.click());
     return;
   }
-  const launcher = initiallyClosed ? '[aria-label="Open right panel"]' : '[aria-label="Open new tab"]';
+  const launcher = initiallyClosed && root.querySelector('[aria-label="Open right panel"]')
+    ? '[aria-label="Open right panel"]' : '[aria-label="Open new tab"]';
   await act(async () => selectionControl<HTMLButtonElement>(root, launcher).click());
   const item = Array.from(root.querySelectorAll<HTMLButtonElement>(".foss-earth-new-tab-choice"))
     .find(button => button.textContent === label);
@@ -764,7 +797,61 @@ async function mountAircraftSelection(initial: [string, string][] = []) {
   return { root, app, storage, setItem, reload };
 }
 
+it("keeps one aircraft health pool, blocks destroyed flight, and repairs without resuming", async () => {
+  const t = await mountAircraftSelection();
+  try {
+    await openPanelTab(t.root, "Damage");
+    const meter = () => t.root.querySelector<HTMLMeterElement>('[aria-label="Aircraft health"]')!;
+    expect(meter().value).toBe(100);
+    const testDamage = t.root.querySelector<HTMLDetailsElement>("details.flight-panel__fieldset")!;
+    testDamage.open = true;
+    const hit = () => [...t.root.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Apply 25 damage")!;
+    await act(async () => mocks.controlPanelOptions!.onPausedChange(false));
+    expect(mocks.runtime.setSimRunning).toHaveBeenLastCalledWith(true);
+    await act(async () => hit().click());
+    expect(meter().value).toBe(75);
+    // Closing and reopening the tab must not create a new health model.
+    await openPanelTab(t.root, "Aircraft");
+    await openPanelTab(t.root, "Damage");
+    expect(meter().value).toBe(75);
+    for (let i = 0; i < 3; i++) await act(async () => hit().click());
+    expect(meter().value).toBe(0);
+    expect(t.root.textContent).toContain("Aircraft destroyed. Repair before resuming.");
+    expect(hit().disabled).toBe(true);
+    expect(mocks.runtime.setSimRunning).toHaveBeenLastCalledWith(false);
+    await act(async () => mocks.controlPanelOptions!.onPausedChange(false));
+    expect(mocks.runtime.setSimRunning).toHaveBeenLastCalledWith(false);
+    const repair = [...t.root.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Repair aircraft")!;
+    await act(async () => repair.click());
+    expect(meter().value).toBe(100);
+    expect(repair.disabled).toBe(true);
+    expect(mocks.runtime.setSimRunning).toHaveBeenLastCalledWith(false);
+    await act(async () => mocks.controlPanelOptions!.onPausedChange(false));
+    expect(mocks.runtime.setSimRunning).toHaveBeenLastCalledWith(true);
+  } finally { await act(async () => t.app.destroy()); }
+});
+
 const generationSelector = ".flight-panel__generation-field select";
+
+it("changes the local damage implementation from Shared settings and resets health at that boundary", async () => {
+  const t = await mountAircraftSelection();
+  try {
+    await act(async () => mocks.controlPanelOptions!.onDamageAction({ type: "test-hit" }));
+    await openPanelTab(t.root, "Shared settings");
+    const choice = (value: string) => t.root.querySelector<HTMLInputElement>(`input[value="${value}"]`)!;
+    expect(choice("health-v1").checked).toBe(true);
+    expect(choice("everyone").disabled).toBe(true);
+    await act(async () => choice("off-v1").click());
+    await openPanelTab(t.root, "Damage");
+    expect(t.root.querySelector('[aria-label="Aircraft health"]')).toBeNull();
+    expect(t.root.textContent).toContain("Damage is off");
+    await openPanelTab(t.root, "Shared settings");
+    await act(async () => choice("health-v1").click());
+    await openPanelTab(t.root, "Damage");
+    expect(t.root.querySelector<HTMLMeterElement>('[aria-label="Aircraft health"]')!.value).toBe(100);
+    expect(mocks.runtime.setSimRunning).toHaveBeenLastCalledWith(false);
+  } finally { await act(async () => t.app.destroy()); }
+});
 
 it("flies at 60 Hz unless 120 Hz was saved, and holds a changed rate until the next flight", async () => {
   let t = await mountAircraftSelection();
@@ -849,6 +936,114 @@ it("connects external tank fuel controls to separation, respawn and simulation t
     readTanks.mockRestore();
   }
   expect(mocks.externalTanks.dispose).toHaveBeenCalledTimes(1);
+});
+
+it("rearms and refuels in the air by default, waits for the wheels when asked, and always jettisons", async () => {
+  mocks.weaponStations = true;
+  const readTanks = vi.spyOn(fuelTanks, "readFuelTanks").mockImplementation(() => [0, 1, 2, 3].map(index => ({
+    index, capacityLbs: index < 2 ? 6550 : 2991, contentsLbs: index < 2 ? 2500 : 0,
+    xIn: 368.52, yIn: [40, -40, 127.952756, -127.952756][index]!, densityLbsPerGal: 6.7,
+    ...(index < 2 ? {} : { attached: mocks.externalTankAttached.get(index)!,
+      attachmentProperty: `stores/external-tank[${index - 2}]/attached` }),
+  })));
+  const writeTanks = vi.spyOn(fuelTanks, "writeFuelTanks").mockImplementation(() => {});
+  const t = await mountAircraftSelection([["osfs.aircraft", "f-35b"]]);
+  const rearmControl = () => t.root.querySelector<HTMLElement>('[data-parameter="osfs.rearm.groundOnly"]');
+  const hung = (station: number) => mocks.storeVisuals.sync.mock.calls.at(-1)?.[0].load[station] ?? null;
+  try {
+    expect(createStoreVisuals).toHaveBeenCalledWith(mocks.runtime.scene, mocks.aircraft.modelRoot,
+      expect.objectContaining({ lifetimeSeconds: 15, maxDetachedStores: 2 }));
+    const options = mocks.controlPanelOptions!;
+    // In the air with the setting off: the load and the fuel change.
+    expect(getAppSettings().get("osfs.rearm.groundOnly")).toBe(false);
+    await act(async () => options.onArmamentLoad!(loadFromPreset("usmc-strike")!));
+    expect(hung(4)).toBe("gbu-32");
+    await act(async () => options.onFuelChange(new Map([[0, 3000]])));
+    expect(writeTanks).toHaveBeenCalledTimes(1);
+
+    // The master arm still holds the load, and never holds jettison.
+    await act(async () => options.onArmamentMasterArm!(true));
+    await act(async () => options.onArmamentLoad!(loadFromPreset("uk")!));
+    expect(hung(4)).toBe("gbu-32");
+    await act(async () => options.onArmamentJettison!(4));
+    expect(mocks.storeVisuals.jettison).toHaveBeenLastCalledWith(4, expect.objectContaining({ x: 6.096, y: 1.524, z: -30.48 }));
+    expect(mocks.storeVisuals.jettison.mock.invocationCallOrder.at(-1))
+      .toBeLessThan(mocks.storeVisuals.sync.mock.invocationCallOrder.at(-1)!);
+    expect(hung(4)).toBeNull();
+    await act(async () => options.onArmamentMasterArm!(false));
+
+    // The bay doors are cut from the loaded belly; a fit that fails leaves the jet whole.
+    const prepareModel = vi.mocked(createAircraftModel).mock.calls.at(-1)![2].prepareModel!;
+    const airframe = { meshes: [] } as unknown as Parameters<typeof prepareModel>[0];
+    expect(prepareModel(airframe)).toBe(mocks.storeVisuals.fitAirframe.mock.results.at(-1)!.value);
+    mocks.storeVisuals.fitAirframe.mockImplementationOnce(() => { throw new Error("not AF267"); });
+    expect(prepareModel(airframe)).toBeNull();
+    // The gear is between its endpoints here, so an open waits for it; a shut goes at once.
+    const { sdk } = await vi.mocked(createJsbsimRuntime).mock.results.at(-1)!.value;
+    await act(async () => options.onArmamentDoor!(0, true));
+    expect(sdk.setPropertyValue).not.toHaveBeenCalledWith("stores/bay[0]/door-cmd-norm", 1);
+    await openPanelTab(t.root, "Armament");
+    expect(selectionControl<HTMLButtonElement>(t.root, '[aria-label="Right bay door"]').textContent)
+      .toBe("Right bay shut (waiting for the gear)");
+    await act(async () => options.onArmamentDoor!(0, false));
+    expect(sdk.setPropertyValue).toHaveBeenLastCalledWith("stores/bay[0]/door-cmd-norm", 0);
+    expect(selectionControl<HTMLButtonElement>(t.root, '[aria-label="Right bay door"]').textContent)
+      .toBe("Right bay open (0%)");
+    await openPanelTab(t.root, "Fuel");
+
+    // One setting, drawn in both tabs.
+    await openPanelTab(t.root, "Armament");
+    expect(rearmControl()).not.toBeNull();
+    await openPanelTab(t.root, "Fuel");
+    await act(async () => rearmControl()!.querySelector<HTMLInputElement>("input")!.click());
+    expect(getAppSettings().get("osfs.rearm.groundOnly")).toBe(true);
+    expect(t.root.textContent).toContain("Fuel changes wait for weight on the wheels.");
+    await act(async () => options.onArmamentLoad!(loadFromPreset("uk")!));
+    expect(hung(1)).toBeNull();
+    await act(async () => options.onFuelChange(new Map([[0, 1000]])));
+    expect(writeTanks).toHaveBeenCalledTimes(1);
+    await act(async () => selectionControl<HTMLButtonElement>(t.root, '[aria-label="Jettison left external tank"]').click());
+    expect(mocks.externalTanks.jettison).toHaveBeenLastCalledWith(3, expect.anything());
+    expect(selectionControl<HTMLButtonElement>(t.root, '[aria-label="Respawn left external tank"]').disabled).toBe(true);
+    await act(async () => options.onFuelAttachmentChange!(3, true));
+    expect(setExternalFuelTankAttached).not.toHaveBeenCalledWith(expect.anything(), "f-35b", 3, true);
+    await act(async () => options.onArmamentJettison!(5));
+    await act(async () => options.onArmamentJettison!(7));
+    expect(mocks.storeVisuals.jettison).toHaveBeenLastCalledWith(7, expect.anything());
+
+    // On the wheels, the same rule lets the load change.
+    mocks.onGround = true;
+    await act(async () => options.onArmamentLoad!(loadFromPreset("uk")!));
+    expect(hung(1)).toBe("asraam");
+    await act(async () => options.onFuelChange(new Map([[0, 1000]])));
+    expect(writeTanks).toHaveBeenCalledTimes(2);
+    mocks.onGround = false;
+
+    // A session holds the setting on with a reason, then hands it back.
+    await act(async () => getAppSettings().set("osfs.rearm.groundOnly", false));
+    await act(async () => setRearmRule("ground-only", { reason: "This server rearms on the ground only." }));
+    expect(getAppSettings().get("osfs.rearm.groundOnly")).toBe(true);
+    expect(rearmControl()!.querySelector<HTMLInputElement>("input")!.disabled).toBe(true);
+    expect(rearmControl()!.textContent).toContain("This server rearms on the ground only.");
+    await act(async () => setRearmRule());
+    expect(getAppSettings().get("osfs.rearm.groundOnly")).toBe(false);
+    expect(rearmControl()!.querySelector<HTMLInputElement>("input")!.disabled).toBe(false);
+
+    const tick = mocks.runtime.setSimTick.mock.calls.at(-1)![0] as (dt: number) => void;
+    await act(async () => tick(1 / 60));
+    expect(mocks.storeVisuals.update).toHaveBeenLastCalledWith(0);
+    await act(async () => {
+      getAppSettings().set("osfs.stores.debrisLifetimeSeconds", 3);
+      getAppSettings().set("osfs.stores.maxDetachedStores", 0);
+    });
+    expect(mocks.storeVisuals.setLifetimeSeconds).toHaveBeenLastCalledWith(3);
+    expect(mocks.storeVisuals.setMaxDetachedStores).toHaveBeenLastCalledWith(0);
+  } finally {
+    await act(async () => t.app.destroy());
+    readTanks.mockRestore();
+    writeTanks.mockRestore();
+  }
+  expect(mocks.storeVisuals.dispose).toHaveBeenCalledTimes(1);
 });
 
 it("switches complete aircraft in place and holds every pause route until its model is ready", async () => {
@@ -1233,7 +1428,8 @@ it("preserves focused manual flap edits while paused and waits for a native step
       });
       tick(1 / 60);
       expect(slider.value).toBe(String(value));
-      expect(output.value).toBe("0%");
+      expect(output.value).toBe(`${Math.round(value * 100)}%`);
+      expect(slider.getAttribute("aria-valuetext")).toContain("0% actual");
       expect(getAppSettings().get("osfs.assist.autoFlaps")).toBe(false);
     }
     expect(runtime.sdk.setPropertyValue).not.toHaveBeenCalledWith("fcs/flap-cmd-norm", expect.anything());
@@ -1254,7 +1450,7 @@ it("takes Auto flaps off for a fresh paused retract key even when the current fl
   } finally { await act(async () => t.app.destroy()); }
 });
 
-it.each(["cessna-172", "cirrus-vision-jet", "f-35b"])("defaults Auto flaps on for %s and displays observed travel with manual takeover", async aircraftId => {
+it.each(["cessna-172", "cirrus-vision-jet", "f-35b"])("defaults Auto flaps on for %s and marks physical travel separately from the command", async aircraftId => {
   mocks.useRealFlightHud = true;
   const canvas = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
     new Proxy({}, { get: () => () => undefined }) as unknown as CanvasRenderingContext2D,
@@ -1272,7 +1468,9 @@ it.each(["cessna-172", "cirrus-vision-jet", "f-35b"])("defaults Auto flaps on fo
     const button = t.root.querySelector<HTMLButtonElement>('[data-control="auto-flaps"]')!;
     expect(getAppSettings().get("osfs.assist.autoFlaps")).toBe(true);
     expect(button.getAttribute("aria-pressed")).toBe("true");
-    expect(slider.value).toBe("0.5");
+    expect(slider.value).toBe("0");
+    expect(slider.getAttribute("aria-valuetext")).toContain("50% actual");
+    expect(slider.parentElement!.querySelector<HTMLElement>(".flight-control-position__actual")!.hidden).toBe(false);
     await act(async () => {
       slider.value = "0.25";
       slider.dispatchEvent(new Event("input", { bubbles: true }));
@@ -1425,7 +1623,7 @@ it("restores the saved VTOL command on reload without treating it as physical co
   try {
     const conversion = t.root.querySelector<HTMLInputElement>('[data-control="vtol-conversion"]')!;
     expect(conversion.value).toBe("0.6");
-    expect(conversion.getAttribute("aria-valuetext")).toBe("60% commanded; 0% actual conversion");
+    expect(conversion.getAttribute("aria-valuetext")).toBe("60% commanded; 0% actual");
   } finally { await act(async () => t.app.destroy()); canvas.mockRestore(); }
 });
 
@@ -1530,6 +1728,69 @@ it("loads and refines around the aircraft when nothing was saved, and removes it
     expect(mocks.unregisterFocusPoint).not.toHaveBeenCalled();
   } finally { await act(async () => app.destroy()); }
   expect(mocks.unregisterFocusPoint).toHaveBeenCalledOnce();
+});
+
+it("shows the failure and alternate map action before retiring the diagnostic log", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.stubGlobal("localStorage", { getItem: () => null, setItem: vi.fn() });
+  Object.defineProperty(navigator, "getGamepads", { configurable: true, value: () => [] });
+  const root = document.createElement("div"); root.id = "root"; document.body.append(root);
+  const log = createGameLog();
+  const diagnostics = startAppDiagnostics({ log, settings: getAppSettings(), identity: getAppIdentity() });
+  const loading = createFlightLoadingScreen(diagnostics.log);
+  mocks.runtime.status = { mode: "google-tiles", lastError: null } as never;
+  mocks.runtime.prepareTerrain.mockRejectedValueOnce(new Error("Google denied")).mockRejectedValueOnce(new Error("Backup offline"));
+  try {
+    await act(async () => {
+      await expect(createFlightSimApp(root, { diagnostics, log: diagnostics.log, loadingScreen: loading }))
+        .rejects.toThrow("Google 3D Tiles and the backup terrain could not load");
+    });
+    const failure = [...document.querySelectorAll<HTMLElement>('#app-log [data-tone="error"]')]
+      .find(line => line.textContent?.includes("Flight could not start safely"));
+    expect(failure).toBeDefined();
+    expect(failure!.textContent).toContain("Use OpenStreetMap");
+    expect(failure!.textContent).toContain("Reload and try again");
+    expect(mocks.runtime.destroy).toHaveBeenCalledOnce();
+  } finally {
+    loading.destroy(); log.destroy(); diagnostics.destroy();
+    mocks.runtime.status = { mode: "fallback" } as never;
+  }
+});
+
+it("finishes startup on backup terrain without a competing teleport, keeps Google selected, and lets that selection retry", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.stubGlobal("localStorage", { getItem: () => null, setItem: vi.fn() });
+  Object.defineProperty(navigator, "getGamepads", { configurable: true, value: () => [] });
+  const settings = getAppSettings();
+  settings.set("map.source.basemap", "google");
+  mocks.runtime.status = { mode: "google-tiles", lastError: null } as never;
+  mocks.hudBarOptions = null;
+  let failGoogle!: (error: Error) => void;
+  mocks.runtime.prepareTerrain.mockImplementationOnce(() => new Promise((_resolve, reject) => { failGoogle = reject; }));
+  const root = document.createElement("div"); root.id = "root"; document.body.append(root);
+  let app: Awaited<ReturnType<typeof createFlightSimApp>> | undefined;
+  try {
+    await act(async () => {
+      const starting = createFlightSimApp(root);
+      await vi.waitFor(() => expect(mocks.hudBarOptions).not.toBeNull());
+      expect(mocks.runtime.setSimRunning).not.toHaveBeenCalledWith(true);
+      mocks.runtime.status = { mode: "raster-basemap", terrainSource: { id: "mapterhorn" }, lastError: "Google HTTP 403" } as never;
+      for (const listener of [...mocks.runtime.statusListeners]) listener(mocks.runtime.status);
+      failGoogle(new Error("Map source changed while preparing the destination"));
+      app = await starting;
+    });
+    expect(mocks.runtime.prepareTerrain).toHaveBeenCalledTimes(2);
+    expect(mocks.runtime.setSimRunning).toHaveBeenCalledWith(true);
+    expect(root.hasAttribute("inert")).toBe(false);
+    expect(document.body.textContent).toContain("Using USGS Imagery. Your Google map preference is kept");
+    expect(settings.get("map.source.basemap")).toBe("google");
+    expect(mocks.runtime.destroy).not.toHaveBeenCalled();
+    await act(async () => shellCapture.mapPanel!.onMapSourceChange("google"));
+    expect(mocks.runtime.setMapSource).toHaveBeenCalledWith("google");
+  } finally {
+    await act(async () => app?.destroy());
+    mocks.runtime.status = { mode: "fallback" } as never;
+  }
 });
 
 it("prepares terrain again only when the ground changes: Google, a 2D basemap, or its elevation", async () => {
@@ -2296,4 +2557,74 @@ describe("G-forces", () => {
       expect(createFixedStepPhysicsLoop).toHaveBeenCalledTimes(1);
     } finally { await act(async () => t.app.destroy()); canvas.mockRestore(); }
   });
+});
+
+it("offers feedback only while the current URL requests it, including same-document navigation", async () => {
+  const { createTestLink } = await import("@foss-earth/ui/diagnostics");
+  const { SAVED_WORKSPACE_STORAGE_KEY } = await import("@foss-earth/ui/browser");
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  window.history.replaceState(null, "", "/fly/");
+  const storage = new Map([[SAVED_WORKSPACE_STORAGE_KEY, JSON.stringify({
+    primary: { tabs: ["test-feedback", "map"], activeTab: "test-feedback", collapsed: false },
+    secondary: { tabs: [], activeTab: null, collapsed: false },
+  })]]);
+  vi.stubGlobal("localStorage", {
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, value: string) => { storage.set(key, value); },
+    removeItem: (key: string) => { storage.delete(key); },
+  });
+  Object.defineProperty(navigator, "getGamepads", { configurable: true, value: () => [] });
+  const root = document.createElement("div"); document.body.append(root);
+  let app: Awaited<ReturnType<typeof createFlightSimApp>> | undefined;
+  const setIntervalSpy = vi.spyOn(globalThis, "setInterval");
+  const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
+  const feedback = () => root.querySelector<HTMLElement>(".foss-earth-test-feedback");
+  const testTab = () => [...root.querySelectorAll<HTMLButtonElement>(".foss-earth-tab-button")].find(button => button.textContent === "Test");
+  const testLink = createTestLink(window.location.href, {
+    version: 1, id: "feedback-url-lifetime", title: "Explicit feedback checklist",
+    steps: [{ id: "try", text: "Try the changed controls" }], sources: [], intervalMs: 250,
+  });
+  const navigate = (href: string, event: "hashchange" | "popstate") => act(async () => {
+    window.history.replaceState(null, "", href);
+    window.dispatchEvent(event === "hashchange" ? new HashChangeEvent("hashchange") : new PopStateEvent("popstate"));
+  });
+  try {
+    await act(async () => { app = await createFlightSimApp(root); });
+    // A saved Test tab is not permission to show feedback on an ordinary visit.
+    expect(feedback()).toBeNull();
+    expect(testTab()).toBeUndefined();
+    expect(root.querySelector('[aria-label="Close Test tab"]')).toBeNull();
+    await act(async () => { app?.destroy(); app = undefined; });
+    await navigate(testLink, "hashchange");
+    await act(async () => { app = await createFlightSimApp(root); });
+    expect(feedback()?.textContent).toContain("Explicit feedback checklist");
+    expect(testTab()).toBeDefined();
+    const first = feedback()!;
+    const firstStart = [...first.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Start")!;
+    setIntervalSpy.mockClear();
+    await act(async () => firstStart.click());
+    const samplingTimer = setIntervalSpy.mock.results[setIntervalSpy.mock.calls.findIndex(([, delay]) => delay === 250)]?.value;
+    expect(samplingTimer).toBeDefined();
+    expect(firstStart.disabled).toBe(true);
+    await navigate("/fly/", "hashchange");
+    expect(feedback()).toBeNull();
+    expect(testTab()).toBeUndefined();
+    expect(first.isConnected).toBe(false);
+    expect(clearIntervalSpy).toHaveBeenCalledWith(samplingTimer);
+    expect(root.querySelector(".foss-earth-new-tab")).toBeNull();
+    await act(async () => root.querySelector<HTMLButtonElement>('[aria-label="Open new tab"]')!.click());
+    expect([...root.querySelectorAll(".foss-earth-new-tab-choice")].some(button => button.textContent === "Test")).toBe(false);
+    await navigate(testLink, "hashchange");
+    expect(feedback()).not.toBe(first);
+    const nextStart = [...feedback()!.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Start")!;
+    expect(nextStart.disabled).toBe(false);
+    await navigate("/fly/", "popstate");
+    expect(feedback()).toBeNull();
+    expect(testTab()).toBeUndefined();
+    expect(root.querySelector(".foss-earth-new-tab")).toBeNull();
+  } finally {
+    await act(async () => app?.destroy());
+    setIntervalSpy.mockRestore(); clearIntervalSpy.mockRestore();
+    window.history.replaceState(null, "", "/");
+  }
 });

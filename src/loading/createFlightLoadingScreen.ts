@@ -18,6 +18,8 @@ export interface FlightLoadingFailure {
   retry?: () => void;
   /** What was thrown: its line and the loading report give it, with secrets removed. */
   cause?: unknown;
+  /** Recovery choices that remain usable while flight input is held. */
+  actions?: GameLogEntry["actions"];
 }
 
 export interface FlightLoadingScreen {
@@ -273,7 +275,7 @@ export function createFlightLoadingScreen(sharedLog?: GameLog): FlightLoadingScr
     setPhase,
     hide,
     trace: diagnostics.trace,
-    fail(message, { retry: onRetry, cause } = {}) {
+    fail(message, { retry: onRetry, cause, actions = [] } = {}) {
       if (destroyed) return;
       if (failure) {
         if (failureCause === null && cause !== undefined) {
@@ -300,15 +302,21 @@ export function createFlightLoadingScreen(sharedLog?: GameLog): FlightLoadingScr
         });
       }
       const label = onRetry ? "Try again" : "Reload and try again";
+      const disableRecovery = (): void => {
+        if (failure) failure.line.update({ ...failure.entry, actions: failure.entry.actions?.map(action =>
+          action === viewReportAction || action === reportAction ? action : { ...action, disabled: true }) });
+      };
       const retry = (): void => {
-        if (failure) failure.line.update({ ...failure.entry, actions: [{ label, onClick: retry, disabled: true }] });
+        disableRecovery();
         if (onRetry) onRetry();
         else window.location.reload();
       };
       const entry: GameLogEntry = {
         text: `Flight paused. ${message}` + (failureCause ? `\n${failureCause.message}` : ""),
         tone: "error",
-        actions: [{ label, onClick: retry }, viewReportAction, reportAction],
+        actions: [{ label, onClick: retry }, ...actions.map(action => ({ ...action, onClick() {
+          disableRecovery(); action.onClick();
+        } })), viewReportAction, reportAction],
       };
       failure = { line: log.print(entry), entry };
       failure.line.focusAction();

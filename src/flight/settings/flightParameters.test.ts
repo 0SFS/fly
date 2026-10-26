@@ -4,10 +4,11 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSettingsRegistry, getAppSettings, resetAppSettings, SETTINGS_STORAGE_KEY, validateValue } from "foss-earth/settings";
 import { aircraftSelectionValues, readAircraftSelection } from "@0sfs/aircraft/aircraftSelectionSetting";
-import { FLIGHT_SECTION_TITLES, flightParameterDefaults, OSFS_PARAMETERS } from "./flightParameters";
+import { FLIGHT_SECTION_TITLES, flightParameterDefaults, flightParameterStore, OSFS_PARAMETERS } from "./flightParameters";
 import { FLIGHT_PRESETS } from "./flightPresets";
 import { DEFAULT_PHYSICS_HZ, PHYSICS_RATE_PARAMETER_ID, readPhysicsHz } from "../physics/physicsRate";
 import { parameterSourceFile, registerFlightSettings } from "./registerFlightSettings";
+import { readControlSharing } from "@0sfs/rc/controlSharing";
 
 afterEach(() => { vi.unstubAllGlobals(); resetAppSettings(); });
 
@@ -15,6 +16,28 @@ afterEach(() => { vi.unstubAllGlobals(); resetAppSettings(); });
 const FOSS_EARTH_SECTIONS = new Set(["map/detail", "controls/orbit"]);
 
 describe("flight parameter catalogue", () => {
+  it("ignores saved exclusive takeover policies and retains only shared input priority", () => {
+    const saved = new Map([[SETTINGS_STORAGE_KEY, JSON.stringify({ version: 1, values: {
+      "osfs.remote.sharing": "exclusive", "osfs.remote.handover": "auto",
+      "osfs.remote.returnIdle": 1, "osfs.remote.holdLast": 0,
+      "osfs.remote.blendPriority": "computer",
+    } })]]);
+    const settings = createSettingsRegistry({ storage: {
+      getItem: key => saved.get(key) ?? null,
+      setItem: (key, value) => { saved.set(key, value); },
+      removeItem: key => { saved.delete(key); },
+    } });
+    settings.register(OSFS_PARAMETERS);
+    const parameters = flightParameterStore(settings);
+    expect(readControlSharing(parameters)).toEqual({
+      mode: "blend", handover: "phone", returnIdleMs: 0, holdMs: 5000, priority: "computer",
+    });
+    for (const id of ["osfs.remote.sharing", "osfs.remote.handover", "osfs.remote.returnIdle", "osfs.remote.holdLast"]) {
+      expect(settings.has(id)).toBe(false);
+    }
+    expect(settings.list({ tab: "remote", section: "control" }).map(spec => spec.id)).toEqual(["osfs.remote.blendPriority"]);
+  });
+
   it("requires holding the brake slider by default and saves persistence in Controls", () => {
     const registry = createSettingsRegistry({ storage: null });
     registry.register(OSFS_PARAMETERS);

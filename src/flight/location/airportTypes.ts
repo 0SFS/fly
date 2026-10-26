@@ -16,6 +16,9 @@ export interface AirportFlightPreset {
 /** Where the Location tab sends the aircraft: coordinates, or a runway preset. */
 export interface FlightLocation extends GeodeticLocation {
   flightPreset?: AirportFlightPreset;
+  /** A multiplayer arrival may match its host without selecting a runway preset. */
+  headingDeg?: number;
+  airspeedKts?: number;
 }
 
 /**

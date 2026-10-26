@@ -1116,3 +1116,38 @@ Checks:
 - Full aft stick held from 70 kt (C172) and 100 kt (Vision Jet) turned
   airspeed and angle of attack red at the stall, and vertical speed blue.
 - None of it has been flown by a person.
+
+## UI scale (2026-10-25)
+
+**Interface → Scale → UI scale** (`osfs.ui.scale`, 0.5× to 1.5×, default 0.8×)
+sets the size of everything drawn over the view: the instruments, controls,
+toolbar, menus and panels. It applies live. The view keeps its full size and
+resolution.
+
+- `createFlightSimApp.ts` writes the value to `--flight-ui-scale` on
+  `.flight-app`.
+- `flight.css` applies it as CSS `zoom` to the four layers over the canvas
+  (HUD, status, shell and panels). The canvas and the g-vision layer are left
+  out, so the 3D view and the vignette still cover the screen.
+- The toolbar publishes its height on the page in screen pixels. Inside the
+  zoomed HUD that length would be scaled a second time, so the HUD's toolbar
+  clearance divides it by the scale first.
+- The attitude indicator sizes its canvas for the zoom (`currentCSSZoom`), so
+  its pixels still match the screen's.
+
+The default is 0.8× because at its drawn size the interface covers much of a
+landscape phone's view.
+
+Known limitation: FOSS Earth's panel edges resize by adding the pointer's
+movement to the panel's size. Under a zoom other than 1× the edge moves at the
+scale times the pointer's speed, so at 0.8× it trails the pointer slightly.
+
+Checks:
+
+- A unit test covers the setting's home and its live value on `.flight-app`.
+- In headless Chrome on an emulated 883 × 412 phone at 2×, the attitude cluster
+  sat 2 px above the toolbar at 1× and 2.2 px above it at 0.8×. At 0.8× the
+  attitude canvas had 352 device pixels across, matching its width on screen.
+- Two phones in one multiplayer session were captured at the default 0.8× and
+  looked at.
+- It has not been tried on a physical phone.

@@ -129,7 +129,8 @@ export function createAttitudeRenderer(host: HTMLElement, options: AttitudeRende
     if (destroyed) return;
     last = [state, stick, view];
     if (!backend || !canvas) return;
-    const pixelRatio = Math.min(3, Math.max(1, globalThis.devicePixelRatio || 1));
+    // The UI scale zooms the HUD, so a CSS pixel here covers fewer device pixels.
+    const pixelRatio = Math.min(3, Math.max(1, (globalThis.devicePixelRatio || 1) * (host.currentCSSZoom || 1)));
     const backing = Math.max(1, Math.round(cssSize * pixelRatio));
     let changed = false;
     const note = (index: number, value: number): void => {

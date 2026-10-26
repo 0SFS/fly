@@ -79,6 +79,7 @@ describe("native model capabilities", () => {
       configurePaths: vi.fn(), loadModel: vi.fn(() => true),
       setDt: vi.fn(), getDeltaT: vi.fn(() => LEGACY_FIXED_DT_120),
       getPropertyCatalog: vi.fn(() => catalog),
+      getPropertyValue: vi.fn(() => 1),
       runIc: vi.fn(() => true), setPropertyValue: vi.fn(),
     };
   }

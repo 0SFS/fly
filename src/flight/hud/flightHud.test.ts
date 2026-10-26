@@ -60,7 +60,28 @@ function mount(overrides: Partial<FlightHudOptions> = {}) {
 afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); });
 
 describe("flight HUD automatic flaps", () => {
-  it("retains a focused manual keyboard edit while paused and keeps the output on actual travel", () => {
+  it("updates physical feedback without moving command thumbs or sending local input", () => {
+    let actual = { throttle: 0.2, rudder: -0.3, flaps: 0.1 };
+    const onThrottleChange = vi.fn(), onRudderChange = vi.fn(), onFlapsChange = vi.fn();
+    const t = mount({ getActualControls: () => actual, onThrottleChange, onRudderChange, onFlapsChange });
+    const commands = { ...CONTROLS, throttle: 0.8, rudder: 0.6, flaps: 0.7 };
+    try {
+      for (const feedback of [actual, { throttle: 0.4, rudder: 0.2, flaps: 0.5 }]) {
+        actual = feedback;
+        t.hud.update(STATE, commands, true, AUTO_OFF);
+        expect(t.host.querySelector<HTMLInputElement>('[data-control="flaps"]')!.value).toBe("0.7");
+        expect(t.host.querySelector<HTMLInputElement>('[data-control="rudder"]')!.value).toBe("0.6");
+        expect(t.host.querySelector('[data-control="flaps"]')!.getAttribute("aria-valuetext")).toContain(`${Math.round(actual.flaps * 100)}% actual`);
+        expect(t.host.querySelector('[data-control="throttle"]')!.getAttribute("aria-valuenow")).toBe("80");
+        expect(t.host.querySelector('[data-control="throttle"]')!.getAttribute("aria-valuetext")).toContain(`${Math.round(actual.throttle * 100)}% actual`);
+      }
+      expect(onThrottleChange).not.toHaveBeenCalled();
+      expect(onRudderChange).not.toHaveBeenCalled();
+      expect(onFlapsChange).not.toHaveBeenCalled();
+    } finally { t.hud.destroy(); }
+  });
+
+  it("keeps the command while paused and marks physical travel separately", () => {
     let enabled = true;
     const onFlapsChange = vi.fn();
     const t = mount({ onFlapsChange, flapAutomation: {
@@ -76,13 +97,13 @@ describe("flight HUD automatic flaps", () => {
         slider.dispatchEvent(new Event("input"));
         t.hud.update(STATE, CONTROLS, true, AUTO_OFF);
         expect(slider.value).toBe(String(value));
-        expect(output.value).toBe("0%");
+        expect(output.value).toBe(`${Math.round(value * 100)}%`);
         expect(slider.getAttribute("aria-valuetext")).toContain("commanded");
       }
       expect(onFlapsChange.mock.calls.map(([value]) => value)).toEqual([0.01, 0.02]);
       expect(enabled).toBe(false);
       slider.blur();
-      expect(slider.value).toBe("0");
+      expect(slider.value).toBe("0.02");
       expect(slider.getAttribute("aria-valuetext")).toContain("actual");
     } finally { t.hud.destroy(); }
   });
@@ -105,7 +126,7 @@ describe("flight HUD automatic flaps", () => {
     } finally { t.hud.destroy(); }
   });
 
-  it("follows physical flap travel, including automatic reflex, and hands the slider to the pilot", () => {
+  it("keeps flap command separate from physical travel, including automatic reflex", () => {
     let enabled = true;
     let actual = 0.6;
     const onFlapsChange = vi.fn();
@@ -120,13 +141,15 @@ describe("flight HUD automatic flaps", () => {
     const button = t.host.querySelector<HTMLButtonElement>('[data-control="auto-flaps"]')!;
     try {
       t.hud.update(STATE, CONTROLS, true, AUTO_OFF);
-      expect(slider.value).toBe("0.6");
-      expect(output.value).toBe("60%");
+      expect(slider.value).toBe("0");
+      expect(output.value).toBe("0%");
+      expect(slider.getAttribute("aria-valuetext")).toContain("60% actual");
       expect(button.getAttribute("aria-pressed")).toBe("true");
       actual = -0.1;
       t.hud.refreshFlaps();
-      expect(slider.value).toBe("-0.1");
-      expect(output.value).toBe("-10%");
+      expect(slider.value).toBe("0");
+      expect(output.value).toBe("0%");
+      expect(slider.getAttribute("aria-valuetext")).toContain("-10% actual");
       slider.dispatchEvent(new Event("pointerdown"));
       slider.value = "0.4";
       slider.dispatchEvent(new Event("input"));
@@ -135,9 +158,10 @@ describe("flight HUD automatic flaps", () => {
       actual = 0.2;
       t.hud.update(STATE, { ...CONTROLS, flaps: 0.4 }, true, AUTO_OFF);
       expect(slider.value).toBe("0.4"); // The moving actuator does not fight a drag.
-      expect(output.value).toBe("20%");
+      expect(output.value).toBe("40%");
+      expect(slider.getAttribute("aria-valuetext")).toContain("20% actual");
       slider.dispatchEvent(new Event("pointerup"));
-      expect(slider.value).toBe("0.2");
+      expect(slider.value).toBe("0.4");
       button.click();
       expect(enabled).toBe(true);
       expect(button.getAttribute("aria-pressed")).toBe("true");
@@ -235,7 +259,7 @@ describe("flight HUD VTOL conversion lever", () => {
     expect([input.min, input.max, input.step]).toEqual(["0", "1", "0.01"]);
     expect(input.getAttribute("aria-label")).toBe("VTOL conversion");
     expect(input.getAttribute("aria-orientation")).toBe("vertical");
-    expect(input.getAttribute("aria-valuetext")).toBe("75% commanded; 40% actual conversion");
+    expect(input.getAttribute("aria-valuetext")).toBe("75% commanded; 40% actual");
     expect(input.value).toBe("0.75");
     expect(lever.querySelector("output")?.value).toBe("75%");
     t.hud.destroy();
@@ -276,7 +300,7 @@ describe("flight HUD VTOL conversion lever", () => {
     position = 0.25;
     t.hud.update(STATE, CONTROLS, true, AUTO_OFF);
     expect(input.value).toBe("0.3");
-    expect(input.getAttribute("aria-valuetext")).toBe("30% commanded; 25% actual conversion");
+    expect(input.getAttribute("aria-valuetext")).toBe("30% commanded; 25% actual");
     expect(onCommandChange).not.toHaveBeenCalled();
     t.hud.destroy();
   });
@@ -351,12 +375,12 @@ describe("flight HUD gear button", () => {
     const records = observer.takeRecords();
     const changed = records.map(record => record.attributeName ?? (record.target as Element).getAttribute?.("data-metric")
       ?? (record.target as Element).getAttribute?.("data-output") ?? record.target.parentElement?.dataset.metric);
-    expect(new Set(changed)).toEqual(new Set(["vs", "flaps", "aria-valuetext"]));
+    expect(new Set(changed)).toEqual(new Set(["vs", "style", "aria-valuetext", "title"]));
     // The readout's text node is kept and its text changed, rather than replaced.
     expect(records.find(record => record.target.parentElement === vs)?.type).toBe("characterData");
     expect(vs.textContent).toBe("+ 210");
     expect(vs.childNodes.length).toBe(1);
-    expect(t.host.querySelector<HTMLOutputElement>('[data-output="flaps"]')!.value).toBe("50%");
+    expect(t.host.querySelector<HTMLOutputElement>('[data-output="flaps"]')!.value).toBe("0%");
     observer.disconnect();
     t.hud.destroy();
   });

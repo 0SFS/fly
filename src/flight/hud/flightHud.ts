@@ -1,6 +1,8 @@
 import { headingDegFromRad, type FlightState } from "@0sfs/ground-contact/flightState";
 import type { FrameProfiler } from "foss-earth/perf";
 import { createThrottleLever, type ThrottleBrakeCommand, type ThrottleLeverEngine } from "@0sfs/engines/throttleLever";
+import { mountNativeControlPosition } from "@0sfs/rc/controlPosition";
+import type { ActualControlPositions } from "@0sfs/rc/protocol";
 import {
   ATTITUDE_HALF_SHARE,
   createAttitudeRenderer,
@@ -18,6 +20,8 @@ import type { ReadingTints } from "./instrumentBands";
 export type FlightHudLayout = "compact" | "classic";
 
 export interface FlightHudOptions {
+  /** Physical actuator positions; absent readings never stand in for a command. */
+  getActualControls?(): ActualControlPositions;
   onGearChange(down: boolean): void;
   onThrottleChange(value: number): void;
   /** Present for an aircraft whose throttle lever includes a lower brake range. */
@@ -73,6 +77,7 @@ export interface FlightHudOptions {
 }
 
 export interface FlightHudControls {
+  throttle?: number;
   pitchTrim: number;
   rollTrim: number;
   flaps: number;
@@ -266,7 +271,7 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
         <div class="flight-hud__throttle">
           <div class="flight-hud__slider-control flight-hud__slider-control--throttle"></div>
           ${options.vtolConversion ? `
-          <label class="flight-hud__slider-control flight-hud__slider-control--vtol">
+          <label class="flight-hud__slider-control flight-hud__slider-control--vtol" title="0% conventional flight; 100% vertical lift">
             <span>VTOL</span>
             <output data-output="vtol-conversion">0%</output>
             <input data-control="vtol-conversion" type="range" min="0" max="1" step="0.01" value="0" aria-label="VTOL conversion" aria-orientation="vertical" />
@@ -324,6 +329,11 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
     onStartHold: options.engine?.onStartHold,
     onShutdown: options.engine?.onShutdown,
   });
+  const pitchPosition = mountNativeControlPosition(pitchTrimInput, "vertical");
+  const rollPosition = mountNativeControlPosition(rollTrimInput, "horizontal");
+  const flapPosition = mountNativeControlPosition(flapsInput, "vertical");
+  const rudderPosition = mountNativeControlPosition(rudderInput, "horizontal");
+  const vtolPosition = vtolInput ? mountNativeControlPosition(vtolInput, "vertical") : null;
   let masterAp: FlightHudMasterAp = {
     ...FLIGHT_HUD_MASTER_OFF,
     engaged: options.autopilotEngaged === true,
@@ -345,14 +355,11 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
       setAttr(autoFlapsButton, "title", title);
       setAttr(autoFlapsButton, "aria-label", title);
     }
-    const actual = automation?.getPositionNorm();
-    const known = actual !== undefined && Number.isFinite(actual);
-    const editingCommand = flapsDragging || (flapsKeyboardEditing && !enabled);
-    const displayed = known && !editingCommand ? actual : flapCommand;
+    const actual = options.getActualControls?.().flaps ?? automation?.getPositionNorm();
     setAttr(flapsInput, "min", String(enabled ? automation?.minPositionNorm ?? 0 : 0));
-    if (!flapsDragging) setValue(flapsInput, String(displayed));
-    setValue(flapsOutput, known ? `${Math.round(actual * 100)}%` : `${Math.round(flapCommand * 100)}%`);
-    setAttr(flapsInput, "aria-valuetext", `${Math.round(displayed * 100)}% ${known && !editingCommand ? "actual" : "commanded"}${masterAp.ownsFlaps ? ", autopilot owns flaps" : enabled ? ", automatic flaps" : ""}`);
+    if (!flapsDragging) setValue(flapsInput, String(flapCommand));
+    setValue(flapsOutput, `${Math.round(flapCommand * 100)}%`);
+    flapPosition.update(Number(flapsInput.value), actual, masterAp.ownsFlaps ? "autopilot owns flaps" : enabled ? "automatic flaps" : undefined);
   };
   const onAutoFlapsClick = (): void => {
     flapsKeyboardEditing = false;
@@ -445,12 +452,9 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
     const command = Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
     const percent = Math.round(command * 100);
     const physical = lever.getPositionNorm?.();
-    const actual = physical !== undefined && Number.isFinite(physical)
-      ? `; ${Math.round(Math.min(1, Math.max(0, physical)) * 100)}% actual conversion` : "";
     setValue(vtolInput, String(command));
+    vtolPosition?.update(command, physical);
     setValue(vtolOutput, `${percent}%`);
-    setAttr(vtolInput, "aria-valuetext", `${percent}% commanded${actual}`);
-    setAttr(vtolInput, "title", `0% conventional flight; 100% vertical lift. ${percent}% commanded${actual}.`);
   };
   const onVtolInput = (): void => {
     if (!options.vtolConversion || !vtolInput) return;
@@ -720,11 +724,16 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
       setText(vsEl, `${vsFpm < 0 ? "-" : "+"}${Math.abs(vsFpm).toString().padStart(4, " ")}`);
       setValue(pitchTrimInput, String(controls.pitchTrim));
       setValue(rollTrimInput, String(controls.rollTrim));
+      const actual = options.getActualControls?.();
+      pitchPosition.update(controls.pitchTrim, actual?.pitchTrim);
+      rollPosition.update(controls.rollTrim, actual?.rollTrim);
       if (!flapsKeyboardEditing) flapCommand = controls.flaps;
       refreshFlaps();
       if (!rudderDragging) setValue(rudderInput, String(controls.rudder));
+      rudderPosition.update(Number(rudderInput.value), actual?.rudder);
       throttle.update({
-        throttle: state.throttleNorm,
+        throttle: controls.throttle ?? state.throttleNorm,
+        actualThrottle: actual?.throttle,
         brake: options.getSliderBrake?.() ?? 0,
         keepBrakes: options.getKeepSliderBrakes?.() ?? false,
         engine: options.engine?.getReading() ?? null,
@@ -743,6 +752,7 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
       rollAutoTrimButton.removeEventListener("click", onRollAutoTrimClick);
       apButton.removeEventListener("click", onAutopilotClick);
       throttle.destroy();
+      for (const position of [pitchPosition, rollPosition, flapPosition, rudderPosition, vtolPosition]) position?.destroy();
       vtolInput?.removeEventListener("input", onVtolInput);
       pitchTrimInput.removeEventListener("input", onPitchTrimInput);
       rollTrimInput.removeEventListener("input", onRollTrimInput);
