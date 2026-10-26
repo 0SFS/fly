@@ -903,11 +903,11 @@ and auto-trim assists remain independently configured. The prototype laws are
 experimental; these modes do not reproduce a real F-35 cockpit control selector.
 
 Beside it, **Full-stick roll rate** (`osfs.aircraft.fullStickRollRate`,
-15–165°/s, default 30°/s) is the roll rate the F-35B's fly-by-wire asks for at
+15–165°/s, default 100°/s) is the roll rate the F-35B's fly-by-wire asks for at
 full stick, through native `fcs/full-stick-roll-rate-deg_sec`; half stick asks
 for half. The jet flies it within 11% between 200 and 600 kt, until the
 ailerons run out near 150°/s at 200 kt, and holds bank with the stick centred.
-The default was chosen in flight. At 300 kt the earlier stick gains of 0.05,
+The first default, 30°/s, was chosen in flight; it is now 100°/s. At 300 kt the earlier stick gains of 0.05,
 0.1 and 0.5 flew about 16, 33 and 165°/s at full stick, which set the bounds.
 It applies only while the pilot owns roll; the autopilot flies the source
 gradient. Manual and the hover roll posts take the unscaled stick, and other
@@ -916,7 +916,7 @@ bank, because there roll trim commands a roll rate.
 [F-35B FDM](https://github.com/0SFS/F-35B/blob/main/docs/proposals/f35b-fdm.md#aircraft-control-law) describes the law.
 
 Below it, **Roll trim range** (`osfs.aircraft.rollTrimRange`, 0.05–1, default
-1) is how far full roll trim reaches as a share of what full stick asks for:
+0.2) is how far full roll trim reaches as a share of what full stick asks for:
 at 1, 100% trim asks what holding A or D, or a controller's stick full over,
 asks; at 0.2, a fifth of it. It applies to every aircraft at the one
 control-to-physics boundary (`applyFlightControls`), since each takes roll trim
