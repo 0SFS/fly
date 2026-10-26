@@ -259,7 +259,7 @@ describe("shared engine exhaust renderer", () => {
     expect(dispose).toHaveBeenCalledOnce();
   });
 
-  it("derives one scenery light from bounded gas power, excludes hardware and disposes it", async () => {
+  it("reuses one scenery light across cutoff/rewind and releases it only with the exhaust", async () => {
     const lightSettings = { ...settings, lightEnabled: true, lightGain: 1, lightRangeMeters: 12 };
     const t = thermalFixture();
     t.handle.update(running, lightSettings);
@@ -276,11 +276,14 @@ describe("shared engine exhaust renderer", () => {
     expect(t.scene.lights[0]).toBe(light);
     expect(t.requestRender).not.toHaveBeenCalled();
     t.handle.update(running, { ...lightSettings, lightEnabled: false });
-    expect(t.scene.lights).toHaveLength(0);
+    expect(t.scene.lights).toEqual([light]);
+    expect(light.isEnabled()).toBe(false);
     t.handle.update(running, lightSettings);
-    expect(t.scene.lights).toHaveLength(1);
+    expect(t.scene.lights).toEqual([light]);
+    expect(light.isEnabled()).toBe(true);
     t.handle.update({ ...running, fuelFlowKgPerSecond: undefined }, lightSettings);
-    expect(t.scene.lights).toHaveLength(0);
+    expect(t.scene.lights).toEqual([light]);
+    expect(light.isEnabled()).toBe(false);
     t.handle.update(running, lightSettings);
     t.handle.dispose();
     expect(t.scene.lights).toHaveLength(0);
@@ -326,7 +329,8 @@ describe("shared engine exhaust renderer", () => {
     expect(light.falloffType).toBe(Light.FALLOFF_GLTF);
     expect(light.intensity).toBe(initial);
     t.handle.update(running, { ...config, gasReferenceNits: 0 });
-    expect(t.scene.lights).toHaveLength(0);
+    expect(t.scene.lights).toEqual([light]);
+    expect(light.isEnabled()).toBe(false);
   });
 
   it("keeps independent metal glow unchanged when dry gas presentation changes", async () => {
