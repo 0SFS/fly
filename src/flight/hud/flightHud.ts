@@ -58,6 +58,8 @@ export interface FlightHudOptions {
   afterburner?: {
     getActive(): boolean | null;
     accentColor: string;
+    /** Where one push of the throttle lever stops, or null when the pilot lets one push light it. */
+    getDetent?(): number | null;
   };
   /**
    * Starting and stopping the engine from the throttle lever. Absent, the
@@ -738,6 +740,7 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
         keepBrakes: options.getKeepSliderBrakes?.() ?? false,
         engine: options.engine?.getReading() ?? null,
         afterburner: options.afterburner?.getActive() ?? null,
+        afterburnerDetent: options.afterburner?.getDetent?.() ?? null,
       });
       setValue(pitchTrimOutput, `${Math.round(controls.pitchTrim * 100)}%`);
       setValue(rollTrimOutput, `${Math.round(controls.rollTrim * 100)}%`);

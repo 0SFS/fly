@@ -181,6 +181,8 @@ const AIRCRAFT_CATALOG: readonly AircraftDefinition[] = [
     afterburner: {
       engineIndices: [0],
       accentColor: getEngineExhaustOpticalProfile("f135-visible-approximation-v1")!.hudAccentHex,
+      // JSBSim's turbine selects augmentation above 0.99 throttle (FGTurbinePlant, augmethod 1).
+      throttleDetent: 0.99,
     },
     exhaustSources: [{
       id: "main-exhaust", engineIndex: 0, opticalProfileId: "f135-visible-approximation-v1",

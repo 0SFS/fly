@@ -877,6 +877,8 @@ export function FlightControlPanel(props: FlightControlPanelProps) {
                 : tabId === "controls" ? <div className="flight-panel__content">
                   {props.snapshot.aircraftId === "f-35b" &&
                     <ParameterSection settings={props.settings} tab="controls" section="braking" />}
+                  {getAircraftDefinition(props.snapshot.aircraftId).afterburner &&
+                    <ParameterSection settings={props.settings} tab="controls" section="afterburner" />}
                   {getFdmProfile(props.snapshot.aircraftId).stovl &&
                     <ParameterSection settings={props.settings} tab="controls" section="stovl">
                       <p className="flight-panel__hint">Use the VTOL lever beside THR: 0% conventional flight; 100% lift fan and downward nozzle. Conversion takes time. Experimental STOVL handling.</p>

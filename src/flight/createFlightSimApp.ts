@@ -921,6 +921,7 @@ async function createFlightSimSession(
     initialGearDown: jsbsim.sdk.getPropertyValue("gear/gear-cmd-norm") > 0.5,
     initialPaused: pausedAtStart,
     rudderSign: getFdmProfile(initialAircraftId).rudderSign,
+    afterburnerDetent: getAircraftDefinition(initialAircraftId).afterburner?.throttleDetent,
     onPausedChange: (paused) => syncSimulationPaused(paused),
     // The HUD's gear button follows the G key. Repainting here rather than
     // waiting for the next frame is what keeps the two in step while the
@@ -1245,6 +1246,9 @@ async function createFlightSimSession(
   const vtolProfile = getFdmProfile(initialAircraftId).stovl;
   const aircraftPresentation = getAircraftDefinition(initialAircraftId);
   const afterburnerProfile = aircraftPresentation.afterburner;
+  /** Where one push of the throttle lever stops, here and on the phone, unless the pilot opts out. */
+  const afterburnerDetent = (): number | null => afterburnerProfile && !parameters.get("osfs.input.afterburnerOneMotion")
+    ? afterburnerProfile.throttleDetent : null;
   // Under a sky model the scene has one exposure: an emitter is shown against the
   // luminance that exposure makes white, as the Sun's and the sky's light are.
   // With the model off there is none, and each emitter keeps its own reference.
@@ -1371,6 +1375,7 @@ async function createFlightSimSession(
     afterburner: afterburnerProfile ? {
       accentColor: afterburnerProfile.accentColor,
       getActive: engineVisuals.afterburnerActive,
+      getDetent: afterburnerDetent,
     } : undefined,
     vtolConversion: vtolProfile ? {
       getCommandNorm: () => parameters.get("osfs.aircraft.stovlConversion"),
@@ -1419,10 +1424,12 @@ async function createFlightSimSession(
     parameters.get("osfs.renderer.attitudeView") === "camera" ? cameraAttitudeView(runtime.scene.activeCamera) : null
   );
   stopWatching.push(parameters.watch("osfs.renderer.attitudeView", () => runtime.requestRender()));
-  stopWatching.push(parameters.watch("osfs.input.keepSliderBrakes", () => {
-    runtime.requestRender();
-    phoneSession?.syncStatus();
-  }));
+  for (const id of ["osfs.input.keepSliderBrakes", "osfs.input.afterburnerOneMotion"] as const) {
+    stopWatching.push(parameters.watch(id, () => {
+      runtime.requestRender();
+      phoneSession?.syncStatus();
+    }));
+  }
   if (vtolProfile) stopWatching.push(parameters.watch("osfs.aircraft.stovlConversion", () => {
     flightHud.refreshVtolConversion();
     runtime.requestRender();
@@ -2707,6 +2714,7 @@ async function createFlightSimSession(
           engine: toEngineStatus(engineMonitor.getReading(), engineControl.reading()),
           throttleBrakeRange: initialAircraftId === "f-35b",
           keepSliderBrakes: parameters.get("osfs.input.keepSliderBrakes"),
+          afterburnerDetent: afterburnerDetent() ?? undefined,
         };
       },
       hasActiveLocalInput: () => inputManager.hasActiveFlightInput() || localStartHeld || flightHud.isPilotHolding(),
