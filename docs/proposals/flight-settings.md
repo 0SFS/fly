@@ -447,6 +447,7 @@ Spec: [Phone controller](https://github.com/0SFS/rc/blob/main/docs/proposals/pho
 | `osfs.phone.yawRelease` | choice | Return to centre (`center`); also `hold` |
 | `osfs.phone.yawReturnMs` | ms | 0, from 0 to 1,500 |
 | `osfs.phone.haptics` | switch | Off |
+| `osfs.phone.twoFingers` | choice | Orbit and zoom (`both`): two fingers on the camera pad turn the view as they move and zoom as they spread; also `zoom`, where they only zoom, as before |
 
 The phone controller's own settings. They used to live only on the phone, so
 an export from the computer left them out. Now the computer keeps them, the

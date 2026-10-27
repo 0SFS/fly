@@ -18,7 +18,7 @@ describe("phone controller settings", () => {
 
   it("live in the osfs.phone parameters", () => {
     const parameters = flightParameterDefaults();
-    const settings = { grid: "top", yawRelease: "hold", yawReturnMs: 350, haptics: true } as const;
+    const settings = { grid: "top", yawRelease: "hold", yawReturnMs: 350, haptics: true, twoFingers: "zoom" } as const;
     parameters.setMany(phoneControllerSettingsValues(settings));
     expect(readPhoneControllerSettings(parameters)).toEqual(settings);
     expect(Object.keys(phoneControllerSettingsValues(settings)).sort()).toEqual([...PHONE_CONTROLLER_PARAMETER_IDS].sort());
@@ -40,10 +40,10 @@ describe("phone controller settings", () => {
   });
 
   it("at pairing keep this computer's, except where it still has the default and the phone has chosen", () => {
-    const phone = { grid: "top", yawRelease: "hold", yawReturnMs: 500, haptics: true } as const;
+    const phone = { grid: "top", yawRelease: "hold", yawReturnMs: 500, haptics: true, twoFingers: "zoom" } as const;
     // An imported setup reaches the phone; the phone's own choices fill what was never set here.
     expect(mergePairedPhoneSettings({ ...DEFAULT_PHONE_CONTROLLER_SETTINGS, yawReturnMs: 300 }, phone))
-      .toEqual({ grid: "top", yawRelease: "hold", yawReturnMs: 300, haptics: true });
+      .toEqual({ grid: "top", yawRelease: "hold", yawReturnMs: 300, haptics: true, twoFingers: "zoom" });
     expect(mergePairedPhoneSettings(DEFAULT_PHONE_CONTROLLER_SETTINGS, DEFAULT_PHONE_CONTROLLER_SETTINGS))
       .toEqual(DEFAULT_PHONE_CONTROLLER_SETTINGS);
   });
