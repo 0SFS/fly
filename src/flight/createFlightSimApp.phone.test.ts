@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => {
     takeCameraAim: vi.fn(() => null as { yaw: number; pitch: number; zoom?: number } | null),
     isCameraActive: vi.fn(() => false),
     hasPendingCameraAim: vi.fn(() => false),
+    cameraFingers: vi.fn(() => null as number | null),
     onHidden: vi.fn(), syncStatus: vi.fn(), destroy: vi.fn(),
   };
   return {
@@ -38,7 +39,7 @@ const mocks = vi.hoisted(() => {
         : property.endsWith("/set-running") ? 1 : 0),
     }, disposeSdk: vi.fn(),
     runtime: {
-      renderer: { mode: "webgl2" }, status: { mode: "fallback" }, scene: { onAfterRenderObservable: { add: () => null, remove: () => true } }, getViewState: () => null,
+      renderer: { mode: "webgl2", engine: {} }, status: { mode: "fallback" }, scene: { onAfterRenderObservable: { add: () => null, remove: () => true } }, getViewState: () => null,
       onDeviceLost: vi.fn(() => () => {}), onDeviceRestored: vi.fn(() => () => {}),
       engine: { getFps: () => 60 }, geospatialCamera: null, prepareTerrain: vi.fn(async (request: { altitudeMeters?: number }) => ({ groundHeightMeters: 250, altitudeMeters: request.altitudeMeters ?? 1774 })),
       surface: { sample: vi.fn(() => null) },
@@ -55,7 +56,7 @@ const mocks = vi.hoisted(() => {
       requestRender: vi.fn(), destroy: vi.fn(),
     },
     aircraft: {
-      setViewMode: vi.fn(), getViewMode: () => "third", toggleViewMode: vi.fn(), dispose: vi.fn(),
+      setViewMode: vi.fn(), getViewMode: () => "third", toggleViewMode: vi.fn(), lookFromCockpit: vi.fn(), dispose: vi.fn(),
       orbitChaseCamera: vi.fn(), zoomChaseCamera: vi.fn(), modelRoot: {}, setModelLoaded: vi.fn(), getChaseDistanceMeters: () => 14,
       thirdPersonCamera: { position: { y: 2.2, length: () => Math.hypot(2.2, 14) } },
     },
@@ -83,6 +84,10 @@ vi.mock("foss-earth/input", () => ({
   loadInputModePreference: () => "mouse", loadInputSensitivityPreference: () => ({}),
   loadOrbitInvertSettings: () => ({ invertYaw: false, invertPitch: false, recenterMode: "hold" }),
   saveOrbitInvertSettings: vi.fn(),
+  attachPanoramaLook: () => ({
+    get: () => ({ headingDeg: 0, pitchDeg: 0, verticalFovDeg: 60 }), set: vi.fn(), setRates: vi.fn(),
+    step: () => false, moving: () => false, detach: vi.fn(),
+  }),
 }));
 vi.mock("./jsbsim/createJsbsimRuntime", () => ({ createJsbsimRuntime: async () => ({ physicsHz: 60, sdk: mocks.sdk, dispose: mocks.disposeSdk }) }));
 vi.mock("@0sfs/ground-contact/ecefBridge", () => ({ readFlightState: () => mocks.state }));
@@ -377,23 +382,80 @@ describe("0SFS phone integration", () => {
     expect(mocks.physics.update).toHaveBeenLastCalledWith(0, expect.any(Function));
   });
 
-  it("draws the phone's camera swipe once, at the mouse's rate, and pinches the chase distance", async () => {
+  it("draws the phone's camera swipe once with Glide off, at the mouse's rate, and pinches the chase distance", async () => {
+    // Stored, so the tests after this one start from the default again.
+    getAppSettings().set("camera.inertiaDecay", 0);
+    try {
+      await mount();
+      grant();
+      // A gesture is what the fingers did, not a rate: the frame length cannot
+      // change how far a swipe moves the view.
+      mocks.phone.takeCameraAim.mockReturnValueOnce({ yaw: 0.1, pitch: -0.05 });
+      tick(0.1);
+      expect(mocks.aircraft.orbitChaseCamera).toHaveBeenCalledWith(expect.closeTo(0.5, 5), expect.closeTo(-0.25, 5));
+      // Drained by the session, so the next frame draws nothing further.
+      mocks.aircraft.orbitChaseCamera.mockClear();
+      tick(0.1);
+      expect(mocks.aircraft.orbitChaseCamera).not.toHaveBeenCalled();
+      // Pinching apart brings the aircraft closer, which is a smaller distance.
+      mocks.phone.takeCameraAim.mockReturnValueOnce({ yaw: 0, pitch: 0, zoom: 2 });
+      tick(0.1);
+      expect(mocks.aircraft.zoomChaseCamera).toHaveBeenCalledWith(0.5);
+      expect(mocks.aircraftModel.refreshAutoLod).toHaveBeenCalled();
+    } finally {
+      getAppSettings().reset("camera.inertiaDecay");
+    }
+  });
+
+  it("glides the phone's camera swipe on from the lift, and stops it where a finger lands", async () => {
+    let now = 1000;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    const frame = () => { now += 1000 / 60; tick(1 / 60); };
+    const turned = () => (mocks.aircraft.orbitChaseCamera.mock.calls as unknown as [number, number][])
+      .reduce((sum, [yaw]) => sum + yaw, 0);
     await mount();
     grant();
-    // A gesture is what the fingers did, not a rate: the frame length cannot
-    // change how far a swipe moves the view.
-    mocks.phone.takeCameraAim.mockReturnValueOnce({ yaw: 0.1, pitch: -0.05 });
-    tick(0.1);
-    expect(mocks.aircraft.orbitChaseCamera).toHaveBeenCalledWith(expect.closeTo(0.5, 5), expect.closeTo(-0.25, 5));
-    // Drained by the session, so the next frame draws nothing further.
-    mocks.aircraft.orbitChaseCamera.mockClear();
-    tick(0.1);
+    // A finger swipes 0.01 rad a frame for six frames.
+    mocks.phone.cameraFingers.mockReturnValue(1);
+    for (let index = 0; index < 6; index++) {
+      mocks.phone.takeCameraAim.mockReturnValueOnce({ yaw: 0.002, pitch: 0 });
+      frame();
+    }
+    // The camera eases in behind the finger.
+    expect(turned()).toBeGreaterThan(0);
+    expect(turned()).toBeLessThan(0.06);
+    // It lifts: the camera goes on past where the finger took it.
+    mocks.phone.cameraFingers.mockReturnValue(0);
+    for (let index = 0; index < 30; index++) frame();
+    expect(turned()).toBeGreaterThan(0.06);
+    // A finger landing stops it there.
+    mocks.phone.cameraFingers.mockReturnValue(1);
+    frame();
+    const stopped = turned();
+    for (let index = 0; index < 10; index++) frame();
+    expect(turned()).toBe(stopped);
+  });
+
+  it("leaves the chase camera where it was after a swipe made in the cockpit", async () => {
+    let now = 1000;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    const frame = () => { now += 1000 / 60; tick(1 / 60); };
+    let view: "first" | "third" = "first";
+    vi.spyOn(mocks.aircraft, "getViewMode").mockImplementation(() => view);
+    await mount();
+    grant();
+    // A flick and a lift in the cockpit, where the camera pad turns nothing.
+    mocks.phone.cameraFingers.mockReturnValue(1);
+    for (let index = 0; index < 6; index++) {
+      mocks.phone.takeCameraAim.mockReturnValueOnce({ yaw: 0.05, pitch: 0 });
+      frame();
+    }
+    mocks.phone.cameraFingers.mockReturnValue(0);
+    frame();
+    // Out to the chase view while it would still be gliding.
+    view = "third";
+    for (let index = 0; index < 60; index++) frame();
     expect(mocks.aircraft.orbitChaseCamera).not.toHaveBeenCalled();
-    // Pinching apart brings the aircraft closer, which is a smaller distance.
-    mocks.phone.takeCameraAim.mockReturnValueOnce({ yaw: 0, pitch: 0, zoom: 2 });
-    tick(0.1);
-    expect(mocks.aircraft.zoomChaseCamera).toHaveBeenCalledWith(0.5);
-    expect(mocks.aircraftModel.refreshAutoLod).toHaveBeenCalled();
   });
 
   it("reports the engine reading the HUD is drawing, so the phone shows the same one", async () => {

@@ -178,6 +178,7 @@ import { createFlightHudBar, type FlightHudBarHandle } from "./hud/createFlightH
 import { createFlightStatusOverlay, type FlightStatusOverlayHandle } from "./hud/createFlightStatusOverlay";
 import type { FlightStatusOverlayState } from "./hud/FlightStatusOverlay";
 import { attachFlightCameraInput } from "@0sfs/controls/flightCameraInput";
+import { createCameraGlide, createTouchSurfaceGlide, DEFAULT_GLIDE_DECAY } from "@0sfs/controls/cameraGlide";
 import { createCockpitLook } from "./cockpitLook";
 import { createCockpitScreen, type CockpitScreenPart } from "./cockpit/cockpitScreen";
 import { createHeadsetPanel, createHeadsetSession, headsetFramesOf, offerHeadsetTab, type HeadsetSurface } from "foss-earth/immersive";
@@ -1839,7 +1840,7 @@ async function createFlightSimSession(
   let chaseFrameApplied: PhoneCameraTuning["chaseFrame"] = "attitude";
   let orbitStateYaw = orbitRestoreYaw();
   let orbitStatePitch = orbitRestorePitch();
-  type OrbitInputSource = "gamepad" | "manual" | "phone";
+  type OrbitInputSource = "gamepad" | "manual" | "phone" | "glide";
   const orbitInputSources = new Set<OrbitInputSource>();
   const setOrbitInputActive = (source: OrbitInputSource, active: boolean): void => {
     if (active) orbitInputSources.add(source);
@@ -1861,6 +1862,21 @@ async function createFlightSimSession(
     runtime.requestRender();
   };
   /**
+   * FOSS Earth's camera glide, Aircraft → Camera → Glide here (`camera.inertiaDecay`):
+   * the chase camera eases into a zoom, and a pinch or a phone swipe glides on
+   * after the fingers lift. One for this computer's gestures and one for the
+   * phone's, so a finger landing on either stops only its own.
+   */
+  const glideOptions = {
+    decay: () => settings.has("camera.inertiaDecay") ? settings.get<number>("camera.inertiaDecay") : DEFAULT_GLIDE_DECAY,
+    orbit: applyOrbitDelta,
+    zoom: applyCameraZoom,
+    wake: () => runtime.requestRender(),
+  };
+  const localGlide = createCameraGlide(glideOptions);
+  const phoneGlide = createCameraGlide(glideOptions);
+  const phonePad = createTouchSurfaceGlide(phoneGlide);
+  /**
    * The phone controller's camera trackpad. It sends what the fingers did —
    * a swipe as a fraction of the pad, a pinch as a spread ratio — so this is a
    * one-to-one gesture like the mouse drag, not something integrated over time.
@@ -1869,18 +1885,17 @@ async function createFlightSimSession(
   const applyPhoneCameraAim = (): CameraAim | null => {
     setOrbitInputActive("phone", phoneSession?.isCameraActive() ?? false);
     const aim = phoneSession?.takeCameraAim() ?? null;
-    if (!aim) return null;
     // Deliberately not the desktop's pointer sensitivity: that setting belongs
     // to a mouse or a laptop trackpad, and a phone is neither.
-    if (aim.yaw !== 0 || aim.pitch !== 0) {
-      const inversion = orbitInvert();
-      applyOrbitDelta(
-        aim.yaw * PHONE_SWIPE_RADIANS * (inversion.invertYaw ? -1 : 1),
-        aim.pitch * PHONE_SWIPE_RADIANS * (inversion.invertPitch ? -1 : 1),
-      );
-    }
-    // A pinch apart brings the aircraft closer, which is a smaller distance.
-    if (aim.zoom !== undefined && aim.zoom !== 1) applyCameraZoom(1 / aim.zoom);
+    const inversion = orbitInvert();
+    // Every frame, moving or not: fingers lifting glide the gesture on, and one landing stops it.
+    phonePad.frame({
+      fingers: phoneSession?.cameraFingers() ?? null,
+      yaw: (aim?.yaw ?? 0) * PHONE_SWIPE_RADIANS * (inversion.invertYaw ? -1 : 1),
+      pitch: (aim?.pitch ?? 0) * PHONE_SWIPE_RADIANS * (inversion.invertPitch ? -1 : 1),
+      // A pinch apart brings the aircraft closer, which is a smaller distance.
+      zoom: aim?.zoom !== undefined && aim.zoom !== 1 ? 1 / aim.zoom : 1,
+    });
     return aim;
   };
   /** Keeps the chase camera out of whichever aircraft rotations the setting leaves out. */
@@ -1915,7 +1930,8 @@ async function createFlightSimSession(
       applyOrbitDelta(yaw, pitch);
     },
     onOrbitActive: (active) => setOrbitInputActive("manual", active),
-    zoom: applyCameraZoom,
+    zoom: factor => localGlide.zoom(factor),
+    glide: localGlide,
     getTouchWheelCooldownMs: () => parameters.get("osfs.input.touchWheelCooldown"),
   });
   // The Cockpit view looks around as a FOSS Earth 360 photograph does; the chase input above acts only outside it.
@@ -3271,8 +3287,17 @@ async function createFlightSimSession(
     skipResumeDelta = false;
     const phoneAimAt = phoneCameraTrace ? performance.now() : 0;
     const phoneAim = applyPhoneCameraAim();
+    // A glide moves only the chase camera: one begun in the cockpit would otherwise turn it on the way back out.
+    if (aircraft?.getViewMode() !== "third") { localGlide.cancel(); phoneGlide.cancel(); }
     // Paced playout draws over several frames; a paused view renders only on request.
     if (phoneSession?.hasPendingCameraAim()) runtime.requestRender();
+    // So does a glide, which moves the camera over the frames after its input.
+    const glideAt = performance.now();
+    const localGliding = localGlide.step(glideAt);
+    const phoneGliding = phoneGlide.step(glideAt);
+    if (localGliding || phoneGliding) runtime.requestRender();
+    // A gliding orbit is still the pilot's: it returns only once it stops.
+    setOrbitInputActive("glide", localGlide.isActive("orbit") || phoneGlide.isActive("orbit"));
     recenterOrbit(deltaSeconds);
     // Before this frame draws: entering the cockpit looks ahead in it at once.
     cockpitLook.sync();

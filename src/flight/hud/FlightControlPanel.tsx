@@ -501,6 +501,8 @@ function AircraftPanel({
           <ChoiceTrack heading="View" value={snapshot.viewMode} defaultValue="third" onChange={mode => onViewModeChange(mode as FlightViewMode)}
             choices={[{ id: "first", label: "Cockpit" }, { id: "third", label: "Chase" }]}
             help="Cockpit shows the view from the pilot's seat. Chase follows the aircraft from outside." />
+          {/* FOSS Earth's Glide, which its own Controls → Camera holds: the chase camera's zoom and the phone's swipes glide with it. */}
+          <RegistryControls settings={settings} ids={["camera.inertiaDecay"]} />
         </ParameterSection>
         {/* "[Ⅱ] W/S Pitch  A/D Roll  Q/E Rudder  ⇧/⌃ Throttle": the keymap wraps as a paragraph. */}
         <div className="flight-panel__row">

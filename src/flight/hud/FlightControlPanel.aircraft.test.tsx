@@ -50,7 +50,7 @@ async function mount(aircraftSwitching = false) {
     overlayApiRef: { current: null },
   } as unknown as Parameters<typeof FlightControlPanel>[0];
   await act(async () => root.render(<FlightControlPanel {...props} />));
-  return { host, onPausedChange };
+  return { host, onPausedChange, settings };
 }
 
 it("starts with the loaded aircraft, omits flight metrics and separates switching from editing", async () => {
@@ -74,6 +74,20 @@ it("starts with the loaded aircraft, omits flight metrics and separates switchin
   expect(edit.hidden).toBe(false);
   expect(host.querySelector(".flight-panel__aircraft-gallery")).toBeNull();
   expect(host.querySelector(".flight-panel__aircraft-current strong")?.textContent).toBe("Cessna 172 Skyhawk");
+});
+
+it("draws FOSS Earth's Glide beside the view, as the chase camera glides with it", async () => {
+  const { host, settings } = await mount();
+  const glide = host.querySelector<HTMLElement>('.flight-panel__aircraft-edit [data-parameter="camera.inertiaDecay"]')!;
+  expect(glide.querySelector(".foss-earth-parameter__label")?.textContent).toBe("Glide");
+  const face = () => glide.querySelector(".foss-earth-parameter__face")?.textContent;
+  const reset = () => glide.querySelector<HTMLButtonElement>(".foss-earth-parameter__reset")!;
+  expect(face()).toBe("0.82");
+  expect(reset().hidden).toBe(true);
+  // It follows the registry, and offers its reset once changed.
+  await act(async () => settings.set("camera.inertiaDecay", 0));
+  expect(face()).toBe("0.00");
+  expect(reset().hidden).toBe(false);
 });
 
 it("disables Resume while the replacement aircraft is loading", async () => {

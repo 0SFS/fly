@@ -386,6 +386,7 @@ share this assist; variant-specific automatic flap behavior is not asserted.
 | `osfs.camera.orbitRestoreYaw` | deg | 0 |
 | `osfs.camera.chaseDistance` / `.chaseHeight` | m | Per aircraft, in the aircraft catalog |
 | `osfs.camera.fieldOfView` | deg | Inherited from the globe camera |
+| `camera.inertiaDecay` (Glide: FOSS Earth's, drawn here too) | speed kept per 60 Hz frame | 0.82; the chase camera's zoom, pinch and phone swipe glide with it, and 0 draws them at once |
 | `osfs.aircraft.windowTint` | fraction | 25% of the model's authored glazing opacity; only catalogued see-through windows (the F-35B canopy) |
 | Phone camera tuning | various | Exists (`osfs.phone-camera-tuning`) |
 

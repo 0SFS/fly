@@ -637,14 +637,27 @@ describe("0SFS render demand", () => {
       canvas.dispatchEvent(new WheelEvent("wheel", { deltaX: 10, deltaY: 20 }));
       expect(mocks.aircraft.orbitChaseCamera).toHaveBeenCalled();
       expect(mocks.runtime.requestRender).toHaveBeenCalledOnce();
-      canvas.dispatchEvent(new WheelEvent("wheel", { ctrlKey: true, deltaY: -10 }));
-      expect(mocks.aircraft.zoomChaseCamera).toHaveBeenCalled();
-      expect(mocks.runtime.requestRender).toHaveBeenCalledTimes(2);
+      const tick = mocks.runtime.setSimTick.mock.calls[0][0] as (dt: number) => void;
+      // A pinch glides: it asks for a frame, and the frame zooms, paused or not.
+      let now = performance.now();
+      const clock = vi.spyOn(performance, "now").mockImplementation(() => now);
+      try {
+        mocks.runtime.requestRender.mockClear();
+        canvas.dispatchEvent(new WheelEvent("wheel", { ctrlKey: true, deltaY: -10 }));
+        expect(mocks.runtime.requestRender).toHaveBeenCalled();
+        expect(mocks.aircraft.zoomChaseCamera).not.toHaveBeenCalled();
+        now += 1000 / 60;
+        mocks.runtime.requestRender.mockClear();
+        tick(1 / 60);
+        expect(mocks.aircraft.zoomChaseCamera).toHaveBeenCalled();
+        // Still gliding, so it asks for the next frame too.
+        expect(mocks.runtime.requestRender).toHaveBeenCalled();
+      } finally { clock.mockRestore(); }
+      mocks.runtime.requestRender.mockClear();
       window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyV" }));
-      expect(mocks.runtime.requestRender).toHaveBeenCalledTimes(3);
+      expect(mocks.runtime.requestRender).toHaveBeenCalledOnce();
       window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyP" }));
       expect(mocks.runtime.setSimRunning).toHaveBeenLastCalledWith(true);
-      const tick = mocks.runtime.setSimTick.mock.calls[0][0] as (dt: number) => void;
       tick(60);
       expect(mocks.physics.update).toHaveBeenLastCalledWith(0, expect.any(Function));
     } finally { await act(async () => app.destroy()); }
