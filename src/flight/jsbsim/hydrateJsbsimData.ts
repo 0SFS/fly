@@ -54,6 +54,27 @@ export async function downloadJsbsimData(
   }
 }
 
+/**
+ * Loads a mod's JSBSim files from its own base URL. Paths are relative to
+ * `${modBaseUrl}/jsbsim-data/`, the same layout a GitHub Pages mod publishes.
+ */
+export async function downloadModJsbsimFiles(
+  modBaseUrl: string,
+  files: readonly string[],
+): Promise<Array<{ path: string; contents: string }>> {
+  const root = modBaseUrl.replace(/\/$/, "");
+  return Promise.all(files.map(async file => {
+    if (!file || file.startsWith("/") || file.split("/").includes("..")) throw new Error(`Invalid mod JSBSim path ${file}.`);
+    const response = await fetch(`${root}/jsbsim-data/${file}`);
+    if (!response.ok) throw new Error(`Failed to load JSBSim asset ${file} from ${root}.`);
+    return { path: file, contents: await response.text() };
+  }));
+}
+
+export async function hydrateModJsbsimData(sdk: JSBSimSdk, modBaseUrl: string, files: readonly string[]): Promise<void> {
+  for (const file of await downloadModJsbsimFiles(modBaseUrl, files)) sdk.writeDataFile(file.path, file.contents);
+}
+
 export async function hydrateJsbsimData(
   sdk: JSBSimSdk,
   baseUrl = DEFAULT_DATA_BASE_URL,

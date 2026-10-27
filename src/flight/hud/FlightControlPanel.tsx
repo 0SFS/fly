@@ -10,6 +10,7 @@ import {
 } from "foss-earth/windowing";
 import type { FlightLocationPanel } from "../location/flightLocation";
 import {
+  Blocks,
   Bug,
   CloudSun,
   Crosshair,
@@ -83,8 +84,9 @@ import type { DamageAction } from "../damage/aircraftHealth";
 import type { AircraftDamageSnapshot } from "../damage/aircraftDamage";
 import { SharedSettingsPanel, type SharedSettingsPanelState } from "../multiplayer/SharedSettingsPanel";
 import type { SharedSettingsPatch } from "@0sfs/multiplayer/sharedSettings";
+import { ModsTab } from "../mods/ModsTab";
 
-export type FlightPanelTab = "weather" | "aircraft" | "fuel" | "armament" | "damage" | "shared-settings" | "autopilot" | "controls" | "remote" | "multiplayer" | "sound" | "exhaust" | "engine" | "gforces" | "logging" | "debug";
+export type FlightPanelTab = "weather" | "aircraft" | "fuel" | "armament" | "damage" | "shared-settings" | "autopilot" | "controls" | "remote" | "multiplayer" | "sound" | "exhaust" | "engine" | "gforces" | "logging" | "mods" | "debug";
 
 const TAB_DEFINITIONS: readonly WindowTabDefinition<FlightPanelTab>[] = [
   { id: "weather", label: "Weather" },
@@ -102,6 +104,7 @@ const TAB_DEFINITIONS: readonly WindowTabDefinition<FlightPanelTab>[] = [
   { id: "engine", label: "Engine" },
   { id: "gforces", label: "G-forces" },
   { id: "logging", label: "Logging" },
+  { id: "mods", label: "Mods" },
   { id: "debug", label: "Debug" },
 ];
 
@@ -123,6 +126,7 @@ const TAB_ICONS = {
   engine: Fan,
   gforces: Weight,
   logging: ScrollText,
+  mods: Blocks,
   debug: Bug,
 } satisfies Record<FlightPanelTab, typeof Plane>;
 
@@ -953,6 +957,7 @@ export function FlightControlPanel(props: FlightControlPanelProps) {
                   </ParameterSection>
                 </div>
                 : tabId === "logging" ? <LoggingPanel state={props.snapshot.logging} onAction={props.onLoggingAction} />
+                : tabId === "mods" ? <ModsTab />
                 : <DebugPanel snapshot={props.snapshot} settings={props.settings} onCollisionDebugChange={props.onCollisionDebugChange}
                   onWheelSpinModeChange={props.onWheelSpinModeChange} onTireSoundChange={props.onTireSoundChange} />}
           </>;

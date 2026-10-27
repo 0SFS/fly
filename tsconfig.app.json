@@ -10,6 +10,7 @@
 
     /* Bundler mode */
     "moduleResolution": "bundler",
+    "resolveJsonModule": true,
     "customConditions": ["source"],
     "preserveSymlinks": true,
     "allowImportingTsExtensions": true,
@@ -27,5 +28,5 @@
     "noUncheckedSideEffectImports": true
   },
   "include": ["src", "node_modules/@0sfs/*/src"],
-  "exclude": ["**/*.test.ts", "**/*.test.tsx"]
+  "exclude": ["**/*.test.ts", "**/*.test.tsx", "node_modules/@0sfs/about/src/**"]
 }

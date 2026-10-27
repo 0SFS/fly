@@ -1,10 +1,13 @@
 import type { AircraftId } from "@0sfs/aircraft/aircraftIds";
-import { C172_ROTOR_BLADES, FJ33_ROTOR_BLADES, F135_ROTOR_BLADES, type EngineRotorBladeCounts } from "@0sfs/engines/engineRotorDefinitions";
+import type { EngineRotorBladeCounts } from "@0sfs/engines/engineRotorDefinitions";
 import type { AutomaticFlaps } from "@0sfs/controls/autoFlaps";
-import { getSf50Variant, type Sf50VariantId } from "@0sfs/sf-50/sf50Variants";
-import { BODY_COLLISION_PROBES, SF50_BODY_COLLISION_PROBES, type BodyCollisionProbe } from "@0sfs/ground-contact/collisionGeometry";
+import type { Sf50VariantId } from "@0sfs/sf-50/sf50Variants";
+import { C172_BODY_COLLISION_PROBES, F35B_BODY_COLLISION_PROBES, SF50_BODY_COLLISION_PROBES, type BodyCollisionProbe } from "@0sfs/ground-contact/collisionGeometry";
 import type { ControlSurfaceTerms, ExternalForceTerms } from "@0sfs/aircraft/aircraftForces";
 import type { FlightControlLawMode } from "@0sfs/controls/applyFlightControls";
+import c172Manifest from "@0sfs/c172/manifest" with { type: "json" };
+import sf50Manifest from "@0sfs/sf-50/manifest" with { type: "json" };
+import f35bManifest from "@0sfs/f-35b/manifest" with { type: "json" };
 
 export { CONTROL_LAW_MODE_VALUES, type FlightControlLawMode } from "@0sfs/controls/applyFlightControls";
 
@@ -111,243 +114,36 @@ export interface FdmProfile {
   bodyCollisionProbes: readonly BodyCollisionProbe[];
 }
 
-const C172_STATI = {
-  staticMeters: 1.33,
-  staticPitchRad: 2.48 * Math.PI / 180,
-  pitchArmMeters: 4.5,
-  rollArmMeters: 5.5,
+/** Ground-contact probes stay on the flight profile. The rest of each profile comes from its aircraft mod. */
+const BODY_COLLISION_PROBES: Partial<Record<AircraftId, readonly BodyCollisionProbe[]>> = {
+  "cessna-172": C172_BODY_COLLISION_PROBES,
+  "cirrus-vision-jet": SF50_BODY_COLLISION_PROBES,
+  "cirrus-vision-jet-g2": SF50_BODY_COLLISION_PROBES,
+  "cirrus-vision-jet-g3": SF50_BODY_COLLISION_PROBES,
+  "f-35b": F35B_BODY_COLLISION_PROBES,
 };
 
-// The SF50 visual origin sits on the ground directly below its CG. The 44 in
-// FDM CG-to-wheel-contact distance therefore also places that origin correctly
-// when the host renders a physics state at the CG.
-const SF50_STATI = {
-  staticMeters: 1.12,
-  staticPitchRad: 0,
-  pitchArmMeters: 4.68,
-  rollArmMeters: 5.9,
-};
-
-const coefficient = (name: string): string => `aero/coefficient/${name}`;
-
-/** The SF50 models keep each ruddervator and aileron in its own terms. */
-const SF50_CONTROL_SURFACES: readonly ControlSurfaceTerms[] = [
-  ...(["left", "right"] as const).map(side => ({
-    id: `${side}-ruddervator`, label: `${side === "left" ? "Left" : "Right"} ruddervator`,
-    terms: { side: coefficient(`CY${side}-ruddervator`), lift: coefficient(`CL${side}-ruddervator`),
-      pitch: coefficient(`Cm${side}-ruddervator`), yaw: coefficient(`Cn${side}-ruddervator`) },
-  })),
-  ...(["left", "right"] as const).map(side => ({
-    id: `${side}-aileron`, label: `${side === "left" ? "Left" : "Right"} aileron`,
-    terms: { roll: coefficient(`Cl${side}-aileron`) },
-  })),
-  { id: "flaps", label: "Flaps", terms: { drag: coefficient("CDflap"), lift: coefficient("CLflap") } },
-];
-
-function createSf50Profile(variantId: Sf50VariantId): FdmProfile {
-  const variant = getSf50Variant(variantId);
-  return {
-    model: variant.model,
-    sf50VariantId: variant.id,
-    maxOperatingAltitudeFt: variant.maxOperatingAltitudeFt,
-    engine: "turbine",
-    rotorBlades: FJ33_ROTOR_BLADES,
-    // fj33_5a.xml: idlen2 53.4.
-    startSpeed: { property: "propulsion/engine[0]/n2", runningAt: 53.4 },
-    rudderSign: 1,
-    stance: SF50_STATI,
-    gauges: {
-      primary: "propulsion/engine[0]/n1",
-      secondary: "propulsion/engine[0]/n2",
-      label: "N1 %",
-    },
-    initialThrottleNorm: 0.35,
-    initialGearDown: false,
-    forceControlSurfaces: SF50_CONTROL_SURFACES,
-    flapPosition: { property: "fcs/flap-pos-norm", fullTravel: 1 },
-    automaticFlaps: {
-      kind: "assist",
-      // Conservative assist curve, not a Cirrus automatic-flap system.
-      // G1 AFM limits: half 190 KIAS, full 150 KIAS. See flight-settings.md.
-      approach: [[0, 1], [100, 1], [140, 0.5], [160, 0.5], [180, 0]],
-      takeoffNorm: 0.5, takeoffRetractionKts: [110, 115],
-      climbThrottleNorm: 0.7, retractWithGear: true,
-    },
-    // Development presets, not performance-validation cases. The available
-    // AFM takeoff/landing procedures use half/full flap respectively; the
-    // 85-knot approach is not a clean-wing or all-weight VREF claim.
-    runwayPresets: {
-      departure: { airspeedKts: 0, throttleNorm: 0, flapsNorm: 0.5, pitchDeg: 0 },
-      arrival: { airspeedKts: 85, throttleNorm: 0.35, flapsNorm: 1, pitchDeg: 3 },
-    },
-    bodyCollisionProbes: SF50_BODY_COLLISION_PROBES,
-  };
+interface AircraftModFile {
+  aircraft?: { fdmProfiles?: Record<string, Omit<FdmProfile, "bodyCollisionProbes">> };
 }
 
-// The F-35B's external stores' drag and pushback, under either engine model.
-const F35B_STORE_AND_PUSHBACK_FORCES: readonly ExternalForceTerms[] = [
-  { name: "external-tank-0-drag", label: "Right store drag", frame: "wind", magnitude: "stores/external-tank[0]/drag-lbs" },
-  { name: "external-tank-1-drag", label: "Left store drag", frame: "wind", magnitude: "stores/external-tank[1]/drag-lbs" },
-  { name: "pushback", label: "Pushback", frame: "body" },
-];
+export const FDM_PROFILES = {} as Record<AircraftId, FdmProfile>;
 
-// Weapon-station drag is plant-only. The empirical model has no station
-// properties, and its force list stays the tanks and pushback.
-const F35B_STATION_DRAG_FORCES: readonly ExternalForceTerms[] = Array.from({ length: 11 }, (_, index): ExternalForceTerms => {
-  const station = index + 1;
-  return { name: `station-${station}-drag`, label: `Station ${station} drag`, frame: "wind", magnitude: `stores/station[${station}]/drag-lbs` };
-});
+/** Adds an aircraft mod's flight profiles, attaching the probes this build already has for that id. */
+export function registerFdmProfile(id: AircraftId, profile: Omit<FdmProfile, "bodyCollisionProbes"> & { bodyCollisionProbes?: readonly BodyCollisionProbe[] }): void {
+  FDM_PROFILES[id] = { ...profile, bodyCollisionProbes: profile.bodyCollisionProbes ?? BODY_COLLISION_PROBES[id] ?? [] };
+}
 
-const F35B_INITIAL_PROPERTIES: Readonly<Record<string, number>> = {
-  "fcs/stovl-cmd-norm": 0,
-  "fcs/stovl-pos-norm": 0,
-  // A new flight clears the FCS zero-time conversion interlock latch.
-  "fcs/stovl-augmentation-inhibit": 0,
-  "fcs/mixture-cmd-norm": 1,
-  "fcs/pitch-trim-cmd-norm": -0.059,
-  "fcs/roll-trim-cmd-norm": 0,
-  "propulsion/engine[0]/pitch-angle-rad": 0,
-  "propulsion/engine[0]/yaw-angle-rad": 0,
-};
+function installManifestProfiles(manifest: AircraftModFile): void {
+  for (const [id, profile] of Object.entries(manifest.aircraft?.fdmProfiles ?? {})) {
+    registerFdmProfile(id as AircraftId, profile);
+  }
+}
 
-const F35B_ENGINE_MODELS: readonly FdmEngineModel[] = [
-  {
-    id: "plant", label: "Coupled engine plant",
-    summary: "JSBSim's coupled engine plant: fuel, ignition, combustion, gas path, shafts, nozzle, metal temperatures and the lift fan advance together. Reheat thrust exists only while reheat fuel burns.",
-  },
-  {
-    id: "empirical", label: "Empirical tables (before the plant)",
-    summary: "The F-35B as it flew before the plant, unchanged: JSBSim's table-driven turbine, with the lift fan and roll posts as force carriers sharing the main engine's upward force. After a cold start it gives reheat thrust for about 4 s before any reheat fuel burns.",
-    profile: {
-      model: "F-35B-jsbsim-empirical",
-      dataPackage: "f-35b-empirical-engine",
-      forceEngineLabels: { 0: "Main engine", 1: "Lift fan", 2: "Right roll post", 3: "Left roll post" },
-      forceExternalForces: F35B_STORE_AND_PUSHBACK_FORCES,
-      // The force carriers' throttles, which the model's FCS holds at full.
-      initialProperties: { ...F35B_INITIAL_PROPERTIES, "fcs/throttle1": 0, "fcs/throttle2": 0, "fcs/throttle3": 0 },
-    },
-  },
-];
+installManifestProfiles(c172Manifest as unknown as AircraftModFile);
+installManifestProfiles(sf50Manifest as unknown as AircraftModFile);
+installManifestProfiles(f35bManifest as unknown as AircraftModFile);
 
-export const FDM_PROFILES: Record<AircraftId, FdmProfile> = {
-  "cessna-172": {
-    model: "c172p",
-    engine: "piston",
-    rotorBlades: C172_ROTOR_BLADES,
-    // Installed JSBSim eng_io320.xml <maxrpm>; an instrument scale, not a physics clamp.
-    maxEngineRpm: 2700,
-    // eng_io320.xml: idlerpm 550, and JSBSim runs it above 80% of that.
-    startSpeed: { property: "propulsion/engine[0]/engine-rpm", runningAt: 0.8 * 550 },
-    rudderSign: -1,
-    stance: C172_STATI,
-    gauges: {
-      primary: "propulsion/engine[0]/propeller-rpm",
-      secondary: "propulsion/engine[0]/engine-rpm",
-      label: "RPM",
-    },
-    initialThrottleNorm: 0.65,
-    initialGearDown: true,
-    // One aileron position drives both ailerons' terms.
-    forceControlSurfaces: [
-      { id: "elevator", label: "Elevator",
-        terms: { drag: coefficient("CDDe"), lift: coefficient("CLDe"), pitch: coefficient("Cmde") } },
-      { id: "ailerons", label: "Ailerons",
-        terms: { side: coefficient("CYda"), roll: coefficient("ClDa"), yaw: coefficient("Cnda") } },
-      { id: "rudder", label: "Rudder",
-        terms: { side: coefficient("CYdr"), roll: coefficient("Cldr"), yaw: coefficient("Cndr") } },
-      { id: "flaps", label: "Flaps",
-        terms: { drag: coefficient("CDDf"), lift: coefficient("CLDf"), pitch: coefficient("Cmdf") } },
-    ],
-    flapPosition: { property: "fcs/flap-pos-deg", fullTravel: 30 },
-    automaticFlaps: {
-      kind: "assist",
-      // 172P POH limits: 10 degrees 110 KIAS; greater travel 85 KIAS.
-      approach: [[0, 1], [65, 1], [80, 1 / 3], [95, 1 / 3], [105, 0]],
-      takeoffNorm: 0, takeoffRetractionKts: [65, 75],
-      climbThrottleNorm: 0.7, retractWithGear: false,
-    },
-    runwayPresets: {
-      departure: { airspeedKts: 0, throttleNorm: 0, flapsNorm: 0, pitchDeg: 2.48 },
-      arrival: { airspeedKts: 75, throttleNorm: 0.35, flapsNorm: 0, pitchDeg: 3 },
-    },
-    bodyCollisionProbes: BODY_COLLISION_PROBES,
-  },
-  "cirrus-vision-jet": createSf50Profile("g1"),
-  "cirrus-vision-jet-g2": createSf50Profile("g2"),
-  "cirrus-vision-jet-g3": createSf50Profile("g3"),
-  "f-35b": {
-    model: "F-35B-jsbsim",
-    engineModels: F35B_ENGINE_MODELS,
-    requiredReadOnlyModelProperties: ["propulsion/engine[0]/body-force-z-lbs"],
-    forceEngineLabels: { 0: "Main engine" },
-    // Every external force of the model: the F135 plant's LiftSystem outlets and
-    // inlet ram drag, the external stores' drag, and pushback.
-    forceExternalForces: [
-      { name: "lift-fan", label: "Lift fan", frame: "body", magnitude: "propulsion/lift-fan-force-lbs" },
-      { name: "roll-post-right", label: "Right roll post", frame: "body", magnitude: "propulsion/roll-post-right-force-lbs" },
-      { name: "roll-post-left", label: "Left roll post", frame: "body", magnitude: "propulsion/roll-post-left-force-lbs" },
-      { name: "engine-ram-drag", label: "Engine inlet ram drag", frame: "wind", magnitude: "propulsion/engine-ram-drag-lbs" },
-      { name: "lift-fan-ram-drag", label: "Lift-fan inlet ram drag", frame: "wind", magnitude: "propulsion/lift-fan-ram-drag-lbs" },
-      ...F35B_STORE_AND_PUSHBACK_FORCES,
-      ...F35B_STATION_DRAG_FORCES,
-    ],
-    // One aileron position drives both ailerons' terms, and one rudder both fins'.
-    // The model gives neither a force, only moments.
-    forceControlSurfaces: [
-      { id: "elevator", label: "Elevator",
-        terms: { drag: coefficient("CDde"), lift: coefficient("CLde"), pitch: coefficient("Cmde") } },
-      { id: "ailerons", label: "Ailerons", terms: { roll: coefficient("Clda"), yaw: coefficient("Cnda") } },
-      { id: "rudders", label: "Rudders", terms: { roll: coefficient("Cldr"), yaw: coefficient("Cndr") } },
-      { id: "flaps", label: "Trailing-edge flaps", terms: { drag: coefficient("CDflap"), lift: coefficient("dCLflap") } },
-      { id: "speedbrake", label: "Speed brake", terms: { drag: coefficient("CDsb"), lift: coefficient("dCLsb") } },
-    ],
-    dataPaths: {
-      enginePath: "aircraft/F-35B-jsbsim/Engines",
-      systemsPath: "aircraft/F-35B-jsbsim/Systems",
-    },
-    stovl: { commandProperty: "fcs/stovl-cmd-norm", positionProperty: "fcs/stovl-pos-norm" },
-    automaticFlaps: { kind: "native", commandProperty: "fcs/flaps-auto-enabled" },
-    controlLaw: {
-      commandProperty: "fcs/control-law-mode", enabledProperty: "fcs/fbw-enabled", automaticMode: "fly-by-wire",
-    },
-    // The source normalizes roll rate as 0.09 per rad/s, so full stick asked for 1/0.09 rad/s.
-    fullStickRollRate: { property: "fcs/full-stick-roll-rate-deg_sec", sourceDegPerSec: 180 / Math.PI / 0.09 },
-    engine: "turbine",
-    rotorBlades: F135_ROTOR_BLADES,
-    // F135-PW-600.xml: the plant runs at its idle corrected N2, 0.60. The lift fan has no start of its own.
-    startSpeed: { property: "propulsion/engine[0]/n2", runningAt: 60 },
-    rudderSign: -1,
-    // Prior FlightGear smoke settling observation, not new ground qualification.
-    stance: {
-      staticMeters: 1.267,
-      staticPitchRad: 1.18 * Math.PI / 180,
-      pitchArmMeters: 6.5,
-      rollArmMeters: 5.350764,
-    },
-    gauges: {
-      primary: "propulsion/engine[0]/n1",
-      secondary: "propulsion/engine[0]/n2",
-      label: "N1 %",
-    },
-    initialThrottleNorm: 0.48,
-    initialAirspeedKts: 300,
-    initialPitchDeg: 1.92,
-    initialGearDown: false,
-    initialProperties: F35B_INITIAL_PROPERTIES,
-    flapPosition: { property: "fcs/flap-pos-norm", fullTravel: 1, minNorm: -0.1 },
-    runwayPresets: {
-      departure: { airspeedKts: 0, throttleNorm: 0, flapsNorm: 0, pitchDeg: 1.18 },
-      arrival: { airspeedKts: 160, throttleNorm: 0.5, flapsNorm: 0, pitchDeg: 5 },
-    },
-    // Ground/body collision geometry is owned by the separate ground work.
-    bodyCollisionProbes: [],
-  },
-};
-
-/**
- * The engine model an aircraft flies with: the one asked for when the aircraft
- * offers it, otherwise its first. Null for an aircraft with no choice.
- */
 export function resolveEngineModel(aircraftId: AircraftId, requested?: EngineModelId): FdmEngineModel | null {
   const offered = FDM_PROFILES[aircraftId].engineModels;
   return offered?.find(model => model.id === requested) ?? offered?.[0] ?? null;

@@ -241,6 +241,9 @@ import { createFlightPathOverlay } from "./hud/flightPathOverlay";
 import { createFlightCompass } from "./hud/flightCompass";
 import type { AttitudeView } from "./hud/attitudeIndicator";
 import { createFlightLoadingScreen, type FlightLoadingScreen } from "../loading/createFlightLoadingScreen";
+import { appendModDependencyTree } from "@0sfs/about/modTree";
+import { modAboutParts } from "@0sfs/mods";
+import { ensureModsSession } from "./mods/modSession";
 import {
   connectMapDetailLog,
   connectMapDetailRuntime,
@@ -1723,7 +1726,8 @@ async function createFlightSimSession(
   }
   const syncCollisionDebugOverlay = (): void => {
     if (collisionDebugEnabled && aircraft && !collisionDebugOverlay) {
-      collisionDebugOverlay = createCollisionDebugOverlay(runtime.scene, aircraft.root, jsbsim.sdk);
+      collisionDebugOverlay = createCollisionDebugOverlay(runtime.scene, aircraft.root, jsbsim.sdk,
+        getFdmProfile(initialAircraftId).bodyCollisionProbes);
     }
     collisionDebugOverlay?.setEnabled(collisionDebugEnabled);
     const showWheels = collisionDebugEnabled && wheelSpinMode !== "off";
@@ -2992,6 +2996,7 @@ async function createFlightSimSession(
   ];
   // Which version runs, and everything it is built from, read from the page itself.
   const about = createAboutPanel({ site: __REPOSITORY_SLUG__ || undefined });
+  void ensureModsSession().then(loaded => appendModDependencyTree(about.element, modAboutParts(loaded)));
   const browserData = createBrowserDataPanel(document);
   const interfaceParameterPanels = interfaceParameterSections.map(({ section, handle }) => ({
     id: section, title: settings.getSectionTitle("interface", section), element: handle.element,
@@ -3578,6 +3583,8 @@ async function createFlightSimSession(
       headingDeg: (displayState.headingRad * 180) / Math.PI,
     });
 
+    // The tick's surface queries end here: the floating origin is about to move the world.
+    flightSurface.endFrame();
     floatingOrigin?.apply(displayState);
     externalTankVisuals?.sync(readExternalFuelTanks(jsbsim.sdk, aircraftId));
     externalTankVisuals?.update(externalTankStepSeconds);
@@ -3814,8 +3821,9 @@ async function createFlightSimSession(
       gamepadHaptics.dispose();
       wheelCues.invalidate("dispose");
       tireAudio.dispose();
-      // Before jsbsim.dispose(): the audio adapter's property batch must not outlive the SDK.
+      // Before jsbsim.dispose(): the audio adapter's and the hull collision's property batches must not outlive the SDK.
       flightAudio.dispose();
+      visibleMeshCollision.dispose();
       externalTankVisuals?.dispose();
       storeVisuals?.dispose();
       aircraftLights?.dispose();
