@@ -106,11 +106,14 @@ import { flightLog } from "@0sfs/logging/flightLog";
 import { createFlightRecorder } from "@0sfs/logging/flightRecorder";
 import { createEvaluationInstruments } from "./hud/evaluationInstruments";
 import { INSTRUMENT_BANDS, readingTints } from "./hud/instrumentBands";
+import { seaLevelMeters } from "./hud/seaLevel";
+import { createHostFlightUi } from "./hud/hostFlightUi";
 import { createGMeter } from "@0sfs/g-forces/gMeter";
 import { createGVisionOverlay } from "@0sfs/g-forces/gVisionOverlay";
 import type { LoggingAction, LoggingPanelState } from "@0sfs/logging/LoggingPanel";
 import { bindRecorderMarkHotkey, downloadCsv } from "@0sfs/logging/loggingTab";
 import { createEngineMonitor } from "@0sfs/engines/engineMonitor";
+import { throttleLeverGauges } from "@0sfs/engines/throttleLever";
 import { toEngineStatus } from "@0sfs/rc/engineStatus";
 import { createCollisionDebugOverlay } from "@0sfs/ground-contact/createCollisionDebugOverlay";
 import { createForcesDebugOverlay } from "./diagnostics/createForcesDebugOverlay";
@@ -202,7 +205,7 @@ import {
   type ControlArbiterResult,
 } from "@0sfs/autopilot/controlArbiter";
 import type { PhoneControlSession } from "@0sfs/rc/createPhoneControlSession";
-import type { CameraAim } from "@0sfs/rc/protocol";
+import { phoneAttitude, type CameraAim } from "@0sfs/rc/protocol";
 import {
   describePhoneCameraTuning,
   PHONE_CAMERA_PARAMETER_IDS,
@@ -257,6 +260,7 @@ import {
   createSkyPanel,
   clearMapCache,
   inspectMapCache,
+  createBrowserPositionSeaLevelPort,
   type GameLog,
   type GameLogLine,
   type MapDetailController,
@@ -542,6 +546,15 @@ async function createFlightSimSession(
     onSubstitute: (assetPath, url) => flightLog.warn("aircraft", `Dev model override ${modelOverride}: ${assetPath}`, { url }),
   }) : undefined;
   const stopWatching: (() => void)[] = [];
+  // Where sea level is over Google 3D Tiles, whose heights are the WGS84
+  // ellipsoid's: the toolbar's altitude and the phone's take it away.
+  const seaLevel = createBrowserPositionSeaLevelPort();
+  stopWatching.push(() => seaLevel.dispose());
+  /** Feet above sea level, or null while sea level there is unknown. */
+  const feetAboveSeaLevel = (state: FlightState): number | null => {
+    const base = seaLevelMeters(seaLevel, settings, runtime.status.mode, state.latDeg, state.lonDeg);
+    return base === null ? null : (state.altMeters - base) / 0.3048;
+  };
   // A still outline spares the page restyling and repainting the busy chips every frame.
   const applyActivityOutline = (): void => {
     if (settings.get(TOOLBAR_ACTIVITY_OUTLINE_ID) === "still") document.documentElement.dataset.hudActivity = "still";
@@ -1361,6 +1374,8 @@ async function createFlightSimSession(
     } : undefined,
     getKeepSliderBrakes: () => parameters.get("osfs.input.keepSliderBrakes"),
     getSliderBrake: () => inputManager.getSliderBrake(),
+    // The monitor is made below; the HUD first draws from the sim loop, after it.
+    getEngineGauges: () => throttleLeverGauges(engineMonitor.getReading()?.sample),
     engine: {
       getReading: () => engineControl.reading(),
       // Holding the lever is local pilot input; it preserves the selected device priority.
@@ -1837,6 +1852,24 @@ async function createFlightSimSession(
   for (const id of PHONE_CONTROLLER_PARAMETER_IDS) {
     stopWatching.push(parameters.watch(id, () => phoneSession?.syncPhoneSettings()));
   }
+  // A paused flight draws only on request: one for the phone's attitude indicator as it is turned on.
+  stopWatching.push(parameters.watch("osfs.phone.attitude", () => runtime.requestRender()));
+  // Remote Control → Shared controls → Flight UI on this computer while a phone
+  // is connected: off, the phone has the instruments and controls, and this
+  // screen the view, the toolbar and the windows — until the phone stops
+  // answering, or a key is pressed here.
+  const hostFlightUi = createHostFlightUi({
+    isConnected: () => phoneSession?.isConnected() ?? false,
+    isPhoneQuiet: () => phoneSession?.getSnapshot().quiet ?? false,
+    isShownWithPhone: () => parameters.get("osfs.remote.hostFlightUi"),
+    onChange: hidden => {
+      flightHud.setHidden(hidden);
+      // A HUD shown again catches up, and a phone just connected gets its first
+      // attitude, at the next frame, which a paused flight draws only on request.
+      runtime.requestRender();
+    },
+  });
+  stopWatching.push(parameters.watch("osfs.remote.hostFlightUi", hostFlightUi.noteSettingChanged));
   let chaseFrameApplied: PhoneCameraTuning["chaseFrame"] = "attitude";
   let orbitStateYaw = orbitRestoreYaw();
   let orbitStatePitch = orbitRestorePitch();
@@ -2228,6 +2261,7 @@ async function createFlightSimSession(
   // Capture, like the flight keys, so a Ctrl chord with V is not handed on by
   // an embedding browser's own window listener.
   window.addEventListener("keydown", onViewKeyDown, { capture: true });
+  window.addEventListener("keydown", hostFlightUi.noteKey, { capture: true });
 
   const flightGamepadSource = createBrowserInputSource({ target: window });
   const flightGamepadResponse = inputManager.getGamepadResponseController();
@@ -2721,10 +2755,15 @@ async function createFlightSimSession(
           controls: phoneSession?.getSnapshot().owner === "phone"
             ? { ...appliedControls, ...controlBlend?.levers() } : inputManager.getControls(),
           actualControls,
-          airspeedKts: state.airspeedKts, altitudeFt: state.altMeters / 0.3048,
+          // Until sea level there is known, the height the globe flies at.
+          airspeedKts: state.airspeedKts, altitudeFt: feetAboveSeaLevel(state) ?? state.altMeters / 0.3048,
           headingDeg: (state.headingRad * 180 / Math.PI + 360) % 360,
           // Presence of this field is what tells the phone it may offer a G button.
           gearDown: inputManager.getGearDownNorm() > 0,
+          // The flaps lever's AUTO, as the HUD's: moving the phone's flaps turns it off.
+          autoFlaps: parameters.get("osfs.assist.autoFlaps"),
+          // The HUD's AUTO TRIM corner.
+          autoTrim: { pitch: parameters.get("osfs.assist.autoTrim"), roll: parameters.get("osfs.assist.autoRollTrim") },
           // The same reading the HUD's engine chip is drawing from, so both
           // screens show one engine rather than two sampled at two times.
           engine: toEngineStatus(engineMonitor.getReading(), engineControl.reading()),
@@ -2763,9 +2802,14 @@ async function createFlightSimSession(
       ...(phoneCameraTrace ? { trace: phoneCameraTrace } : {}),
       // Same path the HUD's G button and the G key take, so the three stay in step.
       setGearDown: down => { inputManager.setGearDown(down); flightHud.setGearDown(down); runtime.requestRender(); },
+      setAutoFlaps: enabled => { parameters.set("osfs.assist.autoFlaps", enabled); },
+      // The same settings the HUD's AUTO TRIM corner turns.
+      setAutoTrim: (axis, enabled) => { parameters.set(axis === "pitch" ? "osfs.assist.autoTrim" : "osfs.assist.autoRollTrim", enabled); },
+      onPhoneInput: hostFlightUi.notePhoneInput,
       // The same path the HUD lever's ring takes.
       shutdownEngine: () => engineControl.shutdown(),
     });
+    session.subscribe(hostFlightUi.sync);
     return (host, panelOptions) => createPhonePairingPanel(host, session, panelOptions);
   }).catch((error: unknown) => { phonePairing = null; throw error; });
   const onVisibilityChange = () => {
@@ -3201,6 +3245,7 @@ async function createFlightSimSession(
     onRendererClick: () => controlPanel?.toggleTab("renderer"),
     onMapClick: () => controlPanel?.toggleTab("map"),
     onStatusClick: () => controlPanel?.toggleTab("location"),
+    seaLevel,
     onLogToggle: () => {
       // Below the two-window width FOSS Earth's windows hold the log in a Log tab.
       if (document.documentElement.dataset.logVisible === "false") {
@@ -3578,13 +3623,15 @@ async function createFlightSimSession(
     if (parameters.get("osfs.assist.autoFlaps") && lastApResult.owners.flaps === "pilot") {
       inputManager.replaceFlaps(appliedControls.flaps);
     }
+    const hudControls = phoneOwned || lastApResult.engaged || pilot.isOut() ? appliedControls : controls;
+    const hudAttitudeView = attitudeView();
     flightHud.update(
       displayState,
-      phoneOwned || lastApResult.engaged || pilot.isOut() ? appliedControls : controls,
+      hudControls,
       lastApResult.engaged ? lastApResult.gearDownNorm > 0 : inputManager.getGearDownNorm() > 0,
       { pitch: pitchAutoTrim.enabled, roll: rollAutoTrim.enabled },
       hudMasterAp(),
-      attitudeView(),
+      hudAttitudeView,
     );
     frameProfiler.add("flight/hud", sectionStarted);
     const now = performance.now();
@@ -3603,12 +3650,21 @@ async function createFlightSimSession(
     const shownPilotG = gIndicatorShown ? steppedPilotG ?? readPilotG(jsbsim.sdk) : null;
     if (shownPilotG !== null) gMeter.update(shownPilotG);
     steppedPilotG = null;
-    flightHud.setReadingTints(readingTints(instrumentBands, {
-      iasKt: displayState.airspeedKts, aoaDeg: evaluationInstruments.aoaDeg(), g: shownPilotG,
+    const aoaDeg = evaluationInstruments.aoaDeg();
+    const tints = readingTints(instrumentBands, {
+      iasKt: displayState.airspeedKts, aoaDeg, g: shownPilotG,
       vsFpm: displayState.verticalSpeedFps * 60, flaps: actualFlaps,
       weightLb: jsbsim.sdk.getPropertyValue("inertia/weight-lbs"), onGround: aircraftOnGround(),
       jetBorne: vtolProfile !== undefined && jsbsim.sdk.getPropertyValue(vtolProfile.positionProperty) > 0.01,
-    }));
+    });
+    flightHud.setReadingTints(tints);
+    // The phone's pitch/roll pad draws the instrument this HUD does, from the
+    // same frame, with the readings Compact writes on its corners.
+    if (phoneSession?.isConnected() && parameters.get("osfs.phone.attitude")) {
+      phoneSession.setAttitude(phoneAttitude(displayState, hudControls, hudAttitudeView, {
+        iasKt: displayState.airspeedKts, altitudeFt: feetAboveSeaLevel(displayState), aoaDeg, tints,
+      }));
+    }
     // Every frame: a change of camera view changes what is drawn without a step.
     showGVision();
     engineMonitor.update(jsbsim.sdk, feedbackHeld || worldLoading);
@@ -3700,6 +3756,7 @@ async function createFlightSimSession(
       unbindRecorderMark();
       runtime.setSimTick(null);
       window.removeEventListener("keydown", onViewKeyDown, { capture: true });
+      window.removeEventListener("keydown", hostFlightUi.noteKey, { capture: true });
       flightGamepadSource.stop();
       detachGamepadProfileInput();
       flightGamepadRuntime.dispose();

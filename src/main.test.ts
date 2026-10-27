@@ -163,7 +163,8 @@ describe("application route", () => {
     await import("./main");
     await vi.waitFor(() => expect(appMocks.createPhoneControllerApp).toHaveBeenCalledOnce());
 
-    expect(appMocks.createPhoneControllerApp).toHaveBeenCalledWith(document.getElementById("root"));
+    // With the flight HUD's attitude indicator for the pitch/roll pad, loaded only when the pad asks.
+    expect(appMocks.createPhoneControllerApp).toHaveBeenCalledWith(document.getElementById("root"), { loadAttitude: expect.any(Function) });
     expect(appMocks.createFlightSimApp).not.toHaveBeenCalled();
   });
 

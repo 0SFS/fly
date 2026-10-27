@@ -3,12 +3,13 @@ import { attachParameterReset, checkChoice, createChoiceGroup, createExternalLin
 import "foss-earth/shell.css";
 import "foss-earth/input-mode.css";
 
-import { attachFullscreenButton, attachMapDownloadSpeed, attachRendererActivity, attachTileStreamingActivity, createInputModeHud, createHudBar, createMapSourceHud, createPositionReadout, fitHudBar, getRendererLabel, setMapSourceLabel, surfaceHeightDatum, type HudBarFitItem, type HudBarHandle, type InputModeHudOptions, type MapDetailController, type RenderActivitySource, type TileStreamingSource, type MapDownloadSource } from "foss-earth/shell";
+import { attachFullscreenButton, attachMapDownloadSpeed, attachRendererActivity, attachTileStreamingActivity, createInputModeHud, createHudBar, createMapSourceHud, createPositionReadout, fitHudBar, getRendererLabel, setMapSourceLabel, surfaceHeightDatum, type HudBarFitItem, type HudBarHandle, type InputModeHudOptions, type MapDetailController, type PositionSeaLevelPort, type RenderActivitySource, type TileStreamingSource, type MapDownloadSource } from "foss-earth/shell";
 import type { BabylonRuntimeStatus, RendererMode } from "foss-earth/runtime";
 import { getAppSettings, TOOLBAR_EDIT_PRIORITIES_ID, TOOLBAR_PRIORITIES, toolbarPriorityParameterId, type ToolbarItemId } from "foss-earth/settings";
 import { headingDegFromRad, type FlightState } from "@0sfs/ground-contact/flightState";
 import { LOADING_LIVE_ATTRIBUTE } from "../../loading/createFlightLoadingScreen";
 import type { FlightHudLayout } from "./flightHud";
+import { SEA_LEVEL_GRID_ID, seaLevelMeters } from "./seaLevel";
 
 export interface FlightHudBarOptions {
   renderActivity: RenderActivitySource & TileStreamingSource & MapDownloadSource;
@@ -32,6 +33,11 @@ export interface FlightHudBarOptions {
   onMapClick(): void;
   /** The position readout toggles the Location tab. */
   onStatusClick(): void;
+  /**
+   * Where sea level is over Google 3D Tiles, whose heights are the WGS84
+   * ellipsoid's: without it the altitude above sea level is a dash there.
+   */
+  seaLevel?: PositionSeaLevelPort;
   /** Opens or closes the game log history; returns whether it is now open. */
   onLogToggle?(): boolean;
 }
@@ -156,7 +162,7 @@ export function createFlightHudBar(container: HTMLElement, options: FlightHudBar
   });
   const detachRendererActivity = attachRendererActivity(rendererButton, options.renderActivity);
   // FOSS Earth's readout: Interface → Position readout says how it is written.
-  const position = createPositionReadout(statusElement, getAppSettings());
+  const position = createPositionReadout(statusElement, getAppSettings(), { seaLevel: options.seaLevel });
   // Compact's split chips. The latitude and longitude are FOSS Earth's readout
   // without the altitude, so they are marked as Interface → Position readout says.
   const positionChips = [latLonButton, altitudeButton, headingButton, pitchButton];
@@ -291,15 +297,23 @@ export function createFlightHudBar(container: HTMLElement, options: FlightHudBar
   setLayout("classic");
 
   /** Altitude as Interface → Position readout measures it; a dash while its base is unknown. */
-  const drawAltitude = (altitudeMeters: number, groundHeightMeters: number | null, mode: BabylonRuntimeStatus["mode"]): void => {
+  let lastAltitude: { state: FlightState; groundHeightMeters: number | null; mode: BabylonRuntimeStatus["mode"] } | null = null;
+  const drawAltitude = (state: FlightState, groundHeightMeters: number | null, mode: BabylonRuntimeStatus["mode"]): void => {
+    lastAltitude = { state, groundHeightMeters, mode };
     const reference = settings.get<"asl" | "agl">(ALTITUDE_REFERENCE_ID);
     const unit = settings.get<"m" | "ft">(ALTITUDE_UNIT_ID);
-    // Over Google 3D Tiles heights are the ellipsoid's, and the flight has no
-    // sea level to take away: the one readout shows a dash there too.
-    const base = reference === "agl" ? groundHeightMeters : surfaceHeightDatum(mode) === "geoid" ? 0 : null;
-    altitudeChip.setValue(base === null ? "\u2014" : String(Math.round((altitudeMeters - base) / (unit === "ft" ? METERS_PER_FOOT : 1))));
+    // Over Google 3D Tiles heights are the ellipsoid's: sea level is the geoid's
+    // height there, a dash until its grid has loaded.
+    const base = reference === "agl" ? groundHeightMeters : seaLevelMeters(options.seaLevel, settings, mode, state.latDeg, state.lonDeg);
+    altitudeChip.setValue(base === null ? "\u2014" : String(Math.round((state.altMeters - base) / (unit === "ft" ? METERS_PER_FOOT : 1))));
     altitudeChip.setLabel(`${unit} ${reference === "agl" ? "AGL" : "ASL"}`);
   };
+  // The geoid's grid arrives, or another is chosen: redraw, paused too.
+  const redrawAltitude = (): void => {
+    if (layout === "compact" && lastAltitude) drawAltitude(lastAltitude.state, lastAltitude.groundHeightMeters, lastAltitude.mode);
+  };
+  const stopWatchingSeaLevel = options.seaLevel?.subscribe?.(redrawAltitude) ?? (() => {});
+  const stopWatchingGrid = settings.subscribe(changed => { if (changed.has(SEA_LEVEL_GRID_ID)) redrawAltitude(); });
 
   return {
     setResumeBlocked(blocked) { pauseButton.disabled = blocked; },
@@ -323,7 +337,7 @@ export function createFlightHudBar(container: HTMLElement, options: FlightHudBar
       }
       if (fpsValue.textContent !== fpsText) fpsValue.textContent = fpsText;
       latLon.update({ latDeg: state.latDeg, lonDeg: state.lonDeg });
-      drawAltitude(state.altMeters, groundHeightMeters, runtimeStatus.mode);
+      drawAltitude(state, groundHeightMeters, runtimeStatus.mode);
       headingChip.setValue(`${String(headingDeg % 360).padStart(3, "0")}°`);
       headingChip.setLabel(compassPoint(headingDeg));
       const pitchDeg = Math.round(state.pitchRad * 180 / Math.PI);
@@ -331,6 +345,8 @@ export function createFlightHudBar(container: HTMLElement, options: FlightHudBar
     },
     destroy(): void {
       stopWatchingToolbar();
+      stopWatchingSeaLevel();
+      stopWatchingGrid();
       fit.destroy();
       logButton?.removeEventListener("click", onLogClick);
       detachFullscreen();

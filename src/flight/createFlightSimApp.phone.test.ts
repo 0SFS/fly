@@ -7,7 +7,7 @@ import type { FlightControlPanelOptions } from "./hud/FlightControlPanel";
 
 const mocks = vi.hoisted(() => {
   const state = { latDeg: 1, lonDeg: 2, altMeters: 1000, headingRad: 0, airspeedKts: 110 };
-  const snapshot = { owner: "local" as "local" | "phone", phase: "paired" };
+  const snapshot = { owner: "local" as "local" | "phone", phase: "paired", quiet: false };
   const phoneControls = { elevator: -0.4, aileron: 0.6, rudder: 0.5, throttle: 0.83, pitchTrim: -0.2, rollTrim: 0.15, flaps: 1 / 3, brake: 1 };
   const engineVisualValues = new Map<string, number>();
   const phone = {
@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => {
     hasPendingCameraAim: vi.fn(() => false),
     cameraFingers: vi.fn(() => null as number | null),
     onHidden: vi.fn(), syncStatus: vi.fn(), destroy: vi.fn(),
+    isConnected: vi.fn(() => snapshot.phase === "paired"), setAttitude: vi.fn(), syncPhoneSettings: vi.fn(),
   };
   return {
     state, snapshot, phoneControls, phone, engineVisualValues,
@@ -66,7 +67,7 @@ const mocks = vi.hoisted(() => {
     physics: {
       reset: vi.fn(), setPaused: vi.fn(), update: vi.fn(), getLatestState: () => state, getFault: () => null,
     },
-    createHud: vi.fn(() => ({ update: vi.fn(), refreshFlaps: vi.fn(), isPilotHolding: vi.fn(() => false), setLayout: vi.fn(), setReadingTints: vi.fn(), destroy: vi.fn() })),
+    createHud: vi.fn(() => ({ update: vi.fn(), refreshFlaps: vi.fn(), isPilotHolding: vi.fn(() => false), setLayout: vi.fn(), setReadingTints: vi.fn(), setHidden: vi.fn(), destroy: vi.fn() })),
     createPanel: vi.fn(() => ({ update: vi.fn(), openOrSelectTab: vi.fn(), toggleTab: vi.fn(), destroy: vi.fn() })),
     createHudBar: vi.fn(() => ({ update: vi.fn(), setLayout: vi.fn(), destroy: vi.fn() })),
   };
@@ -125,6 +126,7 @@ beforeEach(() => {
   mocks.engineVisualValues.clear();
   Object.defineProperty(navigator, "getGamepads", { configurable: true, value: vi.fn(() => []) });
   mocks.snapshot.owner = "local";
+  mocks.snapshot.quiet = false;
   mocks.createPairingPanel.mockReturnValue(mocks.pairingPanel);
   mocks.terrainContact.update.mockReturnValue(true);
   mocks.visibleMeshCollision.update.mockReturnValue(false);
@@ -472,6 +474,43 @@ describe("0SFS phone integration", () => {
       rotorBlades: { outer: 2, inner: null, outerEstimated: false, innerEstimated: false },
       orbs: { fps: 1000, turnsPerSecond: 2, maxPatternStep: 0.45, pixelRatio: 2, renderer: "auto" },
     });
+  });
+
+  it("hides this computer's flight UI for a phone, but not past a key pressed here or a phone gone quiet", async () => {
+    await mount();
+    const hud = mocks.createHud.mock.results[0].value as { setHidden: ReturnType<typeof vi.fn> };
+    // The session says when it changes; this one is paired.
+    const changed = (mocks.phone.subscribe.mock.calls as unknown as [() => void][])[0][0];
+    changed();
+    expect(hud.setHidden).toHaveBeenLastCalledWith(true);
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "w", code: "KeyW" }));
+    expect(hud.setHidden).toHaveBeenLastCalledWith(false);
+    options.onPhoneInput!();
+    expect(hud.setHidden).toHaveBeenLastCalledWith(true);
+    mocks.snapshot.quiet = true;
+    changed();
+    expect(hud.setHidden).toHaveBeenLastCalledWith(false);
+    mocks.snapshot.quiet = false;
+    changed();
+    expect(hud.setHidden).toHaveBeenLastCalledWith(true);
+    // The setting on, both screens have it.
+    registerFlightSettings(getAppSettings()).set("osfs.remote.hostFlightUi", true);
+    expect(hud.setHidden).toHaveBeenLastCalledWith(false);
+    expect(hud.setHidden).toHaveBeenCalledTimes(6);
+  });
+
+  it("offers the phone the HUD's trim assists, and switches each from it on its own", async () => {
+    const parameters = registerFlightSettings(getAppSettings());
+    parameters.set("osfs.assist.autoTrim", false);
+    parameters.set("osfs.assist.autoRollTrim", false);
+    await mount();
+    expect(options.getStatus().autoTrim).toEqual({ pitch: false, roll: false });
+    options.setAutoTrim!("roll", true);
+    expect(options.getStatus().autoTrim).toEqual({ pitch: false, roll: true });
+    options.setAutoTrim!("pitch", true);
+    options.setAutoTrim!("roll", false);
+    expect(options.getStatus().autoTrim).toEqual({ pitch: true, roll: false });
+    expect([parameters.get("osfs.assist.autoTrim"), parameters.get("osfs.assist.autoRollTrim")]).toEqual([true, false]);
   });
 
   it("shares the F-35 afterburner accent through cached native visuals and the phone status", async () => {

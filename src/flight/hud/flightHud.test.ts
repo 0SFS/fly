@@ -427,6 +427,37 @@ describe("flight HUD layout", () => {
     expect(toolbar.children).toHaveLength(0);
   });
 
+  it("hides everywhere it is, toolbar too, and draws nothing until shown again", () => {
+    const onStickChange = vi.fn();
+    const t = mount({ onStickChange });
+    const toolbar = document.createElement("span");
+    document.body.append(toolbar);
+    t.hud.setLayout("compact", toolbar);
+    t.hud.update(STATE, CONTROLS, true, AUTO_OFF);
+    const pad = t.host.querySelector<HTMLElement>(".flight-hud__attitude")!;
+    pad.focus();
+    pad.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+    expect(onStickChange).toHaveBeenLastCalledWith(-1, -0);
+
+    t.hud.setHidden(true);
+    expect(t.host.style.display).toBe("none");
+    expect([...toolbar.children].map(item => (item as HTMLElement).style.display)).toEqual(["none", "none", "none"]);
+    // A stick held here lets go: the phone has the controls.
+    expect(onStickChange).toHaveBeenLastCalledWith(0, -0);
+    const observer = new MutationObserver(() => undefined);
+    observer.observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+    t.hud.update({ ...STATE, airspeedKts: 160, verticalSpeedFps: 20 }, CONTROLS, false, AUTO_OFF);
+    expect(observer.takeRecords()).toEqual([]);
+    observer.disconnect();
+
+    t.hud.setHidden(false);
+    expect(t.host.style.display).toBe("");
+    expect([...toolbar.children].map(item => (item as HTMLElement).style.display)).toEqual(["", "", ""]);
+    t.hud.update({ ...STATE, airspeedKts: 160 }, CONTROLS, false, AUTO_OFF);
+    expect(t.gear.getAttribute("aria-pressed")).toBe("false");
+    t.hud.destroy();
+  });
+
   it("keeps the buttons in the row when Compact has no toolbar to put them in", () => {
     const t = mount();
     t.hud.setLayout("compact");

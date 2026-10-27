@@ -357,6 +357,32 @@ describe("flight HUD position readout", () => {
     expect(status.querySelector('[data-position-part="altitude"]')?.textContent).toBe("—ft ASL");
     hud.destroy();
   });
+
+  it("measures above sea level from FOSS Earth's geoid over Google 3D Tiles, in both layouts, once the grid arrives", () => {
+    registerFlightSettings(getAppSettings());
+    let geoidMeters: number | null = null;
+    const listeners = new Set<() => void>();
+    const seaLevel = {
+      read: vi.fn(() => ({ baseMeters: geoidMeters })),
+      subscribe: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
+    };
+    const { container, hud } = createTestHud({ seaLevel });
+    const status = container.querySelector<HTMLButtonElement>("#flightShellStatus")!;
+    const altitude = () => status.querySelector('[data-position-part="altitude"]')?.textContent;
+    hud.update(STATE, { ...STATUS, mode: "google-tiles" }, 60, false, 100);
+    expect(altitude()).toBe("—ft ASL");
+    expect(seaLevel.read).toHaveBeenCalledWith(expect.objectContaining({ latDeg: 44.9778, lonDeg: -93.265, heightDatum: "ellipsoid" }), expect.anything());
+
+    // The geoid is 30.48 m below the ellipsoid here; the aircraft is 304.8 m above the ellipsoid.
+    geoidMeters = -30.48;
+    for (const listener of listeners) listener();
+    expect(altitude()).toBe("1100ft ASL");
+    hud.setLayout("compact");
+    hud.update(STATE, { ...STATUS, mode: "google-tiles" }, 60, false, 100);
+    expect(container.querySelector("#flightAltitude .flight-reading__value")?.textContent).toBe("1100");
+    hud.destroy();
+    expect(listeners.size).toBe(0);
+  });
 });
 
 describe("flight HUD compact toolbar", () => {

@@ -38,7 +38,10 @@ async function bootApp(rootElement: HTMLElement, loading: FlightLoadingScreen | 
 
   if (route === "remote") {
     const { createPhoneControllerApp } = await import("@0sfs/rc/createPhoneControllerApp");
-    await createPhoneControllerApp(rootElement);
+    await createPhoneControllerApp(rootElement, {
+      // The flight HUD's own attitude indicator, for the pitch/roll pad.
+      loadAttitude: () => import("./flight/hud/phoneAttitude").then(module => module.phoneAttitudeRenderer),
+    });
     clearBootShell();
     markBrowserAppReady(document);
     return;

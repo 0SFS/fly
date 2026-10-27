@@ -107,51 +107,6 @@
 }
 
 /*
- * Airspeed, angle of attack and load, tinted by their value: green while it is
- * comfortable, through yellow, to red at the stall or the aircraft's limit
- * (instrumentBands.ts). The HUD sets `--hud-tint`, 0 to 1, on the chip or on
- * the slot round it, and both layouts read it.
- */
-:is(.flight-hud__tape[data-tint], [data-tint] > .flight-hud__tape) {
-  --hud-tint-hue: calc(130 - 130 * var(--hud-tint, 0));
-  border-color: hsl(var(--hud-tint-hue) 85% 52% / 0.9);
-  background: hsl(var(--hud-tint-hue) 75% 15% / 0.75);
-  color: hsl(var(--hud-tint-hue) 90% 68%);
-}
-
-:is(.flight-hud__tape[data-tint], [data-tint] > .flight-hud__tape) .flight-hud__tape-header {
-  color: inherit;
-  opacity: 0.8;
-}
-
-/*
- * Vertical speed, coloured as the attitude indicator: dark brown descending,
- * white level, dark blue climbing. The HUD sets `--hud-vs-mix`, 0 level to 1
- * at the aircraft's full scale, its direction, and dark ink on the pale end.
- */
-.flight-hud__tape[data-vs-tint] {
-  --hud-vs-end: hsl(218 72% 24%);
-  --hud-vs-fill: color-mix(in oklab, var(--hud-vs-end) calc(var(--hud-vs-mix, 0) * 100%), #f4f6f9);
-  border-color: color-mix(in oklab, var(--hud-vs-fill), #000 35%);
-  background: var(--hud-vs-fill);
-  color: #f4f6f9;
-}
-
-.flight-hud__tape[data-vs-tint][data-vs-direction="down"] {
-  --hud-vs-end: hsl(26 62% 20%);
-}
-
-.flight-hud__tape[data-vs-tint][data-vs-ink="dark"] {
-  color: #111827;
-  text-shadow: none;
-}
-
-.flight-hud__tape[data-vs-tint] .flight-hud__tape-header {
-  color: inherit;
-  opacity: 0.8;
-}
-
-/*
  * Compact (osfs.hud.layout): both clusters sit against the toolbar in the
  * bottom corners, on see-through surfaces, with the readings on the attitude
  * indicator's corners. The text keeps a shadow so it reads over a bright sky.
@@ -215,37 +170,6 @@
   transform: translateX(-50%);
 }
 
-/* Value over its label, as the toolbar's readings. */
-.flight-hud__attitude-readings .flight-hud__tape {
-  flex-direction: column-reverse;
-  gap: 0;
-  padding: 2px 5px;
-  border-radius: 6px;
-}
-
-/* The ball shows through a reading with no tint to show. */
-.flight-hud__attitude-readings .flight-hud__tape:not([data-tint], [data-vs-tint], [data-tint] > *) {
-  background: transparent;
-  border-color: transparent;
-}
-
-/* Brighter than the row's muted labels: these sit over the sky. */
-.flight-hud__attitude-readings .flight-hud__tape-header {
-  gap: 2px;
-  color: rgba(232, 237, 245, 0.85);
-}
-
-.flight-hud__attitude-readings :is(.flight-hud__label, .flight-hud__unit) {
-  font-size: 8px;
-}
-
-.flight-hud__attitude-readings .flight-hud__value {
-  font-size: 12px;
-}
-
-.flight-hud__attitude-readings :is(.flight-hud__tape[data-tint], [data-tint] > .flight-hud__tape) {
-  background: hsl(var(--hud-tint-hue) 75% 15% / 0.6);
-}
 
 .flight-hud__yaw-throttle {
   position: absolute;
@@ -313,21 +237,6 @@
   align-self: end;
   width: var(--flight-auto-trim-size);
   height: var(--flight-auto-trim-size);
-}
-
-.flight-hud__auto-button {
-  width: max-content;
-  padding: 2px 3px;
-  border: 1px solid currentColor;
-  border-radius: 3px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-.flight-hud__auto-button.is-on {
-  color: var(--flight-panel-accent);
 }
 
 .flight-hud__slider-control--roll-trim {

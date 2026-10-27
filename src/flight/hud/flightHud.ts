@@ -1,6 +1,6 @@
 import { headingDegFromRad, type FlightState } from "@0sfs/ground-contact/flightState";
 import type { FrameProfiler } from "foss-earth/perf";
-import { createThrottleLever, type ThrottleBrakeCommand, type ThrottleLeverEngine } from "@0sfs/engines/throttleLever";
+import { createThrottleLever, type ThrottleBrakeCommand, type ThrottleLeverEngine, type ThrottleLeverGauge } from "@0sfs/engines/throttleLever";
 import { mountNativeControlPosition } from "@0sfs/rc/controlPosition";
 import type { ActualControlPositions } from "@0sfs/rc/protocol";
 import {
@@ -29,6 +29,8 @@ export interface FlightHudOptions {
   getKeepSliderBrakes?(): boolean;
   /** The slider's own brake selection, before keyboard/button brakes are mixed in. */
   getSliderBrake?(): number;
+  /** How fast the engine turns, as I-beams beside the throttle lever; see `throttleLeverGauges`. */
+  getEngineGauges?(): readonly ThrottleLeverGauge[];
   onPitchTrimChange(value: number): void;
   onRollTrimChange(value: number): void;
   onPitchAutoTrimChange(enabled: boolean): void;
@@ -135,6 +137,12 @@ export interface FlightHudHandle {
   refreshVtolConversion(): void;
   refreshFlaps(): void;
   setAttitudeRenderer(preference: AttitudeRendererPreference): void;
+  /**
+   * Hides the instruments and controls, those in the toolbar slot too, and
+   * stops drawing them, letting go of a stick held here: Remote Control →
+   * Flight UI on this computer, off, while a phone has them.
+   */
+  setHidden(hidden: boolean): void;
   /**
    * Moves the readings and buttons between the instrument row and their
    * Compact places: airspeed, vertical speed and angle of attack on the
@@ -654,6 +662,20 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
     hud.dataset.layout = layout;
   };
 
+  let hidden = false;
+  const setHidden = (next: boolean): void => {
+    if (next === hidden) return;
+    hidden = next;
+    if (hidden) {
+      releaseStick();
+      heldPointers.clear();
+    }
+    for (const element of [root, ...toolbarItems]) {
+      if (hidden) element.style.display = "none";
+      else element.style.removeProperty("display");
+    }
+  };
+
   // Steps of 5%: a reading that holds still writes nothing.
   const tintStep = (value: number, min: number) => (Math.round(Math.min(1, Math.max(min, value)) * 20) / 20).toFixed(2);
   const tintTargets = [["ias", iasTape], ["aoa", aoaSlot], ["g", gSlot]] as const;
@@ -693,6 +715,7 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
     refreshVtolConversion,
     refreshFlaps,
     setAttitudeRenderer: preference => attitude.setPreference(preference),
+    setHidden,
     setLayout,
     setReadingTints,
     update(
@@ -703,6 +726,8 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
       nextMasterAp = FLIGHT_HUD_MASTER_OFF,
       attitudeView: AttitudeView | null = null,
     ): void {
+      // Brought up to date by the first update once shown again.
+      if (hidden) return;
       setGearDown(nextGearDown);
       setAutoTrim(nextAutoTrim);
       setMasterAp(nextMasterAp);
@@ -739,6 +764,7 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
         brake: options.getSliderBrake?.() ?? 0,
         keepBrakes: options.getKeepSliderBrakes?.() ?? false,
         engine: options.engine?.getReading() ?? null,
+        gauges: options.getEngineGauges?.(),
         afterburner: options.afterburner?.getActive() ?? null,
         afterburnerDetent: options.afterburner?.getDetent?.() ?? null,
       });

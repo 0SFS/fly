@@ -35,7 +35,7 @@ describe("flight parameter catalogue", () => {
     for (const id of ["osfs.remote.sharing", "osfs.remote.handover", "osfs.remote.returnIdle", "osfs.remote.holdLast"]) {
       expect(settings.has(id)).toBe(false);
     }
-    expect(settings.list({ tab: "remote", section: "control" }).map(spec => spec.id)).toEqual(["osfs.remote.blendPriority"]);
+    expect(settings.list({ tab: "remote", section: "control" }).map(spec => spec.id)).toEqual(["osfs.remote.blendPriority", "osfs.remote.hostFlightUi"]);
   });
 
   it("requires holding the brake slider by default and saves persistence in Controls", () => {

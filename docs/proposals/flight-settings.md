@@ -429,6 +429,7 @@ These are engineering gains; they appear only under **Show all parameters**.
 | `osfs.remote.handover` | choice | Automatically (`auto`); also `stay`, `phone`, `computer` |
 | `osfs.remote.returnIdle` | s | 1 |
 | `osfs.remote.holdLast` | s | 2, from 0 to 10 |
+| `osfs.remote.hostFlightUi` | switch | Off |
 
 How control passes between a paired phone and this computer, or how the two
 blend. Before these existed, one device flew at a time and every hand-back
@@ -436,6 +437,10 @@ needed the phone's pilot to tap Take control, which is now **Only when taken**.
 **Hold the phone's last command** is how long a flying phone's last frame
 stands once its input stops arriving, past the 250 ms stale limit; before it
 existed, any silence that long paused the flight and took control away.
+**Flight UI on this computer while a phone is connected** is off, so the
+computer hides its flight HUD while a phone has it, except while the phone has
+stopped answering, and from a key pressed here until the phone is touched again;
+before it existed, the HUD stayed on both screens.
 Spec: [Phone controller](https://github.com/0SFS/rc/blob/main/docs/proposals/phone-controller.md) → *Sharing the controls* and
 *Losing the phone*.
 
@@ -447,6 +452,8 @@ Spec: [Phone controller](https://github.com/0SFS/rc/blob/main/docs/proposals/pho
 | `osfs.phone.yawRelease` | choice | Return to centre (`center`); also `hold` |
 | `osfs.phone.yawReturnMs` | ms | 0, from 0 to 1,500 |
 | `osfs.phone.haptics` | switch | Off |
+| `osfs.phone.attitude` | switch | On: the pitch/roll pad is the attitude indicator; off, the plain pad it was before |
+| `osfs.phone.sliders` | choice | Jump to the finger (`jump`); also `grab`, which moves a slider only from its handle |
 | `osfs.phone.twoFingers` | choice | Orbit and zoom (`both`): two fingers on the camera pad turn the view as they move and zoom as they spread; also `zoom`, where they only zoom, as before |
 
 The phone controller's own settings. They used to live only on the phone, so
