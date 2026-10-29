@@ -11,66 +11,20 @@ import { quadAircraftIds, uninstallQuadLayer, uninstallQuadVehicle } from "../dr
 import { uninstallCameraPreview } from "../drone/cameraPreviewRegistry";
 import { unregisterAircraftMod } from "@0sfs/aircraft/aircraftCatalog";
 import { unregisterFdmProfile } from "../jsbsim/fdmProfiles";
-import c172 from "@0sfs/c172/manifest" with { type: "json" };
-import sf50 from "@0sfs/sf-50/manifest" with { type: "json" };
-import f35b from "@0sfs/f-35b/manifest" with { type: "json" };
-import io320 from "@0sfs/io320/manifest" with { type: "json" };
-import fj33 from "@0sfs/fj33/manifest" with { type: "json" };
-import f135 from "@0sfs/f135/manifest" with { type: "json" };
-import aim120 from "@0sfs/aim-120/manifest" with { type: "json" };
-import gbu12 from "@0sfs/gbu-12/manifest" with { type: "json" };
-import gbu32 from "@0sfs/gbu-32/manifest" with { type: "json" };
-import aim9x from "@0sfs/aim-9x/manifest" with { type: "json" };
-import asraam from "@0sfs/asraam/manifest" with { type: "json" };
-import paveway from "@0sfs/paveway-iv/manifest" with { type: "json" };
-import gau22 from "@0sfs/gau-22-pod/manifest" with { type: "json" };
-import tank from "@0sfs/f-35b-external-tank/manifest" with { type: "json" };
+import { BUNDLED_MODS, DEFAULT_MODPACK } from "./bundledMods";
 
 const ADDED_KEY = "osfs.mods.added";
 const CONFIRMED_KEY = "osfs.mods.confirmed";
 
-import rotatingProp from "@0sfs/rotating-prop/manifest" with { type: "json" };
-
-const OFFICIAL: readonly [string, OsfsModManifest][] = [
-  ["0SFS/rotating-prop", rotatingProp as OsfsModManifest],
-  ["0SFS/C172", c172 as OsfsModManifest],
-  ["0SFS/SF-50", sf50 as OsfsModManifest],
-  ["0SFS/F-35B", f35b as OsfsModManifest],
-  ["0SFS/IO320", io320 as OsfsModManifest],
-  ["0SFS/FJ33", fj33 as OsfsModManifest],
-  ["0SFS/F135", f135 as OsfsModManifest],
-  ["0SFS/AIM-120", aim120 as OsfsModManifest],
-  ["0SFS/GBU-12", gbu12 as OsfsModManifest],
-  ["0SFS/GBU-32", gbu32 as OsfsModManifest],
-  ["0SFS/AIM-9X", aim9x as OsfsModManifest],
-  ["0SFS/ASRAAM", asraam as OsfsModManifest],
-  ["0SFS/Paveway-IV", paveway as OsfsModManifest],
-  ["0SFS/GAU-22-pod", gau22 as OsfsModManifest],
-  ["0SFS/F-35B-external-tank", tank as OsfsModManifest],
-];
-
-const BUNDLED_REPOS = new Set(OFFICIAL.map(([source]) => source.toLowerCase()));
-
-const DEV_QUAD_REPOS = /^(Quadcopter|DJI-Quadcopter|DJI-Mini2|DJI-Mini-2|DJI-Air-2S)$/;
-
-/** Unpublished quad repos resolve to the Vite dev server instead of GitHub Pages. */
-function devQuadFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  const href = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-  const pages = /^https:\/\/0sfs\.github\.io\/([^/]+)\/(.*)$/.exec(href);
-  if (import.meta.env.DEV && pages && DEV_QUAD_REPOS.test(pages[1] ?? "")) {
-    return globalThis.fetch(`/dev-mods/${(pages[1] ?? "").toLowerCase()}/${pages[2] ?? ""}`, init);
-  }
-  return globalThis.fetch(input, init);
-}
+/** The default modpack and every mod it brings in. Their manifests are bundled. */
+const BUNDLED_REPOS = new Set(BUNDLED_MODS.map(([source]) => source.toLowerCase()));
 
 function dependsOn(record: LoadedModRecord, id: string): boolean {
   return record.dependencies.some(dependency => dependency.manifest.id === id || dependsOn(dependency, id));
 }
 
-function findAdded(source: string): LoadedModRecord | null {
-  if (!options) return null;
-  let key: string;
-  try { key = normalizeModSource(source, options).canonicalKey; } catch { return null; }
+/** The loaded mod with this canonical key, at the top or anywhere among the dependencies. */
+function findRecord(key: string): LoadedModRecord | null {
   const stack = [...records];
   while (stack.length) {
     const record = stack.pop();
@@ -79,6 +33,16 @@ function findAdded(source: string): LoadedModRecord | null {
     stack.push(...record.dependencies);
   }
   return null;
+}
+
+function findAdded(source: string): LoadedModRecord | null {
+  if (!options) return null;
+  try { return findRecord(normalizeModSource(source, options).canonicalKey); } catch { return null; }
+}
+
+/** True when the source names a mod the default modpack already brings in. */
+function isBundled(source: string): boolean {
+  try { return normalizeModSource(source, { bundledRepos: BUNDLED_REPOS }).bundled; } catch { return false; }
 }
 
 export interface ModsSessionSnapshot {
@@ -190,7 +154,7 @@ function modsFromSearch(): string[] {
 async function loadSource(source: string, fromUrl: boolean): Promise<void> {
   if (!registry || !options) return;
   const normalized = normalizeModSource(source, options);
-  if (records.some(record => record.source.canonicalKey === normalized.canonicalKey)) return;
+  if (findRecord(normalized.canonicalKey)) return;
   options.entry = fromUrl ? "startup-url" : "user-add";
   const preview = await registry.preview(source);
   if (fromUrl && preview.security.blockAutomaticUrl) {
@@ -209,7 +173,7 @@ async function loadSource(source: string, fromUrl: boolean): Promise<void> {
   writeList(ADDED_KEY, added);
 }
 
-/** Loads the built-in mods, then any mods saved on this browser or named in `?mods=`. */
+/** Installs the default modpack, then any mods saved on this browser or named in `?mods=`. */
 export function ensureModsSession(): Promise<readonly LoadedModRecord[]> {
   if (started) return started;
   started = (async () => {
@@ -217,18 +181,20 @@ export function ensureModsSession(): Promise<readonly LoadedModRecord[]> {
     confirmed = new Set(readList(CONFIRMED_KEY));
     const bundled = new Map<string, OsfsModManifest>();
     const normalizeOptions: NormalizeModSourceOptions = { bundledRepos: BUNDLED_REPOS };
-    for (const [source, manifest] of OFFICIAL) {
+    for (const [source, manifest] of BUNDLED_MODS) {
       bundled.set(normalizeModSource(source, normalizeOptions).canonicalKey, manifest);
     }
-    options = { ...normalizeOptions, bundled, entry: "startup-url", confirmed, viewer, fetch: devQuadFetch };
+    // scripts/link-packs.mjs links each bundled mod's public/ files into this app's root.
+    options = { ...normalizeOptions, bundled, bundledBaseUrl: import.meta.env.BASE_URL, entry: "startup-url", confirmed, viewer };
     registry = new ModRegistry(options);
-    records = [];
-    for (const [source, manifest] of OFFICIAL) {
-      if (manifest.kind !== "aircraft" && manifest.kind !== "plugin") continue;
-      const record = await registry.installBundled(manifest, source);
-      records.push(record);
-    }
-    added = readList(ADDED_KEY);
+    const pack = bundled.get(normalizeModSource(DEFAULT_MODPACK, normalizeOptions).canonicalKey);
+    if (!pack) throw new Error(`${DEFAULT_MODPACK} is not bundled. Run node scripts/link-packs.mjs.`);
+    const record = await registry.installBundled(pack, DEFAULT_MODPACK);
+    applyDynamicMod(record);
+    records = [record];
+    // A mod saved before the pack brought it in is part of the pack now.
+    added = readList(ADDED_KEY).filter(source => !isBundled(source));
+    writeList(ADDED_KEY, added);
     const requested = [...added];
     for (const source of modsFromSearch()) {
       if (!requested.includes(source)) requested.push(source);

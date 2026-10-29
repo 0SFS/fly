@@ -5,9 +5,7 @@ import type { Sf50VariantId } from "@0sfs/sf-50/sf50Variants";
 import { C172_BODY_COLLISION_PROBES, F35B_BODY_COLLISION_PROBES, SF50_BODY_COLLISION_PROBES, type BodyCollisionProbe } from "@0sfs/ground-contact/collisionGeometry";
 import type { ControlSurfaceTerms, ExternalForceTerms } from "@0sfs/aircraft/aircraftForces";
 import type { FlightControlLawMode } from "@0sfs/controls/applyFlightControls";
-import c172Manifest from "@0sfs/c172/manifest" with { type: "json" };
-import sf50Manifest from "@0sfs/sf-50/manifest" with { type: "json" };
-import f35bManifest from "@0sfs/f-35b/manifest" with { type: "json" };
+import { BUILTIN_AIRCRAFT_MODS } from "../mods/builtinAircraftMods";
 
 export { CONTROL_LAW_MODE_VALUES, type FlightControlLawMode } from "@0sfs/controls/applyFlightControls";
 
@@ -152,9 +150,7 @@ function installManifestProfiles(manifest: AircraftModFile): void {
   }
 }
 
-installManifestProfiles(c172Manifest as unknown as AircraftModFile);
-installManifestProfiles(sf50Manifest as unknown as AircraftModFile);
-installManifestProfiles(f35bManifest as unknown as AircraftModFile);
+for (const manifest of BUILTIN_AIRCRAFT_MODS) installManifestProfiles(manifest as unknown as AircraftModFile);
 
 export function resolveEngineModel(aircraftId: AircraftId, requested?: EngineModelId): FdmEngineModel | null {
   const offered = FDM_PROFILES[aircraftId].engineModels;

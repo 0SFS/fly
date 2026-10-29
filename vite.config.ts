@@ -10,7 +10,11 @@ import { findLanAddress } from './scripts/dev-lan.mjs'
 import { linkPackPublicFiles } from './scripts/link-packs.mjs'
 import { pageHtmlFor } from './scripts/pages-html.mjs'
 
-/** Serves the quadcopter mods as static files. They stay out of the flight module graph. */
+/**
+ * Serves these mod checkouts at /dev-mods/<repo>/ for `local:0SFS/<repo>` sources,
+ * so a change to a mod can be tried from its checkout as an added mod. The default
+ * modpack's own copies are linked into public/ by scripts/link-packs.mjs.
+ */
 function serveDevQuadMods(): Plugin {
   const roots: Record<string, string> = {
     'rotating-prop': path.resolve(import.meta.dirname, '../rotating-prop/public'),
@@ -327,7 +331,6 @@ export default defineConfig({
       'src/**/*.{test,spec}.{ts,tsx}',
       'scripts/**/*.{test,spec}.{ts,tsx,js,mjs}',
       'benchmarks/**/*.{test,spec}.{ts,tsx,js,mjs}',
-      '../camera-preview/tests/**/*.test.ts',
       // Phase 3 moved some scripts and benchmarks into their owning repos.
       '../{F135,exhaust,fuel,sound,SF-50,F-35B,aircraft,rc,research,ground-contact}/scripts/**/*.{test,spec}.{ts,tsx,js,mjs}',
       '../sound/benchmarks/**/*.{test,spec}.{ts,tsx,js,mjs}',

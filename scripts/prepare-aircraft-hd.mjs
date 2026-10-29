@@ -4,10 +4,10 @@ import { Matrix, Quaternion, Vector3 } from '@babylonjs/core/Maths/math.vector.j
 
 // Keep the downloaded source intact. Reframe its scene in metres without
 // changing vertex attributes, textures or materials.
-const [input, output, scaleText, sourceUrl, rotorFile, gimbalFile] = process.argv.slice(2);
+const [input, output, scaleText, credit, rotorFile, gimbalFile] = process.argv.slice(2);
 const scale = Number(scaleText);
-if (!input || !output || !Number.isFinite(scale) || scale <= 0 || !sourceUrl) {
-  throw new Error('Usage: prepare-aircraft-hd.mjs input.glb output.glb metres-per-unit source-url');
+if (!input || !output || !Number.isFinite(scale) || scale <= 0 || !credit?.trim()) {
+  throw new Error('Usage: prepare-aircraft-hd.mjs input.glb output.glb metres-per-unit credit [rotors.json] [gimbal.json]');
 }
 const source = await readFile(input);
 if (source.readUInt32LE(0) !== 0x46546c67 || source.readUInt32LE(4) !== 2) throw new Error('Expected GLB 2');
@@ -176,8 +176,9 @@ if (gimbalFile) {
   }
 }
 
-gltf.asset.copyright = [gltf.asset.copyright, 'DJI model by yigeshichen, CC BY-NC 4.0', sourceUrl].filter(Boolean).join(' · ');
-gltf.asset.extras = { ...gltf.asset.extras, sourceUrl, license: 'https://creativecommons.org/licenses/by-nc/4.0/',
+// The credit is the model's whole attribution, as the aircraft manifest shows it.
+gltf.asset.copyright = credit.trim();
+gltf.asset.extras = { ...gltf.asset.extras,
   changes: 'Scene recentered, converted to metres, with declared motor pivots and disconnected gimbal shells assigned to separate yaw, roll and camera pitch joints.', metresPerSourceUnit: scale };
 const json = Buffer.from(JSON.stringify(gltf));
 chunks.find(chunk => chunk.type === 0x4e4f534a).bytes = Buffer.concat([json, Buffer.alloc((4 - json.length % 4) % 4, 0x20)]);

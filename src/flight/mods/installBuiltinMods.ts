@@ -12,20 +12,8 @@ import { registerPayloadInstallation } from "@0sfs/stores/stationTable";
 import { applyStoreClearance, registerPayloadStore, registerRefusedStore, registerStorePresets } from "@0sfs/stores/storeCatalog";
 import type { StoreCard } from "@0sfs/stores/storeCatalog";
 import { F135_ENGINE_GAS_SUPPORT } from "../aircraft/f135Installation";
-import c172 from "@0sfs/c172/manifest" with { type: "json" };
-import sf50 from "@0sfs/sf-50/manifest" with { type: "json" };
-import f35b from "@0sfs/f-35b/manifest" with { type: "json" };
-import io320 from "@0sfs/io320/manifest" with { type: "json" };
-import fj33 from "@0sfs/fj33/manifest" with { type: "json" };
-import f135 from "@0sfs/f135/manifest" with { type: "json" };
-import aim120 from "@0sfs/aim-120/manifest" with { type: "json" };
-import gbu12 from "@0sfs/gbu-12/manifest" with { type: "json" };
-import gbu32 from "@0sfs/gbu-32/manifest" with { type: "json" };
-import aim9x from "@0sfs/aim-9x/manifest" with { type: "json" };
-import asraam from "@0sfs/asraam/manifest" with { type: "json" };
-import paveway from "@0sfs/paveway-iv/manifest" with { type: "json" };
-import gau22 from "@0sfs/gau-22-pod/manifest" with { type: "json" };
-import tank from "@0sfs/f-35b-external-tank/manifest" with { type: "json" };
+import { BUNDLED_MODS } from "./bundledMods";
+import { BUILTIN_AIRCRAFT_MODS } from "./builtinAircraftMods";
 
 /**
  * Catalogue order. The landing page checks that one flight script lists these
@@ -85,7 +73,8 @@ interface TankMod { payload?: { tank?: { key: string; capacityLbs: number; dryWe
 
 void F135_ENGINE_GAS_SUPPORT;
 
-const aircraftMods = [c172, sf50, f35b] as unknown as AircraftMod[];
+const manifests = BUNDLED_MODS.map(([, manifest]) => manifest);
+const aircraftMods = BUILTIN_AIRCRAFT_MODS as unknown as AircraftMod[];
 const families = aircraftMods.map(mod => mod.aircraft.family);
 for (const [index, family] of families.entries()) {
   const thumbnail = family.thumbnail?.path;
@@ -95,7 +84,7 @@ for (const [index, family] of families.entries()) {
 }
 registerAircraftFleet(families, aircraftMods.flatMap(mod => mod.aircraft.definitions));
 
-for (const mod of [io320, fj33, f135] as unknown as EngineMod[]) {
+for (const mod of manifests.filter(manifest => manifest.kind === "engine") as unknown as EngineMod[]) {
   const engine = mod.engine;
   registerEngine(engine);
   const acoustic = engine.acousticProfile;
@@ -105,7 +94,9 @@ for (const mod of [io320, fj33, f135] as unknown as EngineMod[]) {
   }
 }
 
-const stores = [aim120, gbu12, gbu32, aim9x, asraam, paveway, gau22] as unknown as StoreMod[];
+const payloads = manifests.filter(manifest => manifest.kind === "payload");
+const stores = payloads.filter(manifest => manifest.payload?.payloadType === "store") as unknown as StoreMod[];
+const tanks = payloads.filter(manifest => manifest.payload?.payloadType === "external-tank") as unknown as TankMod[];
 stores.sort((left, right) => (left.payload?.store?.id ?? 0) - (right.payload?.store?.id ?? 0));
 for (const mod of stores) {
   if (mod.payload?.store) registerPayloadStore(mod.payload.store);
@@ -137,15 +128,18 @@ for (const mod of aircraftMods) {
       internalStoreVisibleAt: installation.bayDoors.internalStoreVisibleAt,
     });
   }
-  const tankDefinition = (tank as unknown as TankMod).payload?.tank;
-  if (tankDefinition && installation.externalTankInstallations) {
-    registerExternalTanks("f-35b", installation.externalTankInstallations.filter(item => item.tankKey === tankDefinition.key).map(item => ({
+  const externalTanks = (installation.externalTankInstallations ?? []).flatMap(item => {
+    const tank = tanks.find(mod => mod.payload?.tank?.key === item.tankKey)?.payload?.tank;
+    return tank ? [{
       index: item.index,
       label: item.label,
       attachmentProperty: item.attachmentProperty,
-      capacityLbs: tankDefinition.capacityLbs,
-      dryWeightLbs: tankDefinition.dryWeightLbs,
+      capacityLbs: tank.capacityLbs,
+      dryWeightLbs: tank.dryWeightLbs,
       locationIn: item.locationIn,
-    })));
+    }] : [];
+  });
+  if (externalTanks.length) {
+    for (const id of Object.keys(mod.aircraft.fdmProfiles)) registerExternalTanks(id, externalTanks);
   }
 }

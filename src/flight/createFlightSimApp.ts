@@ -649,8 +649,9 @@ async function createFlightSimSession(
   loading.setPhase("world", { state: "loading", detail: "Preparing the map renderer" });
   loading.setPhase("flight", { state: "loading", detail: "Loading flight physics" });
   // Restored selections and flight snapshots validate aircraft IDs against the
-  // live catalogue. Reinstall saved declarative mods before either is read;
-  // otherwise a reload treats a mod aircraft as unknown and loses its location.
+  // live catalogue. Install the default modpack, whose drones join the catalogue
+  // here, and reinstall saved mods before either is read; otherwise a reload
+  // treats a mod aircraft as unknown and loses its location.
   await ensureModsSession();
   // The last saved flight carries on where it was, unless resuming is off or
   // the page address chose a start position.
