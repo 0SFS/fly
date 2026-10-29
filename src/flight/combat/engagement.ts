@@ -41,8 +41,6 @@ export interface EngagementStep {
   damage: number[];
 }
 
-interface Place extends Geodetic { id: string }
-
 export function createEngagement() {
   let world = createSessionWorld();
   const previous = new Map<string, Geodetic>();
