@@ -17,6 +17,7 @@
   "@0sfs/dji-mini2": "f6cfd7f92e9fcc3f9a9f3212c2bd592b339e834c",
   "@0sfs/dji-quadcopter": "cab3ac94d0f9076b3fe34e52941272328b99fa54",
   "@0sfs/drone-camera": "67a5d4a7cb2aa6dd233d9ada6e7dd0eee7257859",
+  "@0sfs/engine-sound": "792ff8da704e2565a88373246408ce28820e5317",
   "@0sfs/engines": "646f39bf2b695767fe95baca2cd851bafdeb2cb4",
   "@0sfs/exhaust": "e779e4c3505656c907f3111a94009aed4939f2f3",
   "@0sfs/f-35b": "e061944ae47ac4c8ca44185cc18e2ef57d86805b",
