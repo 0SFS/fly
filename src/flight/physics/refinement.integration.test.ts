@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { JSBSimSdk } from "@felipegalind0/jsbsim";
 import { wasmBinaryUrl, wasmModuleUrl } from "@felipegalind0/jsbsim/wasm";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { SurfaceHit, SurfaceQuery } from "foss-earth/runtime";
 import { createTerrainContact } from "@0sfs/ground-contact/terrainContact";
 import { createFixedStepPhysicsLoop } from "./fixedStepLoop";
@@ -31,17 +31,20 @@ function surfaceAt(getHeight: (lat: number) => number, revision: () => number): 
 }
 
 describe("terrain refinement physics regressions", () => {
-  it("lifts a clear aircraft above a 300m refinement without an impulse and preserves lateral velocity", async () => {
+  it("lifts a clear aircraft through a 300m refinement by the refinement, without an impulse, and preserves lateral velocity", async () => {
     const sdk = await setup();
     let height = 300, revision = 0;
     const contact = createTerrainContact(sdk, surfaceAt(() => height, () => revision), getFdmProfile("cessna-172").stance);
     expect(contact.update()).toBe(true);
     const north = sdk.getPropertyValue("velocities/v-north-fps"), east = sdk.getPropertyValue("velocities/v-east-fps");
     sdk.setPropertyValue("fcs/throttle-cmd-norm", 0.6);
+    const reinitialised = vi.spyOn(sdk, "resetToInitialConditions"), ranIc = vi.spyOn(sdk, "runIc");
     height = 600; revision++;
     expect(contact.update()).toBe("reset");
-    expect(readFlightState(sdk).altMeters).toBeGreaterThan(601);
-    expect(readFlightState(sdk).altMeters).toBeLessThan(603);
+    // Moved with the surface, keeping its 100 m above it, not re-placed on it.
+    expect(readFlightState(sdk).altMeters).toBeCloseTo(700, 6);
+    expect(reinitialised).not.toHaveBeenCalled();
+    expect(ranIc).not.toHaveBeenCalled();
     expect(sdk.getPropertyValue("velocities/v-north-fps")).toBeCloseTo(north, 3);
     expect(sdk.getPropertyValue("velocities/v-east-fps")).toBeCloseTo(east, 3);
     expect(sdk.getPropertyValue("attitude/psi-deg")).toBeCloseTo(45, 3);

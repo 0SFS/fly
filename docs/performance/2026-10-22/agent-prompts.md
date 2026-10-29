@@ -116,7 +116,7 @@ Own `src/browser/terrainHeightPixels.ts`, `src/browser/terrainHeightBatches.ts`,
 tests (`terrainHeightPixels.test.ts`, `terrainHeightBatches.test.ts`,
 `terrainHeightBatches.adversarial.test.ts`), and new height-only tests. Protocol/kernel files
 `terrainHeightBatchProtocol.ts` and `terrainHeightBatchKernel.ts` are in scope only when needed
-for an exact internal change. Follow native parity/build guidance. Selector, binding,
+for an exact internal change. Follow WASM parity/build guidance. Selector, binding,
 `createRasterTilesRuntime.ts` and `createImageryRuntime.ts` are read-only.
 
 Find exact savings in sparse pixel collection/sorting/packing, repeated cache bookkeeping,

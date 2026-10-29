@@ -41,4 +41,13 @@ describe("remote aircraft in the moving local frame", () => {
     remote.update(undefined, null, 0);
     expect(scene.getTransformNodeByName("multiplayer-aircraft")!.isEnabled()).toBe(false);
   });
+  it("draws each pilot on its own node", () => {
+    const { scene } = setup();
+    const second = createRemoteAircraft(scene, vi.fn(), "pilot-b");
+    resources.push(() => second.dispose());
+    const aircraft = pose({ pilotId: "pilot-b", aircraftId: "unknown-plane" });
+    second.update({ pose: aircraft, stale: false, held: false, leadMs: 0 }, frameAt(aircraft), 0);
+    expect(scene.getTransformNodeByName("multiplayer-aircraft-pilot-b")!.isEnabled()).toBe(true);
+    expect(scene.getTransformNodeByName("multiplayer-aircraft")!.isEnabled()).toBe(false);
+  });
 });

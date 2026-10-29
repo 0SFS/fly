@@ -174,7 +174,8 @@ try {
   await ready("cirrus-vision-jet-g3");
   await select("Lockheed Martin F-35B Lightning II");
   await wait(`document.querySelector('dialog[aria-label="Aircraft switch failed"]')?.open===true`);
-  const failure = await run(`({report:document.querySelector('.flight-panel__aircraft-error-report')?.textContent,running:window.__aircraftSwitch.running,id:window.osfsJsbsimBuild?.aircraftId})`);
+  await run(`document.querySelector('[role=tab][data-file="failure.txt"]').click()`);
+  const failure = await run(`({report:document.querySelector('.foss-earth-issue-report__text')?.textContent,running:window.__aircraftSwitch.running,id:window.osfsJsbsimBuild?.aircraftId})`);
   if (failure.running || !failure.report?.includes("Aircraft switch failed") || failure.id !== "cirrus-vision-jet-g3") throw new Error("Failed switch did not restore paused aircraft/report: " + JSON.stringify(failure));
   checks.push({ failedSwitch: failure });
   await screenshot("switch-failure.png");

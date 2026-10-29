@@ -61,7 +61,8 @@ describe("SF50 runtime contracts (not performance calibration)", () => {
     const sdk = await createSf50({ latDeg: 46.7867, lonDeg: -92.1005, altFt: 8500, airspeedKts: 130 });
     expect(sdk.module.FS.analyzePath("/runtime/engine/direct.xml").exists).toBe(true);
     expect(sdk.module.FS.analyzePath("/runtime/aircraft/c172p/c172p.xml").exists).toBe(false);
-    expect(sdk.getPropertyValue("gear/num-units")).toBe(3);
+    // Three gear and eight hull STRUCTURE contacts.
+    expect(sdk.getPropertyValue("gear/num-units")).toBe(11);
     expect(sdk.getDeltaT()).toBeCloseTo(LEGACY_FIXED_DT_120, 12);
     const state = readFlightState(sdk);
     expect(state.latDeg).toBeCloseTo(46.7867, 8);
@@ -149,7 +150,8 @@ describe("SF50 runtime contracts (not performance calibration)", () => {
     advance(sdk, 480);
     expect(sdk.getPropertyValue("gear/gear-pos-norm")).toBeCloseTo(0.5, 10);
     expect(readControlSurfaceState(sdk).gearDownNorm).toBeCloseTo(0.5, 10);
-    expect(groundContactClearanceMeters(sdk, 0, 0)).toBe(0);
+    // Gear in transit supports nothing; the lowest hull contact, the forward belly, still does.
+    expect(groundContactClearanceMeters(sdk, 0, 0)).toBeCloseTo((sdk.getPropertyValue("inertia/cg-z-in") + 61.4) * 0.0254, 8);
     advance(sdk, 480);
     expect(sdk.getPropertyValue("gear/gear-pos-norm")).toBeCloseTo(1, 10);
     const expectedClearance = (sdk.getPropertyValue("inertia/cg-z-in") + 84) * 0.0254;

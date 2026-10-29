@@ -2,8 +2,22 @@ import { readFileSync } from "node:fs";
 import { JSBSimSdk } from "@felipegalind0/jsbsim";
 import { wasmBinaryUrl, wasmModuleUrl } from "@felipegalind0/jsbsim/wasm";
 import { describe, expect, it, vi } from "vitest";
+import { captureSimulation, createSimulationRecorder, type SimulationRecorder } from "@0sfs/ground-contact/safeFlightState";
 import { createFixedStepPhysicsLoop } from "./fixedStepLoop";
 import { DEFAULT_PHYSICS_HZ, LEGACY_FIXED_DT_120, LEGACY_PHYSICS_HZ_120, maxCatchUpSteps, physicsStepSeconds, type PhysicsHz } from "./physicsRate";
+
+// The real capture, watched: which steps record, and which build a snapshot.
+vi.mock("@0sfs/ground-contact/safeFlightState", async importOriginal => {
+  const actual = await importOriginal<typeof import("@0sfs/ground-contact/safeFlightState")>();
+  return {
+    ...actual,
+    captureSimulation: vi.fn(actual.captureSimulation),
+    createSimulationRecorder: vi.fn((sdk: JSBSimSdk) => {
+      const recorder = actual.createSimulationRecorder(sdk);
+      return { record: vi.fn(recorder.record), snapshot: vi.fn(recorder.snapshot) };
+    }),
+  };
+});
 
 const DEFAULT_DT = physicsStepSeconds(DEFAULT_PHYSICS_HZ);
 
@@ -84,6 +98,48 @@ describe("ground impact uses actual C172 contact geometry", () => {
       loop.update(LEGACY_FIXED_DT_120, () => true);
       expect(loop.getFault()).toBe("Hard ground impact. Reposition the aircraft to recover.");
       expect(run).not.toHaveBeenCalled();
+    } finally { sdk.destroy(); }
+  });
+});
+
+describe("the state kept for undoing a step", () => {
+  it("builds no snapshot on normal steps, reads into one array, and undoes a faulted step from it", async () => {
+    const sdk = await aircraftAt(0, 0, 300);
+    try {
+      const batches = vi.spyOn(sdk, "createPropertyBatch");
+      vi.mocked(captureSimulation).mockClear();
+      const loop = createFixedStepPhysicsLoop(sdk, undefined, { physicsHz: LEGACY_PHYSICS_HZ_120 });
+      const recorder = vi.mocked(createSimulationRecorder).mock.results.at(-1)!.value as {
+        [K in keyof SimulationRecorder]: ReturnType<typeof vi.fn<SimulationRecorder[K]>> };
+      const nativeRun = sdk.run.bind(sdk);
+      const run = vi.spyOn(sdk, "run");
+      loop.update(LEGACY_FIXED_DT_120, () => true);
+      const slot = batches.mock.calls.findIndex(([paths]) => paths.includes("simulation/sim-time-sec"));
+      const capture = batches.mock.results[slot]!.value as ReturnType<JSBSimSdk["createPropertyBatch"]>;
+      const reads = vi.spyOn(capture, "read");
+      for (let frame = 0; frame < 119; frame++) loop.update(LEGACY_FIXED_DT_120, () => true);
+      expect(loop.getFault()).toBeNull();
+      expect(run.mock.calls.length).toBeGreaterThanOrEqual(119);
+      expect(recorder.record).toHaveBeenCalledTimes(run.mock.calls.length);
+      expect(recorder.snapshot).not.toHaveBeenCalled();
+      expect(captureSimulation).not.toHaveBeenCalled();
+      expect(reads).toHaveBeenCalledTimes(run.mock.calls.length - 1);
+      expect(new Set(reads.mock.calls.map(([target]) => target)).size).toBe(1);
+
+      // A step that throws the aircraft 600 m up is undone from the record taken before it.
+      const altitudeFt = sdk.getPropertyValue("position/h-sl-ft");
+      const simTime = sdk.getSimTime();
+      run.mockImplementationOnce(() => {
+        const success = nativeRun();
+        sdk.setPropertyValue("position/h-sl-ft", sdk.getPropertyValue("position/h-sl-ft") + 2000);
+        return success;
+      });
+      loop.update(LEGACY_FIXED_DT_120, () => true);
+      expect(loop.getFault()).toMatch(/Physics stopped/);
+      expect(recorder.snapshot).toHaveBeenCalledOnce();
+      expect(captureSimulation).not.toHaveBeenCalled();
+      expect(sdk.getPropertyValue("position/h-sl-ft")).toBeCloseTo(altitudeFt, 3);
+      expect(sdk.getSimTime()).toBeCloseTo(simTime, 9);
     } finally { sdk.destroy(); }
   });
 });

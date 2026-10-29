@@ -56,7 +56,7 @@ explicit owned paths. Serialize Git mutations when several agents share a reposi
 
 Known protected work:
 
-- `foss-earth/engine/AGENTS.md` and `docs/agent-native.md` belong to earlier work. Read the native
+- `foss-earth/engine/AGENTS.md` and `docs/agent-wasm.md` belong to earlier work. Read the WASM
   instructions when applicable, but do not include these files in an optimization commit.
 - `0sfs/engines/src/engineLiveData.ts`, `src/engineSpoolRenderer.ts`, and
   `tests/engineMonitor.redesign.test.ts` belong to earlier work.
@@ -101,8 +101,8 @@ Two VR follow-ups remain documented, unfixed and not visually validated:
   scratchpad directory, or `~/.claude`. Use repo-local `TMPDIR` and caches where tools need them.
 - Never print or log `FOSS_EARTH_GOOGLE_KEY` or tile URLs. Do not dump `.env` files, network logs,
   raw profiles or snapshots. Retain only bounded, reviewed evidence when adding tracked docs.
-- Read target `AGENTS.md` and the relevant adjacent `.github/` guides. For engine native work,
-  read `engine/docs/agent-native.md`. Prefer direct installed binaries over package downloads.
+- Read target `AGENTS.md` and the relevant adjacent `.github/` guides. For engine WASM work,
+  read `engine/docs/agent-wasm.md`. Prefer direct installed binaries over package downloads.
 - One-sentence commit messages, explicit paths, no AI author/co-author lines. Fly commits go
   directly on `main`. No push, deploy, history rewrite or repository-settings changes.
 - An automatic permission rejection is not an invitation to find another route. Stop that

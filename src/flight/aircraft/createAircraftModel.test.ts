@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createAircraftModel, type AircraftModelState } from "@0sfs/aircraft/createAircraftModel";
 import { getFdmProfile } from "../jsbsim/fdmProfiles";
 import * as aircraftCatalog from "@0sfs/aircraft/aircraftCatalog";
+import { setDroneMeshHook } from "@0sfs/aircraft/droneMeshHook";
 
 // The readiness wait is FOSS Earth's, covered there; the runtime it comes with
 // does not load under this environment. Tests that care pass `whenReady`.
@@ -90,6 +91,47 @@ function gearMeshes(container: AssetContainer): AbstractMesh[] {
 }
 
 describe("aircraft model loader", () => {
+  it("keeps procedural geometry across zoom refreshes and owns its HD transitions", async () => {
+    const t = setup();
+    const base = aircraftCatalog.getAircraftDefinition("cessna-172");
+    const definition: aircraftCatalog.AircraftDefinition = { ...base, procedural: "drone", lods: [
+      { ...base.lods[0], id: "hd", path: "/dev-mods/dji-mini2/3d_model/HD/dji-mini2.glb", autoFromMeters: 0 },
+      { ...base.lods[0], id: "lod0", path: "", autoFromMeters: 15 },
+    ] };
+    const catalog = vi.spyOn(aircraftCatalog, "getAircraftDefinition").mockReturnValue(definition);
+    const releases: ReturnType<typeof vi.fn>[] = [];
+    const mounts: Mesh[] = [];
+    const mount = vi.fn((root: TransformNode) => {
+      const mesh = MeshBuilder.CreateBox(`test-drone-${mounts.length}`, {}, t.scene);
+      mesh.parent = root;
+      mounts.push(mesh);
+      const dispose = vi.fn(() => mesh.dispose()); releases.push(dispose); return dispose;
+    });
+    setDroneMeshHook({ mount, dispose: () => {} });
+    let distance = 20;
+    const model = createAircraftModel(t.scene, t.parent, { aircraftId: base.id, lodId: "auto",
+      getChaseDistanceMeters: () => distance, loadContainer: t.loadContainer, whenReady: async () => {} });
+    try {
+      for (distance = 20; distance <= 40; distance++) model.refreshAutoLod();
+      expect(mount).toHaveBeenCalledOnce();
+      expect(mounts[0].isDisposed()).toBe(false);
+      expect(t.urls).toEqual([]);
+      distance = 1; model.refreshAutoLod();
+      await vi.waitFor(() => expect(model.getState().activeLodId).toBe("hd"));
+      expect(t.urls).toEqual(["/dev-mods/dji-mini2/3d_model/HD/dji-mini2.glb"]);
+      expect(releases[0]).toHaveBeenCalledOnce();
+      for (let index = 0; index < 20; index++) model.refreshAutoLod();
+      expect(t.loadContainer).toHaveBeenCalledOnce();
+      distance = 25; model.refreshAutoLod();
+      expect(model.getState().activeLodId).toBe("lod0");
+      expect(mount).toHaveBeenCalledTimes(2);
+      expect(mounts[1].isDisposed()).toBe(false);
+    } finally {
+      model.dispose(); catalog.mockRestore(); setDroneMeshHook(null); t.teardown();
+    }
+    expect(releases[1]).toHaveBeenCalledOnce();
+  });
+
   it("loads only the complete engine in the Earth stand and prepares it before reveal", async () => {
     const t = setup();
     const gate = readinessGate();

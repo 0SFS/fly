@@ -2,7 +2,7 @@ import { buildIdentity, JSBSimSdk } from "@felipegalind0/jsbsim";
 import { wasmBinaryUrl, wasmModuleUrl } from "@felipegalind0/jsbsim/wasm";
 import { bootstrapAircraft, type C172BootstrapOptions } from "./bootstrapC172";
 import { type AircraftId, isAircraftId } from "@0sfs/aircraft/aircraftIds";
-import { downloadJsbsimData, type JsbsimLoadProgress } from "./hydrateJsbsimData";
+import { downloadJsbsimData, downloadModJsbsimFiles, type JsbsimLoadProgress } from "./hydrateJsbsimData";
 import { readJsbsimBuildIdentity, type JsbsimBuildIdentity } from "./jsbsimBuildIdentity";
 import { getFdmProfile, resolveEngineModel, type EngineModelId } from "./fdmProfiles";
 import { releaseFlightStateReads } from "@0sfs/ground-contact/ecefBridge";
@@ -34,6 +34,8 @@ export interface JsbsimRuntimeOptions {
   physicsHz?: PhysicsHz;
   onProgress?: (progress: JsbsimLoadProgress) => void;
   onLog?: (stream: "stdout" | "stderr", message: string) => void;
+  /** Resolves a mod's JSBSim files when the profile's data source is that mod. */
+  findMod?: (modId: string) => { baseUrl: string; files: readonly string[] } | null;
 }
 
 export interface JsbsimRuntime {
@@ -61,8 +63,14 @@ export async function createJsbsimRuntime(options: JsbsimRuntimeOptions = {}): P
     moduleUrl: wasmModuleUrl, wasmUrl: wasmBinaryUrl,
     persistence: { enabled: false }, log: { console: false, stripAnsi: true },
   });
-  const dataPromise = downloadJsbsimData(options.dataBaseUrl, options.onProgress,
-    getFdmProfile(aircraftId, engineModel ?? undefined).dataPackage ?? aircraftId);
+  const profile = getFdmProfile(aircraftId, engineModel ?? undefined);
+  const dataPromise = profile.dataSource?.kind === "mod"
+    ? (async () => {
+      const found = options.findMod?.(profile.dataSource?.modId ?? "") ?? null;
+      if (!found) throw new Error(`JSBSim data for ${aircraftId} is in mod ${profile.dataSource?.modId}, which is not loaded.`);
+      return downloadModJsbsimFiles(found.baseUrl, found.files);
+    })()
+    : downloadJsbsimData(options.dataBaseUrl, options.onProgress, profile.dataPackage ?? aircraftId);
   let sdk: JSBSimSdk;
   let files: Awaited<typeof dataPromise>;
   try {

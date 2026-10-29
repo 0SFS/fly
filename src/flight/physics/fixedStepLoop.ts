@@ -5,7 +5,7 @@ import { flightLog } from "@0sfs/logging/flightLog";
 import { readContactDiagnostics } from "@0sfs/ground-contact/contactDiagnostics";
 import { groundContactClearanceMeters } from "@0sfs/ground-contact/groundContactClearance";
 import {
-  captureSimulation, invalidFlightStateReasons, restoreSimulation,
+  createSimulationRecorder, invalidFlightStateReasons, restoreSimulation,
 } from "@0sfs/ground-contact/safeFlightState";
 
 import { maxCatchUpSteps, physicsStepSeconds, type PhysicsHz } from "./physicsRate";
@@ -91,6 +91,9 @@ export function createFixedStepPhysicsLoop(
   let acceptedSteps = 0;
   let discardedSeconds = 0;
   let catchUpDiscardedSeconds = 0;
+  // The state before each step, for undoing one that faults. Normal steps only
+  // copy numbers into an array; the snapshot is built when a guard trips.
+  const recorder = createSimulationRecorder(sdk);
   // Pending time that will now never be simulated: a refused step, a fault, a pause or a reset.
   const discardBacklog = (): void => {
     discardedSeconds += accumulator;
@@ -145,7 +148,8 @@ export function createFixedStepPhysicsLoop(
         }
         currState ??= before;
         if (result === "reset") prevState = currState = before;
-        const snapshot = typeof sdk.resetToInitialConditions === "function" ? captureSimulation(sdk) : null;
+        const restorable = typeof sdk.resetToInitialConditions === "function";
+        if (restorable) recorder.record();
         const success = sdk.run();
         const candidate = readFlightState(sdk);
         const deltaLon = ((candidate.lonDeg - before.lonDeg + 540) % 360) - 180;
@@ -171,8 +175,8 @@ export function createFixedStepPhysicsLoop(
             tripped.push(`gear was ${(-contact.aglBeforeMeters).toFixed(0)} m under the terrain JSBSim was given (${contact.terrainElevationMeters.toFixed(0)} m)`);
           }
           let restored: string | null = null;
-          if (snapshot) {
-            try { restoreSimulation(sdk, snapshot); }
+          if (restorable) {
+            try { restoreSimulation(sdk, recorder.snapshot()); }
             catch (error) { restored = error instanceof Error ? error.message : String(error); }
           }
           prevState = currState = before;

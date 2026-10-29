@@ -139,11 +139,14 @@ export async function bootstrapAircraft(
 
   sdk.setPropertyValue("fcs/throttle-cmd-norm", throttleNorm);
   restoreAircraftControls();
-  if (opts.engineRunning) sdk.setPropertyValue("propulsion/set-running", -1);
-  else sdk.setPropertyValue("propulsion/engine/set-running", 0);
-  if (isPiston) {
-    sdk.setPropertyValue("propulsion/magneto_cmd", opts.engineRunning ? 3 : 0);
-    sdk.setPropertyValue("fcs/mixture-cmd-norm", mixtureForAltitude(opts.altFt));
+  const unpowered = profile.engine === "none" || profile.kinematic === "drone-pgps";
+  if (!unpowered) {
+    if (opts.engineRunning) sdk.setPropertyValue("propulsion/set-running", -1);
+    else sdk.setPropertyValue("propulsion/engine/set-running", 0);
+    if (isPiston) {
+      sdk.setPropertyValue("propulsion/magneto_cmd", opts.engineRunning ? 3 : 0);
+      sdk.setPropertyValue("fcs/mixture-cmd-norm", mixtureForAltitude(opts.altFt));
+    }
   }
   // Starting engines evaluates a full-power steady state internally. Restore
   // the requested command and evaluate normal zero-time FCS/propulsion before

@@ -119,16 +119,18 @@ function startPage(rootElement: HTMLElement): void {
   const log = recorded?.log ?? null;
   // The log's history starts with the boot terminal's lines, and the log takes over from it at the first frame.
   if (log) attachBootLog(log);
-  const loading = log ? createFlightLoadingScreen(log) : null;
+  let retainedReport: string | null = null;
+  const loading = log ? createFlightLoadingScreen(log, () => retainedReport !== null
+    ? Promise.resolve(retainedReport) : diagnostics!.report({ allSettings: true })) : null;
   if (loading) diagnostics?.addState(() => `Loading diagnostics:\n${JSON.stringify(window.osfsLoadingDiagnostics?.(), null, 2)}`);
   loading?.setPhase("app", { state: "loading", detail: "Downloading application code" });
   if (log) offerFullscreen(log);
 
-  void bootApp(rootElement, loading, log, diagnostics).catch((error: unknown) => {
+  void bootApp(rootElement, loading, log, diagnostics).catch(async (error: unknown) => {
     reportBrowserAppFailure(document, "The application could not initialize.");
     console.error("Failed to bootstrap application.", error);
     if (loading) {
-      loading.fail("The application could not initialize. Copy the loading report for details, then reload to try again.", { cause: error });
+      loading.fail("The application could not initialize. Open the report for details, then reload to try again.", { cause: error });
       // Retain the useful frames before end() disposes the visit. A report-only
       // page after a reload can then identify the failed operation too.
       try {
@@ -141,6 +143,7 @@ function startPage(rootElement: HTMLElement): void {
           for (const line of lines.slice(0, 40)) if (line) diagnostics?.trail.step(line);
         }
       } catch { /* Retention must not hide the failure or prevent cleanup. */ }
+      retainedReport = await diagnostics?.report({ allSettings: true }).catch(() => "") ?? "";
       recorded?.end();
       return;
     }

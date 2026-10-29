@@ -2,7 +2,7 @@
 
 The 0SFS flight simulator app. It serves the simulator at `/fly/` and the phone controller at `/rc/`.
 
-Aircraft, engines, and features live in the sibling repositories (`aircraft`, `C172`, `SF-50`, `F-35B`, `engines`, `F135`, `FJ33`, `IO320`, `sound`, `rc`, and the others). This app depends on them with `file:` links and runs their tests. Documentation is in the `docs` repository. The site's landing page, its build and its deploy to GitHub Pages are in [0sfs.github.io](https://github.com/0SFS/0SFS.github.io). `npm run deploy` here publishes a new flight and phone controller to the site, keeping its landing page; [Deploying](https://github.com/0SFS/0SFS.github.io/blob/main/docs/deploying.md) has the details.
+Aircraft, engines, and features live in the sibling repositories (`aircraft`, `C172`, `SF-50`, `F-35B`, `engines`, `F135`, `FJ33`, `IO320`, `sound`, `rc`, and the others). This app depends on them with `file:` links and runs their tests. Development, ports, benchmarks, bug reporting and performance sessions are in this repository's [docs/](docs/): [Development](docs/development.md), [local app ports](docs/development-ports.md), [benchmark routes](docs/benchmark-routes.md), [bug reporting](docs/bug-reporting.md), and the [performance sessions](docs/performance/2026-10-27/session-handoff.md). Cross-repo proposals and split status are in the [docs repository](https://github.com/0SFS/docs). The site's landing page, its build and its deploy to GitHub Pages are in [0sfs.github.io](https://github.com/0SFS/0SFS.github.io). `npm run deploy` here publishes a new flight and phone controller to the site, keeping its landing page; [Deploying](https://github.com/0SFS/0SFS.github.io/blob/main/docs/deploying.md) has the details.
 
 Fresh flights start without external fuel tanks. Install them in the Fuel tab when needed; resuming a saved flight restores its selected attachments.
 
@@ -81,11 +81,20 @@ one guest and expires after two minutes. The guest arrives paused beside the
 host; press Resume to fly. Use the network address printed by `npm run dev`
 when sharing with another device.
 
-This first serverless milestone connects two pilots through PeerJS Cloud
-signaling and direct WebRTC aircraft channels. Local pause and tab switching
-preserve the connection; disconnect or an aircraft switch ends it. Multiplayer
-is off until Host/Join, and its code loads with the tab. Four-pilot mesh,
-shared weather/time, voice, server hosting and anti-cheat are later work.
+Host flight connects two pilots through PeerJS Cloud and a direct WebRTC
+aircraft channel. Host on server connects each pilot to a flight server. From
+a checkout beside `multiplayer` and `anti-cheat`:
+
+```sh
+cd ~/gh/0sfs/multiplayer-server && npm install && npm start
+```
+
+Paste the printed address and certificate hash into Multiplayer, then Host on
+server. The invitation admits guests until it expires or the flight reaches 16
+pilots. The server drops a pose that fails the anti-cheat envelope and removes
+a pilot after three failures. Local pause preserves the connection; disconnect
+or an aircraft switch ends it. Multiplayer is off until Host/Join, and its
+code loads with the tab. Shared weather, voice and hybrid mode are later work.
 
 ## Aircraft damage
 
@@ -128,9 +137,14 @@ The [cockpit screen](docs/proposals/cockpit-screen.md) shows the flight's interf
 
 ## Performance work
 
-The [performance handoff](docs/performance/2026-10-21/session-handoff.md) records
-the F-35 CPU fixes, measurements, validation, repository boundaries, retained
-evidence and independent implementation specifications.
+Session notes are under [docs/performance/](docs/performance/). The latest
+handoff is [2026-10-27](docs/performance/2026-10-27/session-handoff.md). Earlier
+sessions are [2026-10-26](docs/performance/2026-10-26/session-handoff.md),
+[2026-10-22](docs/performance/2026-10-22/session-handoff.md) and
+[2026-10-21](docs/performance/2026-10-21/session-handoff.md). The
+[2026-10-21 findings](docs/performance/2026-10-21/README.md) record the F-35 CPU
+fixes, measurements, validation, repository boundaries, retained evidence and
+independent implementation specifications.
 
 ## Community
 

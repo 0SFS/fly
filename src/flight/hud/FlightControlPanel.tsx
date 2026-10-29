@@ -1,7 +1,7 @@
 import "foss-earth/windowing.css";
 
 import type { FlightSectionFactory } from "../earthUiHost";
-import { ChoiceTrack, createHelpTooltip, createParameterControl, createParameterSection, HelpTip, IconButton, MeshInspectorPanel, ParameterSettings, Resettable, WindowOverlay, type PanelSection, type WindowOverlayHandle } from "foss-earth/shell";
+import { ChoiceTrack, closeHelpTooltipWithin, createHelpTooltip, createParameterControl, createParameterSection, HelpTip, IconButton, MeshInspectorPanel, ParameterSettings, Resettable, WindowOverlay, type PanelSection, type WindowOverlayHandle } from "foss-earth/shell";
 import type { MeshInspectorHandle } from "foss-earth/diagnosticDrawing";
 import type { SettingsRegistry } from "foss-earth/settings";
 import {
@@ -13,6 +13,7 @@ import {
   Blocks,
   Bug,
   CloudSun,
+  Camera,
   Crosshair,
   Fan,
   Flame,
@@ -26,16 +27,18 @@ import {
   Weight,
   Users,
 } from "lucide-react";
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { BabylonRuntimeStatus, DeviceLocationFix, RendererMode } from "foss-earth/runtime";
 import type { FlightViewMode } from "@0sfs/aircraft/createPlaceholderAircraft";
 import {
+  AIRCRAFT_CATALOG,
   AIRCRAFT_FAMILIES,
   getAircraftDefinition,
   getAircraftFamilyForAircraft,
   normalizeAircraftSelection,
-  type AircraftFamilyId,
+  subscribeAircraftCatalog,
+  isAircraftFamilyId,
   type AircraftSelection,
   type AircraftId,
   type AircraftLodId,
@@ -51,6 +54,7 @@ import {
   type FlightPerformanceSummary,
 } from "@0sfs/logging/flightPerformanceCapture";
 import type { FlightState } from "@0sfs/ground-contact/flightState";
+import { KEY_PAIRS, KEYBOARD_AXES, keyboardAxisParameterId, readKeyboardAxes } from "@0sfs/controls/keyboardAxisBindings";
 import {
   KEYBOARD_STICK_PARAMETER_IDS,
   readKeyboardStickSettings,
@@ -86,11 +90,12 @@ import { SharedSettingsPanel, type SharedSettingsPanelState } from "../multiplay
 import type { SharedSettingsPatch } from "@0sfs/multiplayer/sharedSettings";
 import { ModsTab } from "../mods/ModsTab";
 
-export type FlightPanelTab = "weather" | "aircraft" | "fuel" | "armament" | "damage" | "shared-settings" | "autopilot" | "controls" | "remote" | "multiplayer" | "sound" | "exhaust" | "engine" | "gforces" | "logging" | "mods" | "debug";
+export type FlightPanelTab = "weather" | "aircraft" | "camera" | "fuel" | "armament" | "damage" | "shared-settings" | "autopilot" | "controls" | "remote" | "multiplayer" | "sound" | "exhaust" | "engine" | "gforces" | "logging" | "mods" | "debug";
 
 const TAB_DEFINITIONS: readonly WindowTabDefinition<FlightPanelTab>[] = [
   { id: "weather", label: "Weather" },
   { id: "aircraft", label: "Aircraft" },
+  { id: "camera", label: "Camera" },
   { id: "fuel", label: "Fuel" },
   { id: "armament", label: "Armament" },
   { id: "damage", label: "Damage" },
@@ -108,11 +113,10 @@ const TAB_DEFINITIONS: readonly WindowTabDefinition<FlightPanelTab>[] = [
   { id: "debug", label: "Debug" },
 ];
 
-const TABS_WITHOUT_ARMAMENT = TAB_DEFINITIONS.filter(tab => tab.id !== "armament");
-
 const TAB_ICONS = {
   weather: CloudSun,
   aircraft: Plane,
+  camera: Camera,
   fuel: Fuel,
   armament: Crosshair,
   damage: Crosshair,
@@ -174,7 +178,7 @@ export interface FlightControlPanelSnapshot {
 }
 
 /** Every tab the panel can show: the flight's own, and the shared globe tabs. */
-export type FlightOverlayTab = "location" | "overview" | "map" | "renderer" | "sky" | "time" | "vr" | "bug-report" | "test-feedback" | "browser-data" | FlightPanelTab;
+export type FlightOverlayTab = "location" | "overview" | "map" | "renderer" | "sky" | "time" | "vr" | "bug-report" | "test-feedback" | "account" | "browser-data" | FlightPanelTab;
 
 export interface FlightControlPanelOptions {
   /** The app's settings registry, whose sections the tabs draw. */
@@ -197,17 +201,21 @@ export interface FlightControlPanelOptions {
   timeTab?: HTMLElement;
   /** The shared Settings tab: presets and the saved record. */
   settingsSections: readonly PanelSection[];
-  /** The shared Native tab: the startup native selection and what each converted core ran. */
-  nativeSections?: readonly PanelSection[];
+  /** The shared Component execution tab: the startup WASM selection and what each converted core ran. */
+  wasmSections?: readonly PanelSection[];
   /** The shared VR tab, from `createHeadsetPanel`: entering a headset session, and its controls. */
   headsetTab?: HTMLElement;
   /** The shared About tab, from `createAboutPanel`: which version runs, and what it is built from. */
   aboutTab?: HTMLElement;
+  /** Sign in, and the signed-in account's Google 3D Tiles budget. */
+  accountTab?: HTMLElement;
   /** Clears this website's saved browser state, preserving API keys by default. */
   browserDataTab?: HTMLElement;
   /** The shared Bug report tab, separate from the activity-trail settings. */
   bugReportTab?: HTMLElement;
   testFeedbackTab?: HTMLElement;
+  /** The active aircraft camera controls, supplied by its lazy feature. */
+  cameraTab?: HTMLElement;
   onBugReportShow?(): void;
   /** The shared Interface tab: the log and place search. */
   interfaceSections: readonly PanelSection[];
@@ -244,6 +252,7 @@ export interface FlightControlPanelOptions {
   onArmamentJettison?(station: number): void;
   onArmamentDoor?(bay: 0 | 1, open: boolean): void;
   onArmamentMasterArm?(armed: boolean): void;
+  onArmamentSelect?(station: number): void;
   /** Hosts Engine's two sections, with the registry controls inside Settings. */
   attachEngineDetails(host: HTMLElement, settingsContent?: HTMLElement): () => void;
   /** The engine model this flight loaded, on an aircraft that offers a choice. */
@@ -471,11 +480,12 @@ function ParameterSection({ settings, tab, section, covers, children, afterContr
 interface AircraftPanelProps extends FlightControlPanelProps {
   aircraftSelection: AircraftSelection;
   onAircraftSelectionChange(selection: AircraftSelection): void;
-  onAircraftFamilyChange(familyId: AircraftFamilyId): void;
+  onAircraftFamilyChange(familyId: string): void;
 }
 
 function AircraftPanel({
   settings,
+  parameters,
   meshInspector,
   snapshot,
   onPausedChange,
@@ -500,6 +510,7 @@ function AircraftPanel({
         onSwitchModeChange={setSwitchMode}
       />
       <div className="flight-panel__aircraft-edit" hidden={switchMode}>
+        <RegistryControls settings={settings} ids={["osfs.aircraft.propellerDiscs"]} />
         <ParameterSection settings={settings} tab="aircraft" section="camera">
           {/* "View [Cockpit / Chase] ?" */}
           <ChoiceTrack heading="View" value={snapshot.viewMode} defaultValue="third" onChange={mode => onViewModeChange(mode as FlightViewMode)}
@@ -514,8 +525,7 @@ function AircraftPanel({
             disabled={snapshot.aircraftSwitching || snapshot.damage?.destroyed}
             onClick={() => onPausedChange(!snapshot.paused)} />
           <div className="flight-panel__keymap" aria-label="Flight controls">
-            <span><kbd>W/S</kbd> Pitch</span><span><kbd>A/D</kbd> Roll</span>
-            <span><kbd>Q/E</kbd> Rudder</span><span><kbd>⇧/⌃</kbd> Throttle</span>
+            <KeyboardAxisHint parameters={parameters} climbRate={getAircraftDefinition(snapshot.aircraftId).controls?.vertical === "climb-rate"} />
           </div>
         </div>
         {/* The control law's own ? explains Auto, Manual and Fly-by-wire. */}
@@ -636,6 +646,15 @@ function FlightPerformancePanel() {
       </div>
     </fieldset>
   );
+}
+
+function KeyboardAxisHint({ parameters, climbRate }: { parameters: FlightParameterStore; climbRate: boolean }) {
+  const [axes, setAxes] = useState(() => readKeyboardAxes(parameters));
+  useEffect(() => {
+    const stops = KEYBOARD_AXES.map(axis => parameters.watch(keyboardAxisParameterId(axis), () => setAxes(readKeyboardAxes(parameters))));
+    return () => stops.forEach(stop => stop());
+  }, [parameters]);
+  return <>{KEYBOARD_AXES.map(axis => <span key={axis}><kbd>{KEY_PAIRS[axes[axis]].label}</kbd> {{ pitch: "Pitch", roll: "Roll", yaw: "Yaw", power: climbRate ? "Climb" : "Throttle" }[axis]}</span>)}</>;
 }
 
 const KEYBOARD_STICK_MODES = flightParameterSpec("osfs.input.keyboard.mode").choices;
@@ -786,10 +805,24 @@ function DebugPanel({ snapshot, settings, onCollisionDebugChange, onWheelSpinMod
   );
 }
 
+/** Mount an owned DOM panel without destroying its state when its tab closes. */
+function ElementTab({ element }: { element: HTMLElement }) {
+  const host = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    host.current?.append(element);
+    return () => { closeHelpTooltipWithin(element); element.remove(); };
+  }, [element]);
+  return <div ref={host} />;
+}
+
 export function FlightControlPanel(props: FlightControlPanelProps) {
+  const hasArmament = Boolean(props.snapshot.armament);
+  const additionalTabs = useMemo(() => TAB_DEFINITIONS.filter(tab =>
+    (tab.id !== "armament" || hasArmament) && (tab.id !== "camera" || props.cameraTab)),
+    [hasArmament, props.cameraTab]);
   // Keep drafts above the tabs so visiting another tab does not discard them.
   // Each family remembers its own generation and model choices for this session.
-  const [selectedAircraftFamily, setSelectedAircraftFamily] = useState<AircraftFamilyId>(
+  const [selectedAircraftFamily, setSelectedAircraftFamily] = useState<string>(
     () => getAircraftFamilyForAircraft(props.snapshot.aircraftId).id,
   );
   const [aircraftSelections, setAircraftSelections] = useState<AircraftSelection[]>(() => {
@@ -801,6 +834,20 @@ export function FlightControlPanel(props: FlightControlPanelProps) {
       },
     ));
   });
+  useEffect(() => subscribeAircraftCatalog(() => {
+    setAircraftSelections(previous => {
+      const live = previous.filter(entry => AIRCRAFT_CATALOG.some(item => item.id === entry.aircraftId));
+      const byFamily = new Map(live.map(entry => [getAircraftFamilyForAircraft(entry.aircraftId).id, entry]));
+      return AIRCRAFT_FAMILIES.map(family => normalizeAircraftSelection(
+        byFamily.get(family.id) ?? { aircraftId: family.defaultAircraftId, lodId: props.snapshot.lodId },
+      ));
+    });
+    setSelectedAircraftFamily(current => {
+      if (AIRCRAFT_FAMILIES.some(family => family.id === current)) return current;
+      const next = AIRCRAFT_FAMILIES[0]?.id;
+      return next && isAircraftFamilyId(next) ? next : current;
+    });
+  }), [props.snapshot.lodId]);
   const aircraftSelection = aircraftSelections.find(
     selection => getAircraftFamilyForAircraft(selection.aircraftId).id === selectedAircraftFamily,
   ) ?? normalizeAircraftSelection(props.snapshot);
@@ -823,10 +870,11 @@ export function FlightControlPanel(props: FlightControlPanelProps) {
         skyTab={props.skyTab}
         timeTab={props.timeTab}
         settingsSections={props.settingsSections}
-        nativeSections={props.nativeSections}
+        wasmSections={props.wasmSections}
         interfaceSections={props.interfaceSections}
         headsetTab={props.headsetTab}
         aboutTab={props.aboutTab}
+        accountTab={props.accountTab}
         browserDataTab={props.browserDataTab}
         bugReportTab={props.bugReportTab}
         testFeedbackTab={props.testFeedbackTab}
@@ -839,7 +887,7 @@ export function FlightControlPanel(props: FlightControlPanelProps) {
         locationHostDataCodec={props.location?.hostDataCodec}
         locationDraft={props.location?.draft}
         locationSearchSection={props.locationSearchSection}
-        additionalTabs={props.snapshot.armament ? TAB_DEFINITIONS : TABS_WITHOUT_ARMAMENT}
+        additionalTabs={additionalTabs}
         onBeforeCloseTab={(tabId) => {
           if (tabId !== "logging") return;
           if (!allowCloseLoggingTab(props.flightRecorder)) return false;
@@ -868,7 +916,8 @@ export function FlightControlPanel(props: FlightControlPanelProps) {
                       onLoad={props.onArmamentLoad ?? (() => {})}
                       onJettison={props.onArmamentJettison ?? (() => {})}
                       onDoor={props.onArmamentDoor ?? (() => {})}
-                      onMasterArm={props.onArmamentMasterArm ?? (() => {})} />
+                      onMasterArm={props.onArmamentMasterArm ?? (() => {})}
+                      onSelect={props.onArmamentSelect} />
                   </div>
                 </ParameterSection>
                 : tabId === "damage" ? <DamagePanel state={props.snapshot.damage} onAction={props.onDamageAction} />
@@ -899,6 +948,7 @@ export function FlightControlPanel(props: FlightControlPanelProps) {
                       They do not change keyboard, on-screen stick, or phone response.
                     </p>
                   </ParameterSection>
+                  <ParameterSection settings={props.settings} tab="controls" section="keys" />
                   <ParameterSection settings={props.settings} tab="controls" section="keyboard" afterControls>
                     <KeyboardModeParameters settings={props.settings} parameters={props.parameters} />
                   </ParameterSection>
@@ -957,6 +1007,7 @@ export function FlightControlPanel(props: FlightControlPanelProps) {
                   </ParameterSection>
                 </div>
                 : tabId === "logging" ? <LoggingPanel state={props.snapshot.logging} onAction={props.onLoggingAction} />
+                : tabId === "camera" ? props.cameraTab && <ElementTab element={props.cameraTab} />
                 : tabId === "mods" ? <ModsTab />
                 : <DebugPanel snapshot={props.snapshot} settings={props.settings} onCollisionDebugChange={props.onCollisionDebugChange}
                   onWheelSpinModeChange={props.onWheelSpinModeChange} onTireSoundChange={props.onTireSoundChange} />}

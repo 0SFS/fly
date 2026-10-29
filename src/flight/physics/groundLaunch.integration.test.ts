@@ -91,10 +91,12 @@ describe("ground contact energy regressions with real JSBSim", () => {
     const contact = createTerrainContact(sdk, surface, getFdmProfile("cessna-172").stance);
     const loop = createFixedStepPhysicsLoop(sdk, undefined, { physicsHz: LEGACY_PHYSICS_HZ_120, getArcadeGroundLaunches: () => true });
     advance(sdk, loop, contact, 120);
-    state.height += 5;
+    state.height += 4;
     const result = advance(sdk, loop, contact, 360);
-    // The previous bug: a 5m height discontinuity at a 10kt taxi speed launches
+    // The previous bug: a 5m height discontinuity at a 10kt taxi speed launched
     // the aircraft upward at about 76m/s without tripping the old 200kt guard.
+    // The belly and tail structure contacts are buried too now, so 4m launches
+    // it as hard (80m/s), and 5m trips the guard in the first step.
     expect(loop.getFault()).toBeNull();
     expect(result.maxUp).toBeGreaterThan(60);
     expect(result.maxUp).toBeLessThan(100);
@@ -113,11 +115,14 @@ describe("ground contact energy regressions with real JSBSim", () => {
     state.revision += 1;
     expect(contact.update()).toBe("reset");
     const placed = telemetry(sdk, state.height);
-    expect(placed.speed).toBeCloseTo(before.speed, 5);
-    expect(placed.up).toBeCloseTo(0, 6);
+    expect(placed.speed).toBeCloseTo(before.speed, 9);
+    // Moved with the refined surface: the same height above it and the same
+    // vertical velocity, so the oleos stay as compressed as they were. JSBSim
+    // moves position/h-sl-ft along the geocentric radius, which turns the local
+    // level frame by about 5e-10 rad per metre; that is the only change allowed.
+    expect(placed.up).toBeCloseTo(before.up, 7);
     expect(placed.rpm).toBe(0);
-    expect(placed.altitude - state.height).toBeGreaterThan(1.3);
-    expect(placed.altitude - state.height).toBeLessThan(1.4);
+    expect(placed.altitude - state.height).toBeCloseTo(before.altitude - INITIAL_GROUND_METERS, 6);
     const result = advance(sdk, loop, contact, 360, state.height);
     expect(loop.getFault()).toBeNull();
     expect(result.maxUp).toBeLessThan(0.2);

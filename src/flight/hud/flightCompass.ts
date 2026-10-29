@@ -32,11 +32,17 @@ export function createFlightCompass(scene: Scene, origin: FloatingOriginHandle, 
       const reference = origin.getOriginEcef();
       const frame = origin.getWorldFromEcef();
       if (!camera || !reference || !frame) { compass.update(null, 0, null); return; }
-      // Refresh the parented chase/cockpit camera after this frame's aircraft move.
+      // Babylon's cached getters skip a dirty ancestor when the render id has not
+      // advanced, and a forced computeWorldMatrix recomputes a node that is already
+      // current. The chase frame often refreshed this chain: force only a stale
+      // parent, root first, then the view matrix only when the camera's own view
+      // is stale. Projection is not part of that check.
       const parents: Node[] = [];
       for (let node = camera.parent; node; node = node.parent) parents.unshift(node);
-      for (const node of parents) node.computeWorldMatrix(true);
-      camera.getViewMatrix(true);
+      for (const node of parents) {
+        if (!node.isSynchronized()) node.computeWorldMatrix(true);
+      }
+      if (!camera._isSynchronizedViewMatrix()) camera.getViewMatrix(true);
       const { x, y, z } = camera.globalPosition;
       const { m } = frame;
       // Invert the orthonormal ECEF -> east/up/south rotation in double precision.

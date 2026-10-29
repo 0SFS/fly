@@ -3,7 +3,9 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSettingsRegistry, getAppSettings, resetAppSettings, SETTINGS_STORAGE_KEY, validateValue } from "foss-earth/settings";
+import { registerAircraftMod, unregisterAircraftMod, type AircraftDefinition, type AircraftFamilyDefinition } from "@0sfs/aircraft/aircraftCatalog";
 import { aircraftSelectionValues, readAircraftSelection } from "@0sfs/aircraft/aircraftSelectionSetting";
+import type { AircraftId } from "@0sfs/aircraft/aircraftIds";
 import { FLIGHT_SECTION_TITLES, flightParameterDefaults, flightParameterStore, OSFS_PARAMETERS } from "./flightParameters";
 import { FLIGHT_PRESETS } from "./flightPresets";
 import { DEFAULT_PHYSICS_HZ, PHYSICS_RATE_PARAMETER_ID, readPhysicsHz } from "../physics/physicsRate";
@@ -67,6 +69,29 @@ describe("flight parameter catalogue", () => {
     const restored = registerFlightSettings(rebooted);
     expect(readAircraftSelection(restored)).toEqual(choice);
     expect(JSON.parse(saved.get(SETTINGS_STORAGE_KEY)!).values).toMatchObject(aircraftSelectionValues(choice));
+  });
+
+  it("accepts an aircraft a mod added after the settings catalogue was built", () => {
+    const parameters = registerFlightSettings(getAppSettings());
+    const credit = { artist: "0SFS", note: "test" };
+    const family = {
+      id: "dji-quadcopter", label: "DJI", summary: "test",
+      thumbnail: { path: "", credit }, defaultAircraftId: "dji-mini-2", variantLabel: "Aircraft",
+      variants: [{ id: "mini-2", aircraftId: "dji-mini-2", label: "Mini 2" }],
+    } as unknown as AircraftFamilyDefinition;
+    const definition = {
+      id: "dji-mini-2", familyId: "dji-quadcopter", label: "DJI Mini 2", summary: "test",
+      modelYawRad: 0, modelOffset: { x: 0, y: 0, z: 0 }, propellerBlades: 0,
+      lods: [{ id: "lod0", label: "Procedural", triangles: 12, path: "", autoFromMeters: 0, credit }],
+    } as unknown as AircraftDefinition;
+    try {
+      registerAircraftMod(family, [definition]);
+      const choice = { aircraftId: "dji-mini-2" as AircraftId, generationId: "mini-2", lodId: "auto" } as const;
+      expect(parameters.setMany(aircraftSelectionValues(choice))).toEqual({ ok: true });
+      expect(readAircraftSelection(parameters).aircraftId).toBe("dji-mini-2");
+    } finally {
+      unregisterAircraftMod("dji-quadcopter", ["dji-mini-2"]);
+    }
   });
 
   it("exposes bounded history metric and storage budgets independently of hidden capture", () => {
@@ -180,7 +205,7 @@ describe("flight parameter catalogue", () => {
       "osfs.input.gamepadDeadzoneMode": "scaled", "osfs.input.keyboard.mode": "rate", "osfs.input.keyboard.expo": 0.25,
       "osfs.input.keyboard.rateTimeToFull": 1.2, "osfs.autopilot.backend": "ardupilot", "osfs.autopilot.axes.gear": false,
       "osfs.autopilot.throttleMode": "hold", "osfs.camera.phone.send": "batch", "osfs.camera.phone.bufferMs": 16,
-      "osfs.camera.phone.catchUp": "jump", "osfs.camera.chaseFrame": "heading", "osfs.sound.quality": "low",
+      "osfs.camera.phone.catchUp": "jump", "osfs.camera.chaseFrame": "momentum", "osfs.sound.quality": "low",
       "osfs.sound.masterVolume": 0.4, "osfs.engineMonitor.fuelFlowUnit": "gal/h", "osfs.ground.rotation": "inertia",
       "osfs.ground.tireAudio": "slip", "osfs.ground.lock.haptics": true,
       // The newer key wins over the older one.

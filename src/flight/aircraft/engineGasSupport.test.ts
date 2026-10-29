@@ -1,6 +1,6 @@
 import "@babylonjs/loaders/glTF";
 import { readFileSync } from "node:fs";
-import { LoadAssetContainerAsync, NullEngine, Quaternion, Scene, TransformNode, Vector3 } from "@babylonjs/core";
+import { LoadAssetContainerAsync, Matrix, NullEngine, Quaternion, Scene, TransformNode, Vector3 } from "@babylonjs/core";
 import { describe, expect, it, vi } from "vitest";
 import { bindEngineNozzleRig } from "@0sfs/engines/engineNozzleRig";
 import { F135_ENGINE_GEOMETRY as g } from "@0sfs/f135/generated/f135EngineData";
@@ -25,15 +25,24 @@ describe("rigid engine interior/exterior gas support", () => {
     const aperture = { throatRadius: 0.35, throatZ: 0.2, exitRadius: 0.4, exitZ: 0.5 };
     const initial = support.update(aperture, 6, 0.07);
     const transform = vi.spyOn(Vector3, "TransformCoordinates");
+    const compose = vi.spyOn(Matrix, "ComposeToRef");
+    const composedCalls = () => {
+      compose.mockClear();
+      const snapshot = support.update(aperture, 6, 0.07);
+      return { snapshot, calls: compose.mock.calls.length };
+    };
     try {
       for (let i = 0; i < 3; i++) expect(support.update({ ...aperture }, 6, 0.07)).toBe(initial);
       root.position.set(20, 100, -50); root.rotationQuaternion = Quaternion.RotationAxis(Vector3.Up(), 0.6);
-      expect(support.update(aperture, 6, 0.07)).toBe(initial);
+      const stable = composedCalls();
+      expect(stable.snapshot).toBe(initial);
       expect(transform).not.toHaveBeenCalled();
 
       // An intermediate ancestor need not itself own a support section to move it.
       pivot.rotation.x = 0.3;
-      let changed = support.update(aperture, 6, 0.07);
+      const moved = composedCalls();
+      const changed = moved.snapshot;
+      expect(moved.calls).toBeGreaterThan(stable.calls);
       expect(changed.revision).toBe(initial.revision + 1);
       expect(changed.sections[0].endCenter).not.toEqual(initial.sections[0].endCenter);
       expect(transform).toHaveBeenCalled();
@@ -41,15 +50,43 @@ describe("rigid engine interior/exterior gas support", () => {
       expect(support.update(aperture, 6, 0.07)).toBe(changed);
       expect(transform).not.toHaveBeenCalled();
 
-      // Every physical aperture coordinate, support length and spread invalidates immediately.
+      // The rig keeps one quaternion and writes its components in place.
+      const posed = nozzle.rotationQuaternion ?? new Quaternion(0, 0, 0, 1);
+      nozzle.rotationQuaternion = posed;
+      const aimed = support.update(aperture, 6, 0.07);
+      posed.y += 0.2;
+      expect(nozzle.rotationQuaternion).toBe(posed);
+      const reaimed = support.update(aperture, 6, 0.07);
+      expect(reaimed.revision).toBe(aimed.revision + 1);
+      expect(reaimed.sections[1].endCenter).not.toEqual(aimed.sections[1].endCenter);
+      expect(support.update(aperture, 6, 0.07)).toBe(reaimed);
+
+      duct.position.x = 0.2;
+      const shifted = support.update(aperture, 6, 0.07);
+      expect(shifted.revision).toBe(reaimed.revision + 1);
+      expect(shifted.sections[0].startCenter).not.toEqual(reaimed.sections[0].startCenter);
+      duct.scaling.y = 1.2;
+      const stretched = support.update(aperture, 6, 0.07);
+      expect(stretched.revision).toBe(shifted.revision + 1);
+      expect(support.update(aperture, 6, 0.07)).toBe(stretched);
+
+      // Every physical aperture coordinate still walks. Length and spread reuse the matrix.
+      let changedSupport = stretched;
       for (const key of ["throatRadius", "throatZ", "exitRadius", "exitZ"] as const) {
+        compose.mockClear();
         aperture[key] += 0.01;
         const next = support.update(aperture, 6, 0.07);
-        expect(next.revision).toBe(changed.revision + 1);
-        changed = next;
+        expect(compose.mock.calls.length).toBeGreaterThan(stable.calls);
+        expect(next.revision).toBe(changedSupport.revision + 1);
+        changedSupport = next;
       }
-      const longer = support.update(aperture, 7, 0.07), wider = support.update(aperture, 7, 0.08);
-      expect(longer.revision).toBe(changed.revision + 1);
+      compose.mockClear();
+      const longer = support.update(aperture, 7, 0.07);
+      expect(compose.mock.calls.length).toBe(stable.calls);
+      compose.mockClear();
+      const wider = support.update(aperture, 7, 0.08);
+      expect(compose.mock.calls.length).toBe(stable.calls);
+      expect(longer.revision).toBe(changedSupport.revision + 1);
       expect(longer.sections.at(-1)!.endDistance).toBeCloseTo(7, 12);
       expect(wider.revision).toBe(longer.revision + 1);
       expect(wider.sections.at(-1)!.endRadius).toBeGreaterThan(longer.sections.at(-1)!.endRadius);
@@ -67,7 +104,7 @@ describe("rigid engine interior/exterior gas support", () => {
       expect(support.update(aperture, 7, 0.08)).toBe(reparented);
       root.scaling.setAll(2);
       expect(() => support.update(aperture, 7, 0.08)).toThrow("metre-scale");
-    } finally { transform.mockRestore(); scene.dispose(); engine.dispose(); }
+    } finally { compose.mockRestore(); transform.mockRestore(); scene.dispose(); engine.dispose(); }
   });
 
   it("joins actual exported sections through aperture and vector motion, with identical full/installed domains", async () => {

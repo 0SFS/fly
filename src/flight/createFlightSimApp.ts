@@ -1,3 +1,4 @@
+import { createCameraFollow } from "@0sfs/aircraft/cameraFollow";
 import "foss-earth/shell.css";
 import "foss-earth/immersive.css";
 // The fleet registers with the aircraft catalog before anything reads it.
@@ -12,6 +13,7 @@ import { createFlightUiHost } from "./earthUiHost";
 import { createBenchmarkRouteController, forceBenchmarkRouteSettings, requestedBenchmarkRoute, type BenchmarkRouteController } from "./benchmarkRoutes";
 import { attachResetButton, bootStep, browserReportDownloads, describeIsolation, createTestFeedbackPanel } from "@foss-earth/ui/browser";
 import { getAppSettings, TOOLBAR_ACTIVITY_OUTLINE_ID, TOOLBAR_EDIT_PRIORITIES_ID } from "foss-earth/settings";
+import { openAccountSession } from "foss-earth/account";
 import {
   getAppIdentity,
   issueReporterFromBuild,
@@ -24,7 +26,7 @@ import {
   type AppDiagnostics,
 } from "foss-earth/diagnostics";
 import { createMeshInspector } from "foss-earth/diagnosticDrawing";
-import { createNativeSections, earthNativeCores, earthComputeScheduling } from "foss-earth/native";
+import { createWasmSections, earthWasmCores, earthComputeScheduling } from "foss-earth/wasm";
 import { describeAttitudeRendererStatus } from "./hud/attitudeRenderer";
 import { AIRCRAFT_FOCUS_POINT, registerFlightSettings } from "./settings/registerFlightSettings";
 import { flightParameterSpec, type FlightParameterStore } from "./settings/flightParameters";
@@ -45,11 +47,15 @@ import { createStoreVisuals, type StoreVisualHandle } from "@0sfs/stores/createS
 import { createBayGearInterlock, type BayGearInterlock } from "@0sfs/stores/bayGearInterlock";
 import { stationForFuelTank, tankOnStation as attachedTankStations } from "@0sfs/stores/stationTable";
 import {
-  aircraftHasWeaponStations, readBayDoorPositionsInto, readStoreMirror, writeMasterArm, writeStation,
+  aircraftHasWeaponStations, readBayDoorPositionsInto, readStoreMirror, writeGunFiring, writeGunRounds, writeMasterArm, writeStation,
   type StoreMirror,
 } from "@0sfs/stores/storeAttachment";
 import { rearmRefusal } from "@0sfs/stores/storeCatalog";
 import { REARM_GROUND_ONLY } from "./settings/rearmRule";
+import { createEngagement } from "./combat/engagement";
+import { bestTarget, createFireControl, kinematicsFromState, missileStations, selectedMissileStation } from "./combat/fireControl";
+import { createProjectileView } from "./combat/projectileView";
+import type { CombatMessage } from "@0sfs/multiplayer/protocol";
 import { createEngineControl } from "@0sfs/engines/engineControl";
 import {
   applySavedControls,
@@ -115,6 +121,7 @@ import { bindRecorderMarkHotkey, downloadCsv } from "@0sfs/logging/loggingTab";
 import { createEngineMonitor } from "@0sfs/engines/engineMonitor";
 import { throttleLeverGauges } from "@0sfs/engines/throttleLever";
 import { toEngineStatus } from "@0sfs/rc/engineStatus";
+import type { AircraftStatus } from "@0sfs/rc/protocol";
 import { createCollisionDebugOverlay } from "@0sfs/ground-contact/createCollisionDebugOverlay";
 import { createForcesDebugOverlay } from "./diagnostics/createForcesDebugOverlay";
 import { createWheelSpinDebugOverlay } from "@0sfs/ground-contact/createWheelSpinDebugOverlay";
@@ -159,7 +166,7 @@ import {
 } from "@0sfs/aircraft/createAircraftModel";
 import { createAircraftLights, type AircraftLightSettings, type AircraftLightsHandle } from "@0sfs/aircraft/createAircraftLights";
 import { applySlowDeviceSkyDefaults, offerViewpointSurfaceLighting } from "./settings/skyDefaults";
-import { flightAttitudeToQuaternion, readFlightState } from "@0sfs/ground-contact/ecefBridge";
+import { readFlightState } from "@0sfs/ground-contact/ecefBridge";
 import type { FlightState } from "@0sfs/ground-contact/flightState";
 import { createFloatingOrigin, type FloatingOriginHandle } from "./bridge/floatingOrigin";
 import { takeMultiplayerInvitation } from "./multiplayer/invitationHandoff";
@@ -226,6 +233,8 @@ import {
   createLegacyFlightProfile,
   createStandardFlightProfile,
 } from "@0sfs/controls/gamepadToolsAdapter";
+import { quadProfile } from "./drone/quadRegistry";
+import { DEFAULT_KEYBOARD_AXES, KEYBOARD_AXES, keyboardAxisParameterId, readKeyboardAxes, withKeyboardAxes } from "@0sfs/controls/keyboardAxisBindings";
 import { KEYBOARD_STICK_PARAMETER_IDS, readKeyboardStickSettings } from "@0sfs/controls/keyboardStickSettings";
 import { createGamepadPollingController } from "@0sfs/controls/gamepadPolling";
 import type { OrbitInvertSettings } from "foss-earth/input";
@@ -243,7 +252,10 @@ import type { AttitudeView } from "./hud/attitudeIndicator";
 import { createFlightLoadingScreen, type FlightLoadingScreen } from "../loading/createFlightLoadingScreen";
 import { appendModDependencyTree } from "@0sfs/about/modTree";
 import { modAboutParts } from "@0sfs/mods";
-import { ensureModsSession } from "./mods/modSession";
+import { ensureModsSession, getModsSession } from "./mods/modSession";
+import {
+  currentDroneCommand, droneCameraTab, droneHooks, droneRefusal, droneTelemetry, isDroneAircraftId, loadDroneFeature, noteActiveAircraft, setDroneRemovalSwitch,
+} from "./drone/droneGate";
 import {
   connectMapDetailLog,
   connectMapDetailRuntime,
@@ -394,6 +406,32 @@ interface FlightSessionHandle extends FlightSimAppHandle {
   destroy(preserveWorld?: boolean): void;
 }
 
+let droneRateRestore: "30" | "60" | "120" | null = null;
+
+function modDefinesAircraft(aircraftId: string): boolean {
+  const stack = [...getModsSession().records];
+  while (stack.length) {
+    const record = stack.pop();
+    if (!record) break;
+    stack.push(...record.dependencies);
+    if (record.manifest.aircraft?.definitions.some(definition => definition["id"] === aircraftId)) return true;
+  }
+  return false;
+}
+
+function findJsbsimMod(modId: string): { baseUrl: string; files: readonly string[] } | null {
+  const stack = [...getModsSession().records];
+  while (stack.length) {
+    const record = stack.pop();
+    if (!record) break;
+    stack.push(...record.dependencies);
+    if (record.manifest.id === modId && record.manifest.jsbsimFiles) {
+      return { baseUrl: record.baseUrl, files: record.manifest.jsbsimFiles };
+    }
+  }
+  return null;
+}
+
 /** Keep the page, canvas and streamed world while replacing all aircraft-owned resources. */
 export async function createFlightSimApp(
   rootElement: HTMLElement,
@@ -411,7 +449,12 @@ export async function createFlightSimApp(
     },
   };
   const switchAircraft = async (selection: AircraftSelection, reportError = false): Promise<string | null> => {
-    if (switching || destroyed) return "An aircraft switch is already in progress.";
+    let retainedReport = "";
+    const failureReport = async (...failure: string[]): Promise<string> => redactIssueReport([
+      ...failure,
+      await current.report().catch(() => retainedReport),
+    ].join("\n"), reportSecrets(getAppSettings()));
+    if (switching || destroyed) return failureReport("An aircraft switch is already in progress.");
     const parameters = registerFlightSettings(getAppSettings());
     switching = true;
     let previous: FlightSessionState;
@@ -422,13 +465,15 @@ export async function createFlightSimApp(
         parameters.setMany(aircraftSelectionValues(previous.selection));
         current.finishSwitch();
         switching = false;
-        if (reportError) overlay.fail(saveError);
-        return saveError;
+        const report = await failureReport(saveError);
+        if (reportError) overlay.fail(report);
+        return report;
       }
     } catch (error) {
       switching = false;
       current.finishSwitch();
-      const report = redactIssueReport(`Could not prepare the aircraft switch: ${describeError(error).message}`, reportSecrets(getAppSettings()));
+      const cause = describeError(error);
+      const report = await failureReport(`Could not prepare the aircraft switch: ${cause.message}`, cause.stack ?? "");
       if (reportError) overlay.fail(report);
       return report;
     }
@@ -438,11 +483,27 @@ export async function createFlightSimApp(
     const runtime = current.runtime;
     const canvas = current.canvas;
     try {
+      if (isDroneAircraftId(selection.aircraftId)) {
+        await ensureModsSession();
+        const installed = modDefinesAircraft(selection.aircraftId);
+        if (!installed) {
+          current.finishSwitch();
+          switching = false;
+          return "Install the DJI quadcopter mod from the Mods tab.";
+        }
+        await loadDroneFeature();
+        if (!droneRateRestore) droneRateRestore = parameters.get(PHYSICS_RATE_PARAMETER_ID) as "30" | "60" | "120";
+        parameters.set(PHYSICS_RATE_PARAMETER_ID, "120");
+      } else if (droneRateRestore) {
+        parameters.set(PHYSICS_RATE_PARAMETER_ID, droneRateRestore);
+        droneRateRestore = null;
+      }
       const profile = getFdmProfile(selection.aircraftId);
       prepared = await createJsbsimRuntime({
         dataBaseUrl: options.dataBaseUrl,
         aircraftId: selection.aircraftId,
         engineModel: resolveEngineModel(selection.aircraftId, parameters.get("osfs.engine.model"))?.id,
+        findMod: findJsbsimMod,
         // A switch starts a new flight: the saved physics rate applies to it.
         physicsHz: readPhysicsHz(parameters),
         bootstrap: {
@@ -458,6 +519,7 @@ export async function createFlightSimApp(
       // Its prepared physics and visible aircraft must commit as one identity.
       parameters.setMany(aircraftSelectionValues(selection));
       // Recreate every aircraft-specific consumer around the same map renderer.
+      retainedReport = await current.report().catch(() => "");
       current.destroy(true);
       replaced = true;
       current = await createFlightSimSession(rootElement, {
@@ -485,12 +547,11 @@ export async function createFlightSimApp(
       }
       const cause = describeError(error);
       const recovery = recoveryError ? `\nRecovery also failed: ${describeError(recoveryError).message}` : "\nThe previous aircraft remains paused.";
-      const report = redactIssueReport([
+      const report = await failureReport(
         `Aircraft switch failed: ${previous.selection.aircraftId} → ${selection.aircraftId}`,
         `Requested generation: ${selection.generationId ?? "default"}; detail: ${selection.lodId}`,
         cause.message, cause.stack ?? "", recovery,
-        await current.report().catch(() => ""),
-      ].join("\n"), reportSecrets(getAppSettings()));
+      );
       if (!destroyed) {
         if (replaced || reportError) overlay.fail(report);
         else overlay.hide();
@@ -582,11 +643,15 @@ async function createFlightSimSession(
   }));
   const startLocation = () => ({ latDeg: parameters.get("osfs.start.latitude"), lonDeg: parameters.get("osfs.start.longitude") });
   const startHeightMeters = parameters.get("osfs.start.heightAboveGround");
-  const loading = options.loadingScreen ?? createFlightLoadingScreen(log);
+  const loading = options.loadingScreen ?? createFlightLoadingScreen(log, () => diagnostics.report({ allSettings: true }));
   loading.show();
   loading.setPhase("app", { state: "ready" });
   loading.setPhase("world", { state: "loading", detail: "Preparing the map renderer" });
   loading.setPhase("flight", { state: "loading", detail: "Loading flight physics" });
+  // Restored selections and flight snapshots validate aircraft IDs against the
+  // live catalogue. Reinstall saved declarative mods before either is read;
+  // otherwise a reload treats a mod aircraft as unknown and loses its location.
+  await ensureModsSession();
   // The last saved flight carries on where it was, unless resuming is off or
   // the page address chose a start position.
   const savedFlights = createSavedFlightStore(preferenceStorage());
@@ -612,14 +677,45 @@ async function createFlightSimSession(
       else startupPauseLine = log.print(entry);
     },
   });
+  const account = await openAccountSession(document);
+  stopWatching.push(() => account.destroy());
+  const explicitGoogleKey = Boolean(options.googleApiKey?.trim()) || account.visitLocked;
+  if (!explicitGoogleKey && account.hosted) {
+    settings.setHostDefault("map.source.basemap", "google", "the signed-in account includes Google 3D Tiles");
+  }
   const mapConfig = resolveMapRuntimeConfig({
-    googleApiKey: options.googleApiKey,
+    googleApiKey: explicitGoogleKey ? options.googleApiKey : null,
+    ignoreSavedGoogleKey: !explicitGoogleKey && Boolean(account.hosted),
     baseMap: options.baseMap,
     preferGoogleTiles: options.preferGoogleTiles,
     settings,
   });
-  const initialAircraftSelection = session.selection ?? readAircraftSelection(parameters);
+  let initialAircraftSelection = session.selection ?? readAircraftSelection(parameters);
+  if (!session.jsbsim && isDroneAircraftId(initialAircraftSelection.aircraftId)) {
+    await ensureModsSession();
+    if (!modDefinesAircraft(initialAircraftSelection.aircraftId)) {
+      initialAircraftSelection = { aircraftId: "cessna-172", lodId: "auto" };
+    } else {
+      await loadDroneFeature();
+      if (!droneRateRestore) droneRateRestore = parameters.get(PHYSICS_RATE_PARAMETER_ID) as "30" | "60" | "120";
+      parameters.set(PHYSICS_RATE_PARAMETER_ID, "120");
+    }
+  }
   const initialAircraftId: AircraftId = initialAircraftSelection.aircraftId;
+  const aircraftControls = getAircraftDefinition(initialAircraftId).controls;
+  const climbRateControls = aircraftControls?.vertical === "climb-rate";
+  for (const axis of KEYBOARD_AXES) settings.setHostDefault(keyboardAxisParameterId(axis), aircraftControls?.keyboard?.[axis] ?? DEFAULT_KEYBOARD_AXES[axis], `the ${initialAircraftId} controls profile`);
+  const aircraftCamera = getAircraftDefinition(initialAircraftId).camera;
+  settings.setHostDefault("osfs.camera.chaseFrame", aircraftCamera?.follow ?? "aircraft", `the ${initialAircraftId} camera profile`);
+  for (const [id, value] of [
+    ["osfs.camera.chaseDistance", aircraftCamera?.chaseDistanceMeters],
+    ["osfs.camera.chaseHeight", aircraftCamera?.chaseHeightMeters],
+    ["osfs.camera.chaseZoomLimits", aircraftCamera?.chaseZoomLimits],
+    ["osfs.camera.nearClipMeters", aircraftCamera?.nearClipMeters],
+  ] as const) {
+    settings.setHostDefault(id, value ?? flightParameterSpec(id).default, `the ${initialAircraftId} camera profile`);
+  }
+  noteActiveAircraft(initialAircraftId);
   // Engine → Simulation: the engine model this flight loads, where the aircraft offers a choice.
   const engineModel = resolveEngineModel(initialAircraftId, parameters.get("osfs.engine.model"))?.id ?? null;
   // World detail's saved range, default and HUD rail belong to the shared
@@ -745,6 +841,7 @@ async function createFlightSimSession(
     : undefined;
   const runtimePromise = (session.runtime ? Promise.resolve(session.runtime) : createBabylonRuntime(canvas, {
     googleApiKey: mapConfig.googleApiKey,
+    googleCredential: explicitGoogleKey ? null : account.hosted,
     preferGoogleTiles: mapConfig.preferGoogleTiles,
     rasterBaseMap: mapConfig.rasterBaseMap,
     terrainSource: mapConfig.terrainSource,
@@ -806,6 +903,7 @@ async function createFlightSimSession(
     aircraftId: initialAircraftId,
     engineModel: engineModel ?? undefined,
     physicsHz: readPhysicsHz(parameters),
+    findMod: findJsbsimMod,
     bootstrap: benchBootstrap ?? {
       ...spawn,
       headingDeg: session.resume ? session.resume.state.headingRad / RADIANS_PER_DEGREE : resumeFlight?.headingDeg ?? parameters.get("osfs.start.heading"),
@@ -860,6 +958,8 @@ async function createFlightSimSession(
   // cues and time accounting all use it; a changed setting waits for the next flight.
   const physicsHz = jsbsim.physicsHz;
   const physicsDt = physicsStepSeconds(physicsHz);
+  let latestTerrainMeters: number | null = null;
+  let requestedDroneId: string | null = null;
   flightLog.info("physics", "Fixed-step rate", { physicsHz, stepSeconds: physicsDt, maxCatchUpSteps: maxCatchUpSteps(physicsHz) });
   if (session.runtime && readPhysicsHz(parameters) === physicsHz) markParametersApplied(settings, [PHYSICS_RATE_PARAMETER_ID]);
   if (runtime.geospatialCamera) {
@@ -935,6 +1035,7 @@ async function createFlightSimSession(
   const inputManager = createFlightInputManager({
     parameters,
     initialThrottle: jsbsim.sdk.getPropertyValue("fcs/throttle-cmd-norm"),
+    verticalControl: aircraftControls?.vertical,
     initialGearDown: jsbsim.sdk.getPropertyValue("gear/gear-cmd-norm") > 0.5,
     initialPaused: pausedAtStart,
     rudderSign: getFdmProfile(initialAircraftId).rudderSign,
@@ -1371,6 +1472,12 @@ async function createFlightSimSession(
     getActualControls: () => actualControls,
     onGearChange: (down) => { inputManager.setGearDown(down); runtime.requestRender(); },
     onThrottleChange: (value) => { inputManager.setThrottle(value); runtime.requestRender(); },
+    climbRate: climbRateControls ? {
+      onChange: value => { inputManager.setClimbRateCommand(value); runtime.requestRender(); },
+      getCommand: () => inputManager.getClimbRateCommand(),
+      climbMps: quadProfile(initialAircraftId)?.modes.normal.climbMps ?? 1,
+      descentMps: quadProfile(initialAircraftId)?.modes.normal.descentMps ?? 1,
+    } : undefined,
     onPowerChange: initialAircraftId === "f-35b" ? ({ throttle, brake }) => {
       inputManager.setThrottleBrake(throttle, brake);
       runtime.requestRender();
@@ -1487,6 +1594,11 @@ async function createFlightSimSession(
   let externalTankVisuals: ReturnType<typeof createExternalTankVisuals> | null = null;
   let storeVisuals: StoreVisualHandle | null = null;
   let storeMirror: StoreMirror | null = null;
+  let selectedStation: number | null = null;
+  let gunFiring = false;
+  const engagement = createEngagement();
+  const fireControl = createFireControl();
+  let projectiles: ReturnType<typeof createProjectileView> | null = null;
   let doorsSettled = true;
   // Holds a gear change until both weapon bays are shut, and a bay open until the gear rests.
   let bayInterlock: BayGearInterlock | null = null;
@@ -1648,12 +1760,15 @@ async function createFlightSimSession(
   for (const id of ["osfs.gForce.visionStrength", "osfs.gForce.visionViews"] as const) {
     stopWatching.push(parameters.watch(id, showGVision));
   }
-  const engineMonitor = createEngineMonitor(
+  const createAppliedEngineMonitor = isDroneAircraftId(initialAircraftId)
+    ? droneHooks()?.createEngineMonitor ?? createEngineMonitor : createEngineMonitor;
+  stopWatching.push(parameters.watch("osfs.aircraft.propellerDiscs", () => runtime.requestRender()));
+  const engineMonitor = createAppliedEngineMonitor(
     hudRoot.querySelector<HTMLElement>(".flight-hud__engine") ?? hudRoot,
     {
       layoutScope: `${initialAircraftId}:${engineModel ?? "default"}:${getFdmProfile(initialAircraftId).engine}`,
       definition: {
-        kind: getFdmProfile(initialAircraftId).engine, maxRpm: getFdmProfile(initialAircraftId).maxEngineRpm,
+        kind: (engineKind => engineKind === "none" ? "piston" as const : engineKind)(getFdmProfile(initialAircraftId).engine), maxRpm: getFdmProfile(initialAircraftId).maxEngineRpm,
         rotorBlades: getFdmProfile(initialAircraftId).rotorBlades,
         primaryThermalSolid: initialAircraftId === "f-35b" ? "liner" : undefined,
       },
@@ -1774,6 +1889,11 @@ async function createFlightSimSession(
   };
   for (const id of GROUND_PARAMETER_IDS) stopWatching.push(parameters.watch(id, followGroundSettings));
   const aircraftId: AircraftId = initialAircraftId;
+  setDroneRemovalSwitch(modId => {
+    const flyingRemoved = modId === `0sfs/${aircraftId}`
+      || ((modId === "0sfs/quadcopter" || modId === "0sfs/dji-quadcopter") && isDroneAircraftId(aircraftId));
+    if (flyingRemoved) void session.onAircraftSwitch({ aircraftId: "cessna-172", lodId: "auto" });
+  });
   let aircraftLodId: AircraftLodId = initialAircraftSelection.lodId;
   let aircraftGenerationId: string = initialAircraftSelection.generationId ?? getAircraftFamilyForAircraft(aircraftId).variants[0]?.id ?? "cessna-172";
   let aircraftSettingSwitchQueued = false;
@@ -1874,7 +1994,8 @@ async function createFlightSimSession(
     },
   });
   stopWatching.push(parameters.watch("osfs.remote.hostFlightUi", hostFlightUi.noteSettingChanged));
-  let chaseFrameApplied: PhoneCameraTuning["chaseFrame"] = "attitude";
+  const cameraFollow = createCameraFollow();
+  let chaseFrameApplied: PhoneCameraTuning["chaseFrame"] = "aircraft";
   let orbitStateYaw = orbitRestoreYaw();
   let orbitStatePitch = orbitRestorePitch();
   type OrbitInputSource = "gamepad" | "manual" | "phone" | "glide";
@@ -1935,14 +2056,11 @@ async function createFlightSimSession(
     });
     return aim;
   };
-  /** Keeps the chase camera out of whichever aircraft rotations the setting leaves out. */
-  const applyChaseFrame = (state: FlightState): void => {
+  const applyChaseFrame = (state: FlightState, dt: number): void => {
     const frame = phoneCameraTuning.chaseFrame;
-    if (!aircraft || (frame === "attitude" && chaseFrameApplied === "attitude")) return;
+    if (!aircraft || (frame === "aircraft" && chaseFrameApplied === "aircraft")) return;
     chaseFrameApplied = frame;
-    aircraft.setChaseFrame(frame === "attitude" ? null : flightAttitudeToQuaternion(
-      0, frame === "no-roll" ? state.pitchRad : 0, state.headingRad,
-    ));
+    aircraft.setChaseFrame(cameraFollow.update(frame, state, dt));
   };
   const recenterOrbit = (deltaSeconds: number): void => {
     if (!aircraft || aircraft.getViewMode() !== "third") return;
@@ -2124,6 +2242,7 @@ async function createFlightSimSession(
         chaseZoomLimits: () => parameters.get("osfs.engineTest.zoomLimits"),
       } : {}),
     });
+    markParametersApplied(settings, ["osfs.camera.chaseDistance", "osfs.camera.chaseHeight", "osfs.camera.chaseZoomLimits", "osfs.camera.nearClipMeters"]);
     if (engineTest) aircraft.setModelLoaded(true);
     aircraft.setViewMode(session.resume?.viewMode ?? "third");
     const externalTanks = getExternalTankDefinitions(aircraftId);
@@ -2264,7 +2383,18 @@ async function createFlightSimSession(
 
   // Capture, like the flight keys, so a Ctrl chord with V is not handed on by
   // an embedding browser's own window listener.
+  const onWeaponKeyDown = (event: KeyboardEvent): void => {
+    if (event.code !== "KeyY" || event.repeat || !storeMirror) return;
+    if (event.target instanceof Element && (event.target.closest("dialog[open]") || event.target.closest("input, textarea, select"))) return;
+    const stations = missileStations(storeMirror.load);
+    if (!stations.length) return;
+    event.preventDefault();
+    const index = selectedStation === null ? -1 : stations.indexOf(selectedStation);
+    selectedStation = stations[(index + 1) % stations.length] ?? null;
+    controlPanel?.update(createPanelSnapshot(physicsLoop.getLatestState() ?? initialState));
+  };
   window.addEventListener("keydown", onViewKeyDown, { capture: true });
+  window.addEventListener("keydown", onWeaponKeyDown, { capture: true });
   window.addEventListener("keydown", hostFlightUi.noteKey, { capture: true });
 
   const flightGamepadSource = createBrowserInputSource({ target: window });
@@ -2295,8 +2425,20 @@ async function createFlightSimSession(
         );
       },
     }),
-    profile: createStandardFlightProfile(flightGamepadSource.getSelectedDevice()?.slot ?? 0, parameters.get("osfs.input.stickDeadzone")),
+    profile: withKeyboardAxes(createStandardFlightProfile(flightGamepadSource.getSelectedDevice()?.slot ?? 0, parameters.get("osfs.input.stickDeadzone")), readKeyboardAxes(parameters), climbRateControls),
   });
+  let previousKeyboardAxes = readKeyboardAxes(parameters);
+  for (const axis of KEYBOARD_AXES) stopWatching.push(parameters.watch(keyboardAxisParameterId(axis), () => {
+    const next = readKeyboardAxes(parameters);
+    const oldPair = previousKeyboardAxes[axis];
+    previousKeyboardAxes = next;
+    const displaced = KEYBOARD_AXES.find(other => other !== axis && next[axis] !== "none" && next[other] === next[axis]);
+    if (displaced) parameters.set(keyboardAxisParameterId(displaced), oldPair);
+    flightGamepadRuntime.setProfile(withKeyboardAxes(flightGamepadRuntime.getProfile(), readKeyboardAxes(parameters), climbRateControls));
+    inputManager.setGamepadToolsActive(false);
+    inputManager.setGamepadToolsActive(true);
+    flightGamepadSource.tick();
+  }));
   const flightGamepadStore = createProfileStore();
   inputManager.setGamepadToolsActive(true);
   const detachGamepadProfileInput = flightGamepadSource.subscribe((frame) => {
@@ -2322,19 +2464,21 @@ async function createFlightSimSession(
             id: "legacy",
             label: "Classic",
             previousNames: ["Legacy 0sfs compatibility"],
-            create: () => createLegacyFlightProfile(inputManager.getSelectedGamepadSlot(), parameters.get("osfs.input.stickDeadzone")),
+            create: () => withKeyboardAxes(createLegacyFlightProfile(inputManager.getSelectedGamepadSlot(), parameters.get("osfs.input.stickDeadzone")), readKeyboardAxes(parameters), climbRateControls),
           },
           {
             id: "standard",
             label: "Xbox",
             previousNames: ["Standard Xbox / PlayStation flight"],
-            create: () => createStandardFlightProfile(inputManager.getSelectedGamepadSlot(), parameters.get("osfs.input.stickDeadzone")),
+            create: () => withKeyboardAxes(createStandardFlightProfile(inputManager.getSelectedGamepadSlot(), parameters.get("osfs.input.stickDeadzone")), readKeyboardAxes(parameters), climbRateControls),
           },
         ],
         // FOSS Earth's tiny circular reset, on a control away from its default.
         attachReset: (control, { label, reset }) => { attachResetButton(document, control, { label: () => label, shown: () => true, reset }); },
         onProfileChange: (profile) => {
-          const signature = JSON.stringify(profile.bindings);
+          const mapped = withKeyboardAxes(profile, readKeyboardAxes(parameters), climbRateControls);
+          const signature = JSON.stringify(mapped.bindings);
+          if (JSON.stringify(profile.bindings) !== signature) flightGamepadRuntime.setProfile(mapped);
           if (signature === flightBindingSignature) return;
           flightBindingSignature = signature;
           inputManager.setGamepadToolsActive(false);
@@ -2493,6 +2637,7 @@ async function createFlightSimSession(
         bayPos: storeMirror.bayPos,
         bayQueued: [bayInterlock?.queued(0) ?? false, bayInterlock?.queued(1) ?? false],
         tankOnStation: attachedTankStations(tanks.flatMap(tank => tank.attached ? [tank.index] : [])),
+        selectedStation: selectedMissileStation(storeMirror.load, selectedStation),
       } : undefined,
       logging: loggingSnapshot(),
       damage: damage.snapshot(),
@@ -2741,6 +2886,7 @@ async function createFlightSimSession(
         return true;
       },
       getGoogleKey: () => settings.get<string>("map.source.googleKey")?.trim() || mapConfig.googleApiKey || null,
+      onCombat: (message: CombatMessage) => { engagement.ingest(message); runtime.requestRender(); },
     });
     return (host: HTMLElement) => feature.mount(host);
   }).catch((error: unknown) => { multiplayerLoading = null; throw error; });
@@ -2770,7 +2916,13 @@ async function createFlightSimSession(
           autoTrim: { pitch: parameters.get("osfs.assist.autoTrim"), roll: parameters.get("osfs.assist.autoRollTrim") },
           // The same reading the HUD's engine chip is drawing from, so both
           // screens show one engine rather than two sampled at two times.
-          engine: toEngineStatus(engineMonitor.getReading(), engineControl.reading()),
+          engine: (() => {
+            const reading = toEngineStatus(engineMonitor.getReading(), engineControl.reading());
+            const refusal = droneRefusal();
+            if (!refusal) return reading;
+            return reading ? { ...reading, blocked: refusal.replace(/°/g, "").slice(0, 60) } : reading;
+          })(),
+          ...(isDroneAircraftId(aircraftId) ? { drone: (droneTelemetry() ?? { available: true as const }) as unknown as AircraftStatus["drone"] } : {}),
           throttleBrakeRange: initialAircraftId === "f-35b",
           keepSliderBrakes: parameters.get("osfs.input.keepSliderBrakes"),
           afterburnerDetent: afterburnerDetent() ?? undefined,
@@ -2907,7 +3059,7 @@ async function createFlightSimSession(
   const savedSettingsSection = createSavedSettingsSection(settings);
   let flightTicks = 0;
   let lastFlightTickAtMs: number | null = null;
-  diagnostics.addState(() => `Component execution: ${JSON.stringify(earthNativeCores(runtime) ?? [])}`);
+  diagnostics.addState(() => `Component execution: ${JSON.stringify(earthWasmCores(runtime) ?? [])}`);
   diagnostics.addState(() => `Compute scheduling: ${JSON.stringify(earthComputeScheduling(runtime))}`);
   diagnostics.addState(() => `Isolation: ${describeIsolation(window)}`);
   diagnostics.addState(() => `Aircraft: ${aircraftId}; generation ${aircraftGenerationId ?? "default"}; LOD ${aircraftLodId}; model ${modelState.status}; active LOD ${modelState.activeLodId ?? "none"}; ${modelState.triangles} triangles.`);
@@ -2977,15 +3129,15 @@ async function createFlightSimSession(
       .map(spec => spec.id),
   });
   // Component execution: editable settings and the running component status.
-  const nativeParameters: { destroy(): void }[] = [];
-  const native = createNativeSections({
+  const wasmParameters: { destroy(): void }[] = [];
+  const wasm = createWasmSections({
     document, settings, reload: url => window.location.assign(url),
     section: (section, content) => {
-      const handle = ui.section(settings, { tab: "native", section, ...content });
-      nativeParameters.push(handle);
+      const handle = ui.section(settings, { tab: "wasm", section, ...content });
+      wasmParameters.push(handle);
       return handle.element;
     },
-    report: () => earthNativeCores(runtime) ?? [],
+    report: () => earthWasmCores(runtime) ?? [],
     computeReport: () => earthComputeScheduling(runtime),
     timers: { set: (callback, delayMs) => window.setTimeout(callback, delayMs), clear: handle => window.clearTimeout(handle as number) },
   });
@@ -3042,12 +3194,14 @@ async function createFlightSimSession(
     skyTab: skyPanel.element,
     timeTab: timePanel.element,
     settingsSections,
-    nativeSections: native.sections,
+    wasmSections: wasm.sections,
     headsetTab: headsetPanel?.element,
     aboutTab: about.element,
+    accountTab: account.panel,
     browserDataTab: browserData.element,
     bugReportTab: bugReportPanel.element,
     testFeedbackTab: testFeedback?.element,
+    cameraTab: isDroneAircraftId(aircraftId) ? droneCameraTab() ?? undefined : undefined,
     onBugReportShow: () => bugReportPanel.show(),
     interfaceSections,
     initialWeather: weather,
@@ -3084,11 +3238,13 @@ async function createFlightSimSession(
       runtime.requestRender();
     },
     onViewModeChange: (mode) => { aircraft?.setViewMode(mode); phoneSession?.syncStatus(); runtime.requestRender(); },
-    onAircraftApply: (selection) => {
+    onAircraftApply: async (selection) => {
       const next = normalizeAircraftSelection(selection);
       if (next.aircraftId !== aircraftId) return session.onAircraftSwitch(next);
       const saveError = writeAircraftSelection(parameters, next);
-      if (saveError) return saveError;
+      if (saveError) return redactIssueReport([
+        saveError, await diagnostics.report({ allSettings: true }).catch(() => ""),
+      ].join("\n"), reportSecrets(settings));
       followAircraftPresentation();
       return null;
     },
@@ -3215,6 +3371,10 @@ async function createFlightSimSession(
       saveFlight();
       controlPanel?.update(createPanelSnapshot(physicsLoop.getLatestState() ?? initialState));
     },
+    onArmamentSelect: (station) => {
+      selectedStation = station;
+      controlPanel?.update(createPanelSnapshot(physicsLoop.getLatestState() ?? initialState));
+    },
     attachEngineDetails: (host, settingsContent) => engineMonitor.attachDetails(host, settingsContent),
     engineModel,
     onReloadFlight: () => {
@@ -3321,6 +3481,69 @@ async function createFlightSimSession(
 
   const ensureWorld = (): void => {
     mountFlightWorld();
+  };
+
+  const stepCombat = (dt: number, state: NonNullable<ReturnType<typeof physicsLoop.getLatestState>>): void => {
+    if (!storeMirror) {
+      if (gunFiring) { gunFiring = false; writeGunFiring(jsbsim.sdk, false); }
+      return;
+    }
+    const clock = multiplayer?.combatClock();
+    const nowMs = clock?.nowMs ?? performance.now();
+    const connected = clock?.connected === true && Boolean(clock.selfId);
+    const shooterId = connected && clock ? clock.selfId : "local";
+    if (clock) engagement.track(clock.remotes, nowMs);
+    const kinematics = kinematicsFromState(state, nowMs);
+    const output = fireControl.step({
+      dt, held: inputManager.getWeaponRelease() > 0.5, armed: storeMirror.masterArm,
+      paused: dt === 0 || damage.snapshot().destroyed,
+      rounds: storeMirror.gunRounds, gunPod: storeMirror.load[6] === "gau-22-pod",
+      load: storeMirror.load, bayPos: storeMirror.bayPos, selectedStation,
+      shooterId, kinematics, missileSpeedMps: 0,
+      target: clock && clock.remotes.length ? bestTarget(kinematics, clock.remotes) : null,
+    });
+    const stoppedFiring = gunFiring && !output.firing;
+    if (output.rounds !== storeMirror.gunRounds) {
+      writeGunRounds(jsbsim.sdk, output.rounds);
+      storeMirror = { ...storeMirror, gunRounds: output.rounds };
+    }
+    if (output.firing !== gunFiring) {
+      gunFiring = output.firing;
+      writeGunFiring(jsbsim.sdk, gunFiring);
+    }
+    if (output.door) bayInterlock?.requestBay(output.door.bay, output.door.open);
+    if (output.consumedStation !== null) {
+      const station = output.consumedStation;
+      const written = writeStation(jsbsim.sdk, station, null);
+      const load = storeMirror.load.slice();
+      load[station] = null;
+      storeMirror = { ...storeMirror, load, gunRounds: written.gunRounds ?? storeMirror.gunRounds };
+      storeVisuals?.sync(storeMirror);
+      if (selectedStation === station) selectedStation = null;
+    }
+    const send = (message: CombatMessage): void => {
+      engagement.ingest(message);
+      if (connected) multiplayer?.publishCombat(message);
+    };
+    for (const burst of output.bursts) send({ type: "fire", burst });
+    for (const launch of output.launches) send({ type: "launch", launch });
+    const result = engagement.step(nowMs, shooterId, damage.implementation === "health-v1");
+    for (const claim of result.claims) if (connected) multiplayer?.publishCombat({ type: "hit", hit: claim });
+    if (result.damage.length) {
+      for (const points of result.damage) damage.applyImpact({ points });
+      const health = damage.snapshot();
+      hudBar?.setResumeBlocked?.(aircraftSwitching || sharedSettingsBlocked() || health.destroyed);
+      if (health.destroyed) setSimulationPaused(true);
+    }
+    if (result.damage.length || stoppedFiring || output.launches.length || output.consumedStation !== null || output.door) {
+      controlPanel?.update(createPanelSnapshot(state));
+    }
+    if (output.launches.length || output.consumedStation !== null) saveFlight();
+    projectiles ??= createProjectileView(runtime.scene);
+    const origin = floatingOrigin?.getOriginEcef();
+    const frame = floatingOrigin?.getWorldFromEcef();
+    projectiles.update(result.draw, origin && frame ? { origin, m: frame.m } : null);
+    if (result.draw.length) runtime.requestRender();
   };
 
   runtime.setSimTick((deltaSeconds) => {
@@ -3492,6 +3715,17 @@ async function createFlightSimSession(
           currentCommand: appliedControls.flaps,
         });
       }
+      const phoneDrone = phoneSession?.getDroneCommand() ?? null;
+      if (phoneDrone && isDroneAircraftId(phoneDrone.droneId) && phoneDrone.droneId !== (aircraftId as string) && phoneDrone.droneId !== requestedDroneId) {
+        requestedDroneId = phoneDrone.droneId;
+        void session.onAircraftSwitch({ aircraftId: phoneDrone.droneId as AircraftId, lodId: "auto" });
+      }
+      droneHooks()?.beforeStep({
+        dtSeconds: physicsDt,
+        sdk: jsbsim.sdk,
+        command: currentDroneCommand(phoneDrone, { ...selected, climb: pilot.isOut() ? 0 : inputManager.getClimbRateCommand() }),
+        terrainMeters: latestTerrainMeters,
+      });
       applyFlightControls(
         jsbsim.sdk,
         commanded,
@@ -3564,6 +3798,7 @@ async function createFlightSimSession(
 
     sectionStarted = frameProfiler.clock();
     const sampledSurfaceHeight = flightSurface.sample(displayState.latDeg, displayState.lonDeg)?.heightMeters ?? null;
+    latestTerrainMeters = sampledSurfaceHeight;
     const surfaceHeight = sampledSurfaceHeight ?? 0;
     frameProfiler.add("flight/terrain", sectionStarted);
     // A low spawn's detail requirement ends after a second of simulated flight
@@ -3586,6 +3821,16 @@ async function createFlightSimSession(
     // The tick's surface queries end here: the floating origin is about to move the world.
     flightSurface.endFrame();
     floatingOrigin?.apply(displayState);
+    if (floatingOrigin) droneHooks()?.afterView({
+      paused: inputManager.isPaused(),
+      terrainMeters: sampledSurfaceHeight,
+      state: displayState,
+      scene: runtime.scene,
+      aircraftRoot: floatingOrigin.aircraftRoot,
+      requestRender: () => runtime.requestRender(),
+      rendererMode: runtime.renderer.mode,
+    });
+    stepCombat(inputManager.isPaused() || worldLoading ? 0 : deltaSeconds, displayState);
     externalTankVisuals?.sync(readExternalFuelTanks(jsbsim.sdk, aircraftId));
     externalTankVisuals?.update(externalTankStepSeconds);
     // Returns at once while nothing falls: a hung load adds no reads here.
@@ -3596,7 +3841,7 @@ async function createFlightSimSession(
       readBayDoorPositionsInto(jsbsim.sdk, storeMirror.bayPos);
       doorsSettled = storeVisuals.poseDoors(storeMirror.bayPos, storeMirror.bayCmd);
     }
-    applyChaseFrame(displayState);
+    applyChaseFrame(displayState, deltaSeconds);
     flightCompass?.update(runtime.scene.activeCamera);
     const audioCamera = runtime.scene.activeCamera;
     if (aircraft && audioCamera && flightAudio.isEngineActive()) {
@@ -3618,7 +3863,10 @@ async function createFlightSimSession(
       const surfaceState = readControlSurfaceState(jsbsim.sdk, aircraftId, {
         nozzlePositionNorm: engineVisuals.nozzlePositionNorm(),
       });
-      if (rig) applyAircraftRig(rig, surfaceState, deltaSeconds, { simulationHeld: feedbackHeld });
+      if (rig) applyAircraftRig(rig, surfaceState, deltaSeconds, {
+        simulationHeld: feedbackHeld,
+        propellerDiscs: parameters.get("osfs.aircraft.propellerDiscs"),
+      });
       aircraftModel.updateGearVisibility(surfaceState.gearDownNorm, true);
     }
     engineVisuals.updateRig(rig ?? null, true);
@@ -3750,6 +3998,7 @@ async function createFlightSimSession(
     destroy(preserveWorld = false): void {
       if (disposed) return;
       disposed = true;
+      setDroneRemovalSwitch(null);
       startupAbort.abort();
       placementAbort.abort();
       if (!preserveLoadingScreen) {
@@ -3763,6 +4012,8 @@ async function createFlightSimSession(
       unbindRecorderMark();
       runtime.setSimTick(null);
       window.removeEventListener("keydown", onViewKeyDown, { capture: true });
+      window.removeEventListener("keydown", onWeaponKeyDown, { capture: true });
+      projectiles?.dispose();
       window.removeEventListener("keydown", hostFlightUi.noteKey, { capture: true });
       flightGamepadSource.stop();
       detachGamepadProfileInput();
@@ -3789,8 +4040,8 @@ async function createFlightSimSession(
       presetsSection.destroy();
       savedSettingsSection.destroy();
       diagnosticsParameters.destroy();
-      native.destroy();
-      for (const handle of nativeParameters) handle.destroy();
+      wasm.destroy();
+      for (const handle of wasmParameters) handle.destroy();
       diagnosticsSection.destroy();
       bugReportPanel.destroy();
       testFeedback?.destroy();

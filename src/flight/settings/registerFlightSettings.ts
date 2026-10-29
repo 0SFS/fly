@@ -1,3 +1,4 @@
+import { AIRCRAFT_CATALOG, AIRCRAFT_FAMILIES, subscribeAircraftCatalog } from "@0sfs/aircraft/aircraftCatalog";
 import { frameProfilingParameters } from "@foss-earth/renderer/settings";
 import type { SettingsRegistry } from "foss-earth/settings";
 import { OSFS_LEGACY_MIGRATIONS } from "./flightMigrations";
@@ -33,6 +34,24 @@ export function parameterSourceFile(source: string): { repository: string; path:
 export const AIRCRAFT_FOCUS_POINT = "aircraft";
 
 /**
+ * The aircraft and generation lists the settings store will accept. Built from
+ * the live catalogue, so an aircraft a mod adds can be saved. The lists written
+ * into the parameter specs are only the built-in fleet at module load.
+ */
+export function syncAircraftSettingChoices(registry: SettingsRegistry): void {
+  if (AIRCRAFT_CATALOG.length === 0 || !registry.has("osfs.aircraft.id")) return;
+  const variants = AIRCRAFT_FAMILIES.flatMap(family => family.variants);
+  registry.setChoices("osfs.aircraft.id", AIRCRAFT_CATALOG.map(definition => ({
+    id: definition.id,
+    label: variants.find(variant => variant.aircraftId === definition.id)?.label ?? definition.label,
+  })));
+  registry.setChoices("osfs.aircraft.generation", AIRCRAFT_FAMILIES.flatMap(family => family.variants.map(variant => ({
+    id: variant.id,
+    label: family.variants.length > 1 ? `${family.label} ${variant.label}` : variant.label,
+  }))));
+}
+
+/**
  * Adds the flight's parameters and presets to the app's settings registry,
  * once, with their section titles, source links and the migration of the keys
  * they replace, and sets the FOSS Earth defaults the flight wants.
@@ -66,6 +85,8 @@ export function registerFlightSettings(registry: SettingsRegistry): FlightParame
     if (registry.has("interface.windows.presentation")) registry.setHostDefault("interface.windows.presentation", "overlay", "0sfs: the windows float over the flight");
     registry.registerPresets(FLIGHT_PRESETS);
     registry.migrateLegacy([...OSFS_LEGACY_MIGRATIONS, groundProfilesMigration(registry)]);
+    syncAircraftSettingChoices(registry);
+    subscribeAircraftCatalog(() => { syncAircraftSettingChoices(registry); });
   }
   return flightParameterStore(registry);
 }

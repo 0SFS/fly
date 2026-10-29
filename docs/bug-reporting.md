@@ -2,10 +2,18 @@
 
 Open **Bug report** from the tab strip's **+**, or use the 🐞 icon on the bottom-left
 toolbar when it has room. Give the issue a title and describe what
-happened, then review the activity report already filled in. Download the report as a
-`.txt` file and open the GitHub issue draft. GitHub handles sign-in if needed. Attach the
+happened, then review the report's file tabs. Use **Download all** to save a standard
+`.zip` and open the GitHub issue draft. GitHub handles sign-in if needed. Attach the
 downloaded file to the draft and submit the issue in `0SFS/fly`, the repository the build
 records. There is no report text to paste.
+
+Bug report, Settings → Diagnostics, loading failures and failed aircraft changes all use
+the same FOSS Earth report viewer. Read `index.txt` first: it names the failure as
+`file:line` and quotes that line. `index.json` contains the same references and each file's
+line count. A long file stays closed until a needle or search result names a line;
+search results open exactly that line. **Download this file** saves the selected text
+file; **Download all** saves every file in a store-method zip. Failed dynamic imports
+include a reminder that the dev-server log is outside the report.
 
 The shared FOSS Earth report includes the running build and component revisions, browser,
 viewport and device capabilities, requested and active renderer, available GPU details,
@@ -34,8 +42,8 @@ normal trail retention still applies. The ordinary short activity line remains
 limited to 300 characters.
 
 If the world freezes, open Bug report and download it while the page is still open,
-before reloading. The loading report describes startup and stops collecting when
-startup finishes; it cannot by itself diagnose a freeze later in the flight.
+before reloading. The loading snapshot describes startup and stops collecting when
+startup finishes; the shared report also includes the current flight observations.
 
 If the flight stops before you can reach Settings, open `/fly/?report` on the same site.
 That page reads the previous visit's retained trail and offers the report without starting
@@ -43,16 +51,15 @@ the renderer or flight simulation.
 
 If loading stops, the log says so in one line: what stopped, and under it what was thrown,
 such as `AbortError: Terrain preparation was replaced by another destination.` The visit's
-trail keeps that line for the report. **Copy loading report**, on that line and on the
-loading title, copies the loading screen's own record as version 2 JSON;
-`window.osfsLoadingDiagnostics()` returns the same in a console.
+trail keeps that line for the report. **Copy report**, on that line and on the loading
+title, copies the shared plain-text report with the failure and loading snapshot.
+`window.osfsLoadingDiagnostics()` exposes the loading snapshot in a console.
 
-**View report** opens the same redacted JSON in a scrollable viewer with syntax
-highlighting. Its top-right Copy and Download icons export the exact snapshot being
-viewed; the file is `osfs-loading-report.json`. Close with Escape or the top-left ×.
+**View report** opens the shared file tabs, search and text/zip downloads. Close with
+Escape or the top-left ×.
 The viewer stays usable even while loading has made the application inert.
 
-The report includes:
+The report's `loading.txt` includes:
 
 - Each phase's last state and history; phases stopped by a failure say `failed`.
 - The thrown error's name, supplied stack (up to 32 KiB), source location, nested
@@ -70,9 +77,8 @@ The report includes:
 Capture starts when the loading screen is created, before the flight's dynamic import,
 and stops on success, failure or destruction. A reset starts a new attempt. The report
 retains at most 40 operations, 40 browser events and 80 resources; causes are limited to
-six levels and eight aggregate children. The current visit's full bug report also includes
-this snapshot. Copy the loading JSON while the failed page is open; `/fly/?report` uses
-the separate retained activity trail, which now also records the failed startup operation,
+six levels and eight aggregate children. Download the shared report while the failed
+page is open; `/fly/?report` uses the retained activity trail, which also records the failed startup operation,
 its error and its throw/caller stack lines (up to 40 lines per operation, subject to the
 trail's own retention settings and limits). Failures that prevent `main.tsx` and its static
 dependencies from running still belong to the earlier boot terminal.
@@ -97,7 +103,7 @@ toolbar icon shows or closes that tab. Interface → Toolbar controls the icon: 
 shows it when its measured width fits beside the flight controls and map attribution,
 **On** keeps it visible, and **Off** hides the shortcut. Custom priorities change its
 position. The tab stays available under **+**. Settings → Diagnostics keeps the activity
-trail settings and **Copy report**.
+trail settings, **View report** and **Copy report**.
 
 After an issue is filed, give an agent its issue URL, or its repository and issue number,
 for example `0SFS/fly#123`. The component revisions and attachment help it investigate the code

@@ -1,3 +1,5 @@
+import { createIssueReportView, type IssueReportViewHandle } from "@foss-earth/ui/diagnostics";
+
 export interface AircraftSwitchOverlay {
   show(label: string, position?: { x: number; y: number }): void;
   progress(value: number | null, detail?: string): void;
@@ -35,15 +37,15 @@ export function createAircraftSwitchOverlay(container: HTMLElement): AircraftSwi
   const title = document.createElement("h2");
   title.textContent = "Could not switch aircraft";
   const explanation = document.createElement("p");
-  explanation.textContent = "The simulation remains paused. The error report below describes what failed.";
-  const report = document.createElement("pre");
-  report.className = "flight-panel__aircraft-error-report";
-  report.tabIndex = 0;
+  explanation.textContent = "The simulation remains paused. The report index names the failure and the line to read.";
+  const report = document.createElement("div");
+  let reportView: IssueReportViewHandle | null = null;
   const close = document.createElement("button");
   close.className = "flight-panel__command";
   close.type = "button";
   close.textContent = "Close";
   close.addEventListener("click", () => dialog.close());
+  content.classList.add("is-wide");
   content.append(title, explanation, report, close);
   dialog.append(content);
   container.append(host, dialog);
@@ -71,13 +73,19 @@ export function createAircraftSwitchOverlay(container: HTMLElement): AircraftSwi
     },
     fail(errorReport) {
       host.hidden = true;
-      report.textContent = errorReport;
+      if (reportView) reportView.setReport(errorReport);
+      else {
+        reportView = createIssueReportView(errorReport, { document });
+        report.append(reportView.element);
+      }
       dialog.showModal();
       close.focus();
     },
     hide() { host.hidden = true; },
     dispose() {
       if (dialog.open) dialog.close();
+      reportView?.destroy();
+      reportView = null;
       host.remove();
       dialog.remove();
     },

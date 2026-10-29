@@ -39,7 +39,7 @@ const mocks = vi.hoisted(() => {
       getRig: () => null, setAircraft: vi.fn(), setLod: vi.fn(), setRenderStowedGear: vi.fn(), updateGearVisibility: vi.fn(), refreshAutoLod: vi.fn(), dispose: vi.fn(),
     },
     terrainContact: { reset: vi.fn(), update: vi.fn(() => true) },
-    visibleMeshCollision: { reset: vi.fn(), update: vi.fn(() => false) },
+    visibleMeshCollision: { reset: vi.fn(), update: vi.fn(() => false), dispose: vi.fn() },
     physics: { reset: vi.fn(), setPaused: vi.fn(), update: vi.fn((_delta, applyInputs) => { applyInputs(); return state; }), getLatestState: () => state, getFault: () => null },
   };
 });

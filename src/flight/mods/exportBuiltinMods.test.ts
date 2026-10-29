@@ -73,7 +73,7 @@ describe("export builtin mod manifests", () => {
     write("C172", {
       schemaVersion: 1, id: "0sfs/c172", kind: "aircraft", name: "Cessna 172 Skyhawk",
       summary: byFamily.get("cessna-172")!.summary, execution: "declarative",
-      provenance: provenance("C172"), dependencies: ["0SFS/IO320"],
+      provenance: provenance("C172"), dependencies: ["0SFS/IO320", "0SFS/rotating-prop"],
       jsbsimFiles: JSBSIM.c172,
       aircraft: {
         family: clone(byFamily.get("cessna-172")),

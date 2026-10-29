@@ -6,6 +6,11 @@ import { normalizeModSource, type NormalizeModSourceOptions } from "@0sfs/mods/n
 import type { OsfsModManifest } from "@0sfs/mods/schema";
 import type { ModSecurityAssessment } from "@0sfs/mods/security";
 import { applyDynamicMod } from "./applyDynamicMod";
+import { onModRemoved } from "../drone/droneGate";
+import { quadAircraftIds, uninstallQuadLayer, uninstallQuadVehicle } from "../drone/quadRegistry";
+import { uninstallCameraPreview } from "../drone/cameraPreviewRegistry";
+import { unregisterAircraftMod } from "@0sfs/aircraft/aircraftCatalog";
+import { unregisterFdmProfile } from "../jsbsim/fdmProfiles";
 import c172 from "@0sfs/c172/manifest" with { type: "json" };
 import sf50 from "@0sfs/sf-50/manifest" with { type: "json" };
 import f35b from "@0sfs/f-35b/manifest" with { type: "json" };
@@ -24,7 +29,10 @@ import tank from "@0sfs/f-35b-external-tank/manifest" with { type: "json" };
 const ADDED_KEY = "osfs.mods.added";
 const CONFIRMED_KEY = "osfs.mods.confirmed";
 
+import rotatingProp from "@0sfs/rotating-prop/manifest" with { type: "json" };
+
 const OFFICIAL: readonly [string, OsfsModManifest][] = [
+  ["0SFS/rotating-prop", rotatingProp as OsfsModManifest],
   ["0SFS/C172", c172 as OsfsModManifest],
   ["0SFS/SF-50", sf50 as OsfsModManifest],
   ["0SFS/F-35B", f35b as OsfsModManifest],
@@ -42,6 +50,36 @@ const OFFICIAL: readonly [string, OsfsModManifest][] = [
 ];
 
 const BUNDLED_REPOS = new Set(OFFICIAL.map(([source]) => source.toLowerCase()));
+
+const DEV_QUAD_REPOS = /^(Quadcopter|DJI-Quadcopter|DJI-Mini2|DJI-Mini-2|DJI-Air-2S)$/;
+
+/** Unpublished quad repos resolve to the Vite dev server instead of GitHub Pages. */
+function devQuadFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const href = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  const pages = /^https:\/\/0sfs\.github\.io\/([^/]+)\/(.*)$/.exec(href);
+  if (import.meta.env.DEV && pages && DEV_QUAD_REPOS.test(pages[1] ?? "")) {
+    return globalThis.fetch(`/dev-mods/${(pages[1] ?? "").toLowerCase()}/${pages[2] ?? ""}`, init);
+  }
+  return globalThis.fetch(input, init);
+}
+
+function dependsOn(record: LoadedModRecord, id: string): boolean {
+  return record.dependencies.some(dependency => dependency.manifest.id === id || dependsOn(dependency, id));
+}
+
+function findAdded(source: string): LoadedModRecord | null {
+  if (!options) return null;
+  let key: string;
+  try { key = normalizeModSource(source, options).canonicalKey; } catch { return null; }
+  const stack = [...records];
+  while (stack.length) {
+    const record = stack.pop();
+    if (!record) break;
+    if (record.source.canonicalKey === key) return record;
+    stack.push(...record.dependencies);
+  }
+  return null;
+}
 
 export interface ModsSessionSnapshot {
   installed: readonly ModAboutPart[];
@@ -182,7 +220,7 @@ export function ensureModsSession(): Promise<readonly LoadedModRecord[]> {
     for (const [source, manifest] of OFFICIAL) {
       bundled.set(normalizeModSource(source, normalizeOptions).canonicalKey, manifest);
     }
-    options = { ...normalizeOptions, bundled, entry: "startup-url", confirmed, viewer, fetch: globalThis.fetch.bind(globalThis) };
+    options = { ...normalizeOptions, bundled, entry: "startup-url", confirmed, viewer, fetch: devQuadFetch };
     registry = new ModRegistry(options);
     records = [];
     for (const [source, manifest] of OFFICIAL) {
@@ -206,6 +244,44 @@ export function ensureModsSession(): Promise<readonly LoadedModRecord[]> {
     return records;
   })();
   return started;
+}
+
+function dropRecord(record: LoadedModRecord): void {
+  const manifest = record.manifest;
+  uninstallCameraPreview(manifest.id);
+  if (manifest.kind === "aircraft" && manifest.aircraft) {
+    const familyId = String((manifest.aircraft.family as { id?: string }).id ?? "");
+    const ids = manifest.aircraft.definitions.map(definition => String((definition as { id?: string }).id ?? "")).filter(Boolean);
+    for (const id of ids) uninstallQuadVehicle(id);
+    unregisterAircraftMod(familyId, ids);
+    for (const id of Object.keys(manifest.aircraft.fdmProfiles)) unregisterFdmProfile(id);
+  }
+  uninstallQuadLayer(manifest.id);
+  records = records.filter(item => item.source.canonicalKey !== record.source.canonicalKey);
+  if (options) {
+    added = added.filter(item => {
+      try { return normalizeModSource(item, options!).canonicalKey !== record.source.canonicalKey; }
+      catch { return true; }
+    });
+    writeList(ADDED_KEY, added);
+    confirmed.delete(record.source.canonicalKey);
+    writeList(CONFIRMED_KEY, [...confirmed]);
+  }
+  onModRemoved(manifest.id);
+}
+
+export async function removeMod(source: string): Promise<void> {
+  await ensureModsSession();
+  const record = findAdded(source);
+  if (!record || record.source.bundled) return;
+  const dependents = records.filter(item => item !== record && dependsOn(item, record.manifest.id));
+  for (const dependent of dependents) dropRecord(dependent);
+  dropRecord(record);
+  if (quadAircraftIds().length === 0) {
+    uninstallQuadLayer("0sfs/quadcopter");
+    uninstallQuadLayer("0sfs/dji-quadcopter");
+  }
+  publish();
 }
 
 export async function addMod(source: string): Promise<void> {

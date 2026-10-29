@@ -94,7 +94,7 @@ function describeTerrain(progress: TerrainPreparationProgress | undefined): stri
  * log is made inert, so flight input still waits for safe terrain, except for
  * the controls marked live and the elements that contain them.
  */
-export function createFlightLoadingScreen(sharedLog?: GameLog): FlightLoadingScreen {
+export function createFlightLoadingScreen(sharedLog?: GameLog, report?: () => Promise<string>): FlightLoadingScreen {
   const log = sharedLog ?? createGameLog();
   const root = document.getElementById("root");
   const phases = new Map<FlightLoadingPhase, PhaseLine>();
@@ -129,26 +129,34 @@ export function createFlightLoadingScreen(sharedLog?: GameLog): FlightLoadingScr
   const previousReport = window.osfsLoadingDiagnostics;
   window.osfsLoadingDiagnostics = getReport;
   let reportViewer: ReturnType<typeof createLoadingReportViewer> | null = null;
-  const viewReportAction = { label: "View report", onClick: () => {
+  const readReport = async (): Promise<string> => redactLoadingText([
+    ...(failureMessage ? [failureMessage] : []),
+    ...(failureCause ? [failureCause.stack ?? failureCause.message] : []),
+    await report?.() ?? "",
+  ].filter(Boolean).join("\n"));
+  const openReport = (text: string): void => {
+    if (destroyed) return;
     reportViewer ??= createLoadingReportViewer();
-    reportViewer.show(JSON.stringify(getReport(), null, 2));
+    reportViewer.show(text);
+  };
+  const viewReportAction = { label: "View report", onClick: () => {
+    void readReport().then(openReport, () => log.print({ text: "The report could not be prepared. Try View report again.", tone: "warning" }));
   } };
   const copyReport = async (): Promise<void> => {
-    const text = JSON.stringify(getReport(), null, 2);
     try {
-      await navigator.clipboard.writeText(text);
-      log.print({ text: "Loading report copied.", tone: "success" });
+      const text = await readReport();
+      try {
+        await navigator.clipboard.writeText(text);
+        log.print({ text: "Report copied.", tone: "success" });
+      } catch {
+        openReport(text);
+        log.print({ text: "Clipboard unavailable. Download the report files from the report viewer." });
+      }
     } catch {
-      const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "osfs-loading-report.json";
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      log.print({ text: "Clipboard unavailable. Loading report downloaded." });
+      log.print({ text: "The report could not be prepared. Try View report again.", tone: "warning" });
     }
   };
-  const reportAction = { label: "Copy loading report", onClick: () => { void copyReport(); } };
+  const reportAction = { label: "Copy report", onClick: () => { void copyReport(); } };
 
   const holdElement = (element: Element): void => {
     if (held.has(element)) return;

@@ -1,4 +1,4 @@
-import type { AircraftId } from "@0sfs/aircraft/aircraftIds";
+import { AIRCRAFT_IDS, type AircraftId } from "@0sfs/aircraft/aircraftIds";
 import type { EngineRotorBladeCounts } from "@0sfs/engines/engineRotorDefinitions";
 import type { AutomaticFlaps } from "@0sfs/controls/autoFlaps";
 import type { Sf50VariantId } from "@0sfs/sf-50/sf50Variants";
@@ -60,7 +60,13 @@ export interface FdmProfile {
    * stick asks for, deg/s, and the source model's own, which an autopilot flies.
    */
   fullStickRollRate?: { property: string; sourceDegPerSec: number };
-  engine: "piston" | "turbine";
+  engine: "piston" | "turbine" | "none";
+  /** Quadcopters integrate external forces. They have no propulsion block. */
+  kinematic?: "drone-pgps";
+  /** The flight raises the physics rate to this while the aircraft is selected. */
+  requiresPhysicsHz?: 120;
+  /** Where the JSBSim files are fetched. Absent means the bundled data package. */
+  dataSource?: { kind: "mod"; modId: string };
   /** Rated piston RPM for its instrument scale; turbine limits are read from the native engine. */
   maxEngineRpm?: number;
   /** Representative rotor-row marker counts, with explicit evidence status. */
@@ -132,6 +138,12 @@ export const FDM_PROFILES = {} as Record<AircraftId, FdmProfile>;
 /** Adds an aircraft mod's flight profiles, attaching the probes this build already has for that id. */
 export function registerFdmProfile(id: AircraftId, profile: Omit<FdmProfile, "bodyCollisionProbes"> & { bodyCollisionProbes?: readonly BodyCollisionProbe[] }): void {
   FDM_PROFILES[id] = { ...profile, bodyCollisionProbes: profile.bodyCollisionProbes ?? BODY_COLLISION_PROBES[id] ?? [] };
+}
+
+/** Drops a mod profile. Built-in aircraft stay. */
+export function unregisterFdmProfile(id: string): void {
+  if ((AIRCRAFT_IDS as readonly string[]).includes(id)) return;
+  delete (FDM_PROFILES as Record<string, FdmProfile>)[id];
 }
 
 function installManifestProfiles(manifest: AircraftModFile): void {

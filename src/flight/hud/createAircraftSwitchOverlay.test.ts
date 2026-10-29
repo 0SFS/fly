@@ -2,7 +2,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { createAircraftSwitchOverlay } from "./createAircraftSwitchOverlay";
 
-afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); });
+afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 it("shows loading in the former aircraft position and updates accessible progress", () => {
   const overlay = createAircraftSwitchOverlay(document.body);
@@ -35,10 +35,55 @@ it("keeps a readable failure report outside the replaced flight UI", () => {
   session.remove();
   overlay.fail("Model request failed: <script>unsafe</script>\nHTTP 404 /aircraft/f35b.glb");
   expect(dialog.open).toBe(true);
+  const failureTab = [...dialog.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(tab => tab.textContent === "failure.txt")!;
+  failureTab.click();
   expect(dialog.querySelector("pre")?.textContent).toContain("HTTP 404 /aircraft/f35b.glb");
   expect(dialog.querySelector("script")).toBeNull();
   expect(document.querySelector<HTMLElement>(".flight-aircraft-switch")?.hidden).toBe(true);
-  (dialog.querySelector("button") as HTMLButtonElement).click();
+  ([...dialog.querySelectorAll("button")].find(button => button.textContent === "Close") as HTMLButtonElement).click();
   expect(dialog.open).toBe(false);
   overlay.dispose();
+});
+
+
+it("offers shared file tabs, opens one search hit and downloads one file or the zip", async () => {
+  const createUrl = vi.fn<(blob: Blob) => string>(() => "blob:shared-report");
+  const revokeUrl = vi.fn();
+  vi.stubGlobal("URL", class extends URL { static createObjectURL = createUrl; static revokeObjectURL = revokeUrl; });
+  const overlay = createAircraftSwitchOverlay(document.body);
+  const dialog = document.querySelector("dialog")!;
+  dialog.showModal = function () { this.open = true; };
+  dialog.close = function () { this.open = false; };
+  overlay.fail([
+    "Error: Aircraft download failed",
+    "0SFS report, 2026-10-28T00:00:00.000Z",
+    "Settings (all effective values):",
+    ...Array.from({ length: 50 }, (_, index) => `  osfs.example.${index} = ${index}`),
+    "Errors nothing handled: none.",
+    "This visit, oldest first:",
+    "The visit before: no trail of one on this device.",
+  ].join("\n"));
+  const settings = dialog.querySelector<HTMLButtonElement>('[role="tab"][data-file="settings.txt"]')!;
+  settings.click();
+  expect(dialog.querySelector("pre")).toBeNull();
+  const search = dialog.querySelector<HTMLInputElement>('[aria-label="Find a line in the error report"]')!;
+  search.value = "osfs.example.49";
+  search.dispatchEvent(new Event("input", { bubbles: true }));
+  const hit = dialog.querySelector<HTMLButtonElement>('.foss-earth-issue-report__hits button')!;
+  expect(hit.textContent).toContain("settings.txt:51");
+  hit.click();
+  expect(dialog.querySelector("pre")?.textContent).toBe("51>   osfs.example.49 = 49");
+  const single = dialog.querySelector<HTMLAnchorElement>('[aria-label="Download this file"]')!;
+  single.addEventListener("click", event => event.preventDefault());
+  single.click();
+  expect(single.download).toBe("settings.txt");
+  expect(single.href).toBe("blob:shared-report");
+  expect(createUrl.mock.calls[0][0].type).toBe("text/plain;charset=utf-8");
+  const all = dialog.querySelector<HTMLAnchorElement>('[download="error-report.zip"]')!;
+  all.addEventListener("click", event => event.preventDefault());
+  all.click();
+  expect(all.href).toBe("blob:shared-report");
+  expect(createUrl.mock.calls[1][0].type).toBe("application/zip");
+  overlay.dispose();
+  expect(revokeUrl).toHaveBeenCalledTimes(2);
 });

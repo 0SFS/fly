@@ -10,12 +10,13 @@ import type { ShownPose } from "@0sfs/multiplayer/posePlayout";
 export interface RemoteAircraftFrame { origin: EcefCoord; m: ArrayLike<number> }
 
 /** Remote poses share the local aircraft's floating frame, without cameras or another FDM. */
-export function createRemoteAircraft(scene: Scene, requestRender: () => void) {
-  const root = new TransformNode("multiplayer-aircraft", scene);
-  const body = CreateBox("multiplayer-fallback-body", { width: 1.4, height: 1.4, depth: 8 }, scene);
-  const wing = CreateBox("multiplayer-fallback-wing", { width: 11, height: 0.18, depth: 1.8 }, scene);
+export function createRemoteAircraft(scene: Scene, requestRender: () => void, slotId = "") {
+  const suffix = slotId ? `-${slotId}` : "";
+  const root = new TransformNode(`multiplayer-aircraft${suffix}`, scene);
+  const body = CreateBox(`multiplayer-fallback-body${suffix}`, { width: 1.4, height: 1.4, depth: 8 }, scene);
+  const wing = CreateBox(`multiplayer-fallback-wing${suffix}`, { width: 11, height: 0.18, depth: 1.8 }, scene);
   body.parent = wing.parent = root;
-  const material = new StandardMaterial("multiplayer-fallback", scene);
+  const material = new StandardMaterial(`multiplayer-fallback${suffix}`, scene);
   material.diffuseColor = new Color3(0.2, 0.7, 0.85);
   body.material = wing.material = material;
   body.isPickable = wing.isPickable = false;

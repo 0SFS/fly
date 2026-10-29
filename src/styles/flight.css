@@ -815,8 +815,7 @@ html[data-world-edges="flush"] .flight-toolbar-instruments :where(.flight-hud__t
   cursor: pointer;
 }
 
-.flight-panel__aircraft-dialog .flight-panel__command:focus-visible,
-.flight-panel__aircraft-error-report:focus-visible {
+.flight-panel__aircraft-dialog .flight-panel__command:focus-visible {
   outline: 2px solid #e8b647;
   outline-offset: 2px;
 }
@@ -825,19 +824,7 @@ html[data-world-edges="flush"] .flight-toolbar-instruments :where(.flight-hud__t
 .flight-panel__aircraft-confirm-preference { min-height: 44px; cursor: pointer; }
 .flight-panel__aircraft-confirm-preference input { width: 18px; height: 18px; accent-color: #e8b647; }
 
-.flight-panel__aircraft-error-report {
-  max-height: 40dvh;
-  margin: 0;
-  padding: 12px;
-  overflow: auto;
-  border: 1px solid rgba(232, 119, 111, 0.45);
-  border-radius: 8px;
-  background: #070c11;
-  color: #efc3bf;
-  font: 12px/1.5 ui-monospace, monospace;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
+.flight-panel__aircraft-dialog-content.is-wide { width: min(100%, 880px); }
 
 .flight-aircraft-switch {
   position: fixed;
@@ -1451,3 +1438,10 @@ html[data-world-edges="flush"] .flight-toolbar-instruments :where(.flight-hud__t
   flex: 1 1 100%;
   margin: 0;
 }
+
+/* A DJI vertical stick commands velocity and springs back to altitude hold. */
+.flight-climb-rate { display: flex; flex-direction: column; align-items: center; gap: .3rem; font-size: .65rem; font-weight: 650; }
+.flight-climb-rate output { font-variant-numeric: tabular-nums; white-space: nowrap; min-width: 4.5em; text-align: center; }
+.flight-climb-rate input { touch-action: none; }
+
+.flight-hud__throttle .flight-hud__slider-control--climb-rate { width: auto; min-width: 60px; }

@@ -106,7 +106,7 @@ const mocks = vi.hoisted(() => {
     flightHud: { update: vi.fn(), destroy: vi.fn(), refreshVtolConversion: vi.fn(), refreshFlaps: vi.fn(), setLayout: vi.fn(), setReadingTints: vi.fn() },
     applyAircraftRig: vi.fn(),
     terrainContact: { reset: vi.fn(), update: vi.fn(() => true) },
-    visibleMeshCollision: { reset: vi.fn(), update: vi.fn(() => false) },
+    visibleMeshCollision: { reset: vi.fn(), update: vi.fn(() => false), dispose: vi.fn() },
     physics: { reset: vi.fn(), setPaused: vi.fn(), update: vi.fn((_delta, applyInputs) => { applyInputs(); return state; }), getLatestState: () => state, getFault: () => null,
       getTimeAccounting: () => ({ physicsHz: 60, dtSeconds: 1 / 60, maxStepsPerUpdate: 3, receivedSeconds: 0,
         acceptedSteps: 0, simulatedSeconds: 0, discardedSeconds: 0, catchUpDiscardedSeconds: 0, pendingSeconds: 0 }) },
@@ -1650,10 +1650,14 @@ it("boots a saved SF50 selection with its matching FDM, reset identity and colli
   try {
     expect(createJsbsimRuntime).toHaveBeenCalledWith(expect.objectContaining({ aircraftId: "cirrus-vision-jet" }));
     expect(mocks.resetLocation).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), 250, "cirrus-vision-jet");
-    const probes = vi.mocked(createVisibleMeshCollision).mock.calls.at(-1)![2]!.bodyProbes!;
-    expect(probes).toContainEqual(expect.objectContaining({ name: "left-wing", left: 5.898 }));
-    expect(probes).toContainEqual(expect.objectContaining({ name: "right-tail" }));
+    const probes = vi.mocked(createVisibleMeshCollision).mock.calls.at(-1)![2]!.bodyProbes;
+    expect(probes).toContainEqual(expect.objectContaining({ name: "left-wing", yIn: -226.4 }));
+    expect(probes).toContainEqual(expect.objectContaining({ name: "nacelle" }));
   } finally { await act(async () => app.destroy()); }
+  // The hull collision's property batch is released before the SDK.
+  const jsbsim = await vi.mocked(createJsbsimRuntime).mock.results.at(-1)!.value;
+  expect(mocks.visibleMeshCollision.dispose.mock.invocationCallOrder.at(-1))
+    .toBeLessThan(vi.mocked(jsbsim.dispose).mock.invocationCallOrder.at(-1)!);
 });
 
 it("drives the model's control surfaces and propeller from the simulation each tick", async () => {
@@ -2211,6 +2215,51 @@ describe("pause while loading and resumed flights", () => {
       expect(mocks.physics.setPaused).toHaveBeenLastCalledWith(false);
       expect(mocks.runtime.setSimRunning).toHaveBeenLastCalledWith(true);
     } finally { await act(async () => app.destroy()); }
+  });
+
+  it("loads saved mod aircraft before validating the selection and saved flight", async () => {
+    const catalog = await import("@0sfs/aircraft/aircraftCatalog");
+    const { isAircraftId } = await import("@0sfs/aircraft/aircraftIds");
+    const profiles = await import("./jsbsim/fdmProfiles");
+    const mods = await import("./mods/modSession");
+    const ensure = mods.ensureModsSession;
+    const id = "resume-test-aircraft" as import("@0sfs/aircraft/aircraftIds").AircraftId;
+    const familyId = "resume-test-family" as import("@0sfs/aircraft/aircraftIds").AircraftFamilyId;
+    const flight = savedFlight({ aircraftId: id });
+    expect(isAircraftId(id)).toBe(false);
+    const loadMods = vi.spyOn(mods, "ensureModsSession").mockImplementationOnce(async () => {
+      const records = await ensure();
+      const family = catalog.getAircraftFamilyForAircraft("cessna-172");
+      catalog.registerAircraftMod({ ...family, id: familyId, variants: [
+        { ...family.variants[0], id: "resume-test", aircraftId: id },
+      ] }, [{ ...catalog.getAircraftDefinition("cessna-172"), id, familyId }]);
+      profiles.registerFdmProfile(id, profiles.getFdmProfile("cessna-172"));
+      return records;
+    });
+    let t: Awaited<ReturnType<typeof mountAircraftSelection>> | undefined;
+    try {
+      t = await mountAircraftSelection([
+        [SETTINGS_STORAGE_KEY, JSON.stringify({ version: 1, values: {
+          "osfs.aircraft.id": id, "osfs.aircraft.generation": "resume-test", "osfs.start.resume": true,
+        } })],
+        [SAVED_FLIGHT_STORAGE_KEY, JSON.stringify(flight)],
+      ]);
+      expect(createJsbsimRuntime).toHaveBeenLastCalledWith(expect.objectContaining({
+        aircraftId: id, bootstrap: expect.objectContaining({ latDeg: 46.8, lonDeg: -92.1, headingDeg: 90 }),
+      }));
+      expect(mocks.runtime.prepareTerrain).toHaveBeenCalledWith(expect.objectContaining({
+        latDeg: 46.8, lonDeg: -92.1, altitudeAboveGroundMeters: 180, clearanceMeters: 0,
+      }));
+      const runtime = await vi.mocked(createJsbsimRuntime).mock.results.at(-1)!.value;
+      expect(restoreSavedFlight).toHaveBeenCalledWith(runtime.sdk, flight, id, expect.anything());
+      expect(mocks.physics.setPaused).toHaveBeenLastCalledWith(true);
+      expect(getAppSettings().get("osfs.aircraft.id")).toBe(id);
+    } finally {
+      if (t) await act(async () => t!.app.destroy());
+      loadMods.mockRestore();
+      catalog.unregisterAircraftMod(familyId, [id]);
+      profiles.unregisterFdmProfile(id);
+    }
   });
 
   it("resumes the saved flight where it was, with its controls, paused as it was left", async () => {

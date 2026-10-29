@@ -532,12 +532,12 @@ The options:
 
 ## Waiting on your decision: imagery height verification in a worker
 
-With `native.tier=single`, the page already computes the heights needed to select and measure
+With `wasm.tier=single`, the page already computes the heights needed to select and measure
 imagery. The imagery worker then verifies those results. Earlier attribution put the main-thread
 `flush`/`receive` work at about 13.4 ms/s at 1× and 35.6 ms/s at 4×.
 
 `nimg` alternated the same `osfs-ring` build with and without
-`set.native.core.imagery=typescript`, 2 + 2 runs:
+`set.wasm.core.imagery=typescript`, 2 + 2 runs:
 
 | | Worker placement | TypeScript placement |
 | --- | ---: | ---: |

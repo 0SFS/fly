@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => {
     cameraFingers: vi.fn(() => null as number | null),
     onHidden: vi.fn(), syncStatus: vi.fn(), destroy: vi.fn(),
     isConnected: vi.fn(() => snapshot.phase === "paired"), setAttitude: vi.fn(), syncPhoneSettings: vi.fn(),
+    getDroneCommand: vi.fn(() => null),
   };
   return {
     state, snapshot, phoneControls, phone, engineVisualValues,
@@ -63,7 +64,7 @@ const mocks = vi.hoisted(() => {
     },
     aircraftModel: { getState: () => ({ status: "ready" }), getRig: () => null, setAircraft: vi.fn(), setLod: vi.fn(), setRenderStowedGear: vi.fn(), updateGearVisibility: vi.fn(), refreshAutoLod: vi.fn(), dispose: vi.fn() },
     terrainContact: { update: vi.fn(() => true), reset: vi.fn() },
-    visibleMeshCollision: { update: vi.fn(() => false), reset: vi.fn() },
+    visibleMeshCollision: { update: vi.fn(() => false), reset: vi.fn(), dispose: vi.fn() },
     physics: {
       reset: vi.fn(), setPaused: vi.fn(), update: vi.fn(), getLatestState: () => state, getFault: () => null,
     },
@@ -116,6 +117,8 @@ import { getAppSettings, resetAppSettings } from "foss-earth/settings";
 import { createFlightSimApp } from "./createFlightSimApp";
 import { registerFlightSettings } from "./settings/registerFlightSettings";
 import { getAircraftDefinition } from "@0sfs/aircraft/aircraftCatalog";
+import { setDroneRefusal } from "./drone/droneGate";
+import { parseMessage } from "@0sfs/rc/protocol";
 
 let app: Awaited<ReturnType<typeof createFlightSimApp>> | null = null;
 let tick: (dt: number) => void;
@@ -474,6 +477,21 @@ describe("0SFS phone integration", () => {
       rotorBlades: { outer: 2, inner: null, outerEstimated: false, innerEstimated: false },
       orbs: { fps: 1000, turnsPerSecond: 2, maxPatternStep: 0.45, pixelRatio: 2, renderer: "auto" },
     });
+  });
+
+  it("keeps the WebGPU capture refusal valid on the phone protocol", async () => {
+    await mount();
+    grant();
+    tick(1 / 60);
+    setDroneRefusal("360° capture requires WebGPU.");
+    try {
+      const status = options.getStatus();
+      expect(status.engine?.blocked).toBe("360 capture requires WebGPU.");
+      expect(parseMessage({ v: 1, type: "heartbeat", session: "test", epoch: 0, lease: 1, status }))
+        .toMatchObject({ status: { engine: { blocked: "360 capture requires WebGPU." } } });
+    } finally {
+      setDroneRefusal(null);
+    }
   });
 
   it("hides this computer's flight UI for a phone, but not past a key pressed here or a phone gone quiet", async () => {

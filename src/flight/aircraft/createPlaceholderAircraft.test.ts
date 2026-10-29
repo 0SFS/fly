@@ -1,10 +1,32 @@
-import { NullEngine, Scene, TransformNode, Vector3, type UniversalCamera } from "@babylonjs/core";
+import { Quaternion, NullEngine, Scene, TransformNode, Vector3, type UniversalCamera } from "@babylonjs/core";
 import { describe, expect, it } from "vitest";
 import { flightAttitudeToQuaternion } from "@0sfs/ground-contact/ecefBridge";
 import { createPlaceholderAircraft } from "@0sfs/aircraft/createPlaceholderAircraft";
 import { getAircraftDefinition } from "@0sfs/aircraft/aircraftCatalog";
+import { getAppSettings, resetAppSettings } from "foss-earth/settings";
+import { registerFlightSettings } from "../settings/registerFlightSettings";
+import mini from "../../../../DJI-Mini2/public/0sfs-mod.json";
+import air from "../../../../DJI-Air-2S/public/0sfs-mod.json";
 
 describe("aircraft chase camera", () => {
+  it.each([mini, air])("uses $name camera dimensions for close inspection", manifest => {
+    const engine = new NullEngine(); const scene = new Scene(engine); const parent = new TransformNode("origin", scene);
+    const settings = getAppSettings(); const parameters = registerFlightSettings(settings);
+    const camera = manifest.aircraft.definitions[0].camera;
+    settings.setHostDefault("osfs.camera.chaseDistance", camera.chaseDistanceMeters, manifest.name);
+    settings.setHostDefault("osfs.camera.chaseHeight", camera.chaseHeightMeters, manifest.name);
+    settings.setHostDefault("osfs.camera.chaseZoomLimits", camera.chaseZoomLimits, manifest.name);
+    settings.setHostDefault("osfs.camera.nearClipMeters", camera.nearClipMeters, manifest.name);
+    const aircraft = createPlaceholderAircraft(scene, parent, parameters);
+    try {
+      expect(aircraft.getChaseDistanceMeters()).toBeLessThan(2);
+      aircraft.zoomChaseCamera(.001);
+      expect(aircraft.getChaseDistanceMeters()).toBeCloseTo(camera.chaseZoomLimits.min);
+      expect(aircraft.thirdPersonCamera.minZ).toBeCloseTo(.01);
+      expect(aircraft.thirdPersonCamera.position.length()).toBeCloseTo(camera.chaseZoomLimits.min);
+    } finally { aircraft.dispose(); scene.dispose(); engine.dispose(); resetAppSettings(); }
+  });
+
   it("orbits and zooms around a declared engine focus without losing its offset", () => {
     const engine = new NullEngine();
     const scene = new Scene(engine);
@@ -142,4 +164,34 @@ describe("aircraft chase camera", () => {
     expect(camera.fov).toBeCloseTo(100 * Math.PI / 180);
     aircraft.dispose(); scene.dispose(); engine.dispose();
   });
+  it.each([true, false])('keeps the actual Momentum camera upright through vertical flight and side orbits (RH %s)', rightHanded => {
+    const engine = new NullEngine(), scene = new Scene(engine);
+    scene.useRightHandedSystem = rightHanded;
+    const origin = new TransformNode('origin', scene);
+    origin.rotationQuaternion = flightAttitudeToQuaternion(.4, -.2, 1);
+    const aircraft = createPlaceholderAircraft(scene, origin);
+    try {
+      let yaw = 0;
+      for (const orbit of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
+        aircraft.orbitChaseCamera(orbit - yaw, 0);
+        yaw = orbit;
+        for (const pitch of [0, 60, 85, -60, -85]) {
+          aircraft.setChaseFrame(Quaternion.RotationYawPitchRoll(1.2, -pitch * Math.PI / 180, 0));
+          const world = aircraft.thirdPersonCamera.getViewMatrix(true).clone().invert();
+          const right = Vector3.TransformNormal(Vector3.Right(), world).normalize();
+          const up = Vector3.TransformNormal(Vector3.Up(), world).normalize();
+          const forward = Vector3.TransformNormal(new Vector3(0, 0, rightHanded ? -1 : 1), world).normalize();
+          expect(right.y).toBeCloseTo(0, 5);
+          expect(up.y).toBeGreaterThan(.08);
+          expect(Math.abs(Math.asin(forward.y))).toBeLessThanOrEqual(85 * Math.PI / 180 + 1e-6);
+        }
+      }
+      // Returning to Aircraft restores the original body-relative orbit and offset.
+      aircraft.setChaseFrame(null);
+      expect(aircraft.thirdPersonCamera.parent).toBe(aircraft.root);
+      const pitch = Math.asin(aircraft.thirdPersonCamera.position.y / aircraft.thirdPersonCamera.position.length());
+      expect(pitch).toBeCloseTo(Math.atan2(2.2, 14));
+    } finally { aircraft.dispose(); scene.dispose(); engine.dispose(); }
+  });
+
 });

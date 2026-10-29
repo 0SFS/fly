@@ -7,10 +7,36 @@ import { registerEngineAcousticDefinition, telemetryById } from "@0sfs/sound/eng
 import { registerPayloadInstallation } from "@0sfs/stores/stationTable";
 import { registerPayloadStore, registerRefusedStore, registerStorePresets, storeByKey, type StoreCard } from "@0sfs/stores/storeCatalog";
 import { FDM_PROFILES, registerFdmProfile } from "../jsbsim/fdmProfiles";
+import { onModAdded } from "../drone/droneGate";
+import { installDroneCamera, installDjiCommon, installQuadCommon, installQuadVehicle } from "../drone/quadRegistry";
+import { installCameraPreview } from "../drone/cameraPreviewRegistry";
 
-/** Registers a mod that was not already part of the built-in fleet. Built-ins are left as installed. */
-export function applyDynamicMod(record: LoadedModRecord): void {
+function applyQuadLayer(record: LoadedModRecord): void {
   const manifest = record.manifest;
+  if (manifest.camera) installDroneCamera(manifest.id, manifest.camera);
+  if (manifest.quadcopter) installQuadCommon(manifest.quadcopter);
+  if (manifest.dji) installDjiCommon(manifest.dji);
+  const definition = manifest.aircraft?.definitions[0] as { id?: string; label?: string } | undefined;
+  if (manifest.quad && definition?.id && definition.label) installQuadVehicle(definition.id, definition.label, manifest.quad);
+  if (manifest.quadcopter || manifest.dji || manifest.quad) onModAdded(manifest.id);
+}
+
+/** Registers a mod that was not already part of the built-in fleet. Dependencies register first. */
+export function applyDynamicMod(record: LoadedModRecord): void {
+  const seen = new Set<string>();
+  const visit = (item: LoadedModRecord): void => {
+    if (seen.has(item.manifest.id)) return;
+    for (const dependency of item.dependencies) visit(dependency);
+    seen.add(item.manifest.id);
+    applyOne(item);
+  };
+  visit(record);
+}
+
+function applyOne(record: LoadedModRecord): void {
+  applyQuadLayer(record);
+  const manifest = record.manifest;
+  if (manifest.cameraPreview) installCameraPreview(record);
   if (manifest.kind === "payload" && manifest.payload?.payloadType === "store" && manifest.payload.store) {
     const store = manifest.payload.store as StoreCard;
     if (!storeByKey(store.key)) registerPayloadStore(store);
@@ -23,9 +49,15 @@ export function applyDynamicMod(record: LoadedModRecord): void {
     if (acoustic && telemetry) registerEngineAcousticDefinition({ ...acoustic, telemetry, parameters: acoustic.parameters });
   }
   if (manifest.kind !== "aircraft" || !manifest.aircraft) return;
-  const definitions = manifest.aircraft.definitions as unknown as AircraftDefinition[];
+  const assetPath = (path: string): string => !path || /^(?:[a-z][a-z0-9+.-]*:|\/)/i.test(path)
+    ? path : `${record.baseUrl}${path}`;
+  const definitions = (manifest.aircraft.definitions as unknown as AircraftDefinition[]).map(definition => ({
+    ...definition,
+    lods: definition.lods.map(lod => ({ ...lod, path: assetPath(lod.path) })),
+  }));
   if (definitions.every(definition => AIRCRAFT_CATALOG.some(item => item.id === definition.id))) return;
-  registerAircraftMod(manifest.aircraft.family as unknown as AircraftFamilyDefinition, definitions);
+  const family = manifest.aircraft.family as unknown as AircraftFamilyDefinition;
+  registerAircraftMod({ ...family, thumbnail: { ...family.thumbnail, path: assetPath(family.thumbnail.path) } }, definitions);
   for (const [id, profile] of Object.entries(manifest.aircraft.fdmProfiles)) {
     if (FDM_PROFILES[id as AircraftId]) continue;
     registerFdmProfile(id as AircraftId, profile as Parameters<typeof registerFdmProfile>[1]);

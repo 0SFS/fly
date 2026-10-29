@@ -1,3 +1,4 @@
+import { createClimbRateLever, type ClimbRateLeverOptions } from "@0sfs/controls/climbRateLever";
 import { headingDegFromRad, type FlightState } from "@0sfs/ground-contact/flightState";
 import type { FrameProfiler } from "foss-earth/perf";
 import { createThrottleLever, type ThrottleBrakeCommand, type ThrottleLeverEngine, type ThrottleLeverGauge } from "@0sfs/engines/throttleLever";
@@ -24,6 +25,7 @@ export interface FlightHudOptions {
   getActualControls?(): ActualControlPositions;
   onGearChange(down: boolean): void;
   onThrottleChange(value: number): void;
+  climbRate?: ClimbRateLeverOptions;
   /** Present for an aircraft whose throttle lever includes a lower brake range. */
   onPowerChange?(command: ThrottleBrakeCommand): void;
   getKeepSliderBrakes?(): boolean;
@@ -333,7 +335,12 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
     throttleControl.style.setProperty("--afterburner-accent", options.afterburner.accentColor);
   }
   // The phone mounts this same lever; see throttleLever.ts.
-  const throttle = createThrottleLever(throttleControl, {
+  const climb = options.climbRate ? createClimbRateLever(throttleControl, options.climbRate) : null;
+  if (climb) {
+    throttleControl.classList.add("flight-hud__slider-control--climb-rate");
+    root.querySelector(".flight-hud__yaw-throttle")?.setAttribute("aria-label", "Yaw and climb rate");
+  }
+  const throttle = climb ? null : createThrottleLever(throttleControl, {
     onThrottleChange: options.onThrottleChange,
     onPowerChange: options.onPowerChange,
     onStartHold: options.engine?.onStartHold,
@@ -758,7 +765,8 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
       refreshFlaps();
       if (!rudderDragging) setValue(rudderInput, String(controls.rudder));
       rudderPosition.update(Number(rudderInput.value), actual?.rudder);
-      throttle.update({
+      climb?.update();
+      throttle?.update({
         throttle: controls.throttle ?? state.throttleNorm,
         actualThrottle: actual?.throttle,
         brake: options.getSliderBrake?.() ?? 0,
@@ -780,7 +788,8 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
       pitchAutoTrimButton.removeEventListener("click", onPitchAutoTrimClick);
       rollAutoTrimButton.removeEventListener("click", onRollAutoTrimClick);
       apButton.removeEventListener("click", onAutopilotClick);
-      throttle.destroy();
+      throttle?.destroy();
+      climb?.destroy();
       for (const position of [pitchPosition, rollPosition, flapPosition, rudderPosition, vtolPosition]) position?.destroy();
       vtolInput?.removeEventListener("input", onVtolInput);
       pitchTrimInput.removeEventListener("input", onPitchTrimInput);

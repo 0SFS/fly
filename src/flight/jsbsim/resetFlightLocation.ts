@@ -128,13 +128,16 @@ export function resetFlightLocation(
   restoreStoreAttachments();
   sdk.setPropertyValue("fcs/throttle-cmd-norm", runway?.throttleNorm ?? state.throttleNorm);
   if (!sdk.runIc()) throw new Error("JSBSim could not apply the location.");
-  if (runway || saved.running) sdk.setPropertyValue("propulsion/set-running", -1);
-  else sdk.setPropertyValue("propulsion/engine/set-running", 0);
+  const unpowered = profile.engine === "none" || profile.kinematic === "drone-pgps";
+  if (!unpowered) {
+    if (runway || saved.running) sdk.setPropertyValue("propulsion/set-running", -1);
+    else sdk.setPropertyValue("propulsion/engine/set-running", 0);
+  }
   if (!runway) {
     // Reapply after native initialization, including a partially moved gear.
     for (const [property, value] of controlEntries) sdk.setPropertyValue(property, value);
     if (Number.isFinite(flapPosition)) sdk.setPropertyValue(profile.flapPosition.property, flapPosition);
-  } else {
+  } else if (!unpowered) {
     if (profile.engine === "piston") {
       sdk.setPropertyValue("propulsion/magneto_cmd", 3);
       sdk.setPropertyValue("fcs/mixture-cmd-norm", Math.min(1, Math.max(0, Math.pow(Math.max(0, 1 - 6.87535e-6 * altitude / 0.3048), 5.2561) * 1.3)));

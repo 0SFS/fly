@@ -1,6 +1,6 @@
 import { ModsPanel } from "@0sfs/mods/ModsPanel";
 import { useEffect, useSyncExternalStore } from "react";
-import { addMod, browseMods, confirmPendingMod, dismissPendingMod, ensureModsSession, getModsSession, setBrowseKind, setDeveloperUsername, subscribeModsSession } from "./modSession";
+import { addMod, browseMods, confirmPendingMod, dismissPendingMod, ensureModsSession, getModsSession, removeMod, setBrowseKind, setDeveloperUsername, subscribeModsSession } from "./modSession";
 
 /** The Mods tab. Its state lives beside the flight snapshot, so a frame does not rebuild this tree. */
 export function ModsTab() {
@@ -11,7 +11,9 @@ export function ModsTab() {
       installed={state.installed}
       developerUsername={state.developerUsername}
       onDeveloperUsername={setDeveloperUsername}
+      allowLocal={import.meta.env.DEV}
       onAdd={(source) => { void addMod(source); }}
+      onRemove={(source) => { void removeMod(source); }}
       notice={state.notice}
       pendingWarning={state.pendingWarning}
       onConfirmWarning={() => { void confirmPendingMod(); }}

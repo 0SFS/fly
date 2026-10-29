@@ -196,19 +196,24 @@ describe("flight loading log", () => {
     expect(reported).toContain("https://0sfs.test/assets/app.js");
   });
 
-  it("copies the complete traceback and redacts phase history as well as the thrown error", async () => {
+  it("copies the shared report with loading state and the complete traceback", async () => {
     const writeText = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
-    screen = createFlightLoadingScreen();
+    screen = createFlightLoadingScreen(undefined, async () => `0SFS report, 2026-10-28T00:00:00.000Z\nContact: reporter@example.com\nLoading diagnostics:\n${JSON.stringify(window.osfsLoadingDiagnostics?.())}\nSettings: all at their defaults.\n`);
     screen.setPhase("app", { state: "loading", detail: "Importing https://app.test/app.js?token=phase-secret" });
     const error = new SyntaxError("The requested module '/src/fixedStepLoop.ts?t=123' doesn't provide an export named: 'FIXED_DT'");
     error.stack = "";
     await expect(screen.trace!("Import flight application", async () => { throw error; })).rejects.toBe(error);
     screen.fail("Application failed", { cause: error });
-    const copy = [...newestLine().querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Copy loading report")!;
+    const copy = [...newestLine().querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Copy report")!;
     copy.click();
     await vi.waitFor(() => expect(writeText).toHaveBeenCalledOnce());
-    const report = JSON.parse(writeText.mock.calls[0][0]);
+    const text = writeText.mock.calls[0][0];
+    expect(text).toContain("0SFS report, ");
+    expect(text).toContain("Settings: all at their defaults.");
+    expect(text).not.toContain("reporter@example.com");
+    expect(text).toContain("SyntaxError: The requested module");
+    const report = window.osfsLoadingDiagnostics?.();
     expect(report).toMatchObject({ version: 2, outcome: "failed", phases: { app: { state: "failed" } },
       cause: { stack: null, module: { exportName: "FIXED_DT" } },
       operations: [{ state: "failed", callerStack: expect.stringContaining("createFlightLoadingScreen.test.ts:") }],

@@ -1,7 +1,7 @@
 import { configDefaults, defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { execSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { defaultClientConditions, defaultServerConditions, type Plugin } from 'vite'
 import { babylonBarrels, babylonShaderChunks, builtFrom, crossOriginIsolation, deployedIsolation, headsetEmulator, localSource, networkHttps } from 'foss-earth/vite'
@@ -9,6 +9,46 @@ import { appFiles, bootTerminal, browserRecovery } from '@foss-earth/ui/vite'
 import { findLanAddress } from './scripts/dev-lan.mjs'
 import { linkPackPublicFiles } from './scripts/link-packs.mjs'
 import { pageHtmlFor } from './scripts/pages-html.mjs'
+
+/** Serves the quadcopter mods as static files. They stay out of the flight module graph. */
+function serveDevQuadMods(): Plugin {
+  const roots: Record<string, string> = {
+    'rotating-prop': path.resolve(import.meta.dirname, '../rotating-prop/public'),
+    'drone-camera': path.resolve(import.meta.dirname, '../drone-camera/public'),
+    'camera-preview': path.resolve(import.meta.dirname, '../camera-preview/public'),
+    'dji-fc7303': path.resolve(import.meta.dirname, '../DJI-FC7303/public'),
+    'dji-fc3411': path.resolve(import.meta.dirname, '../DJI-FC3411/public'),
+    'camera-gimbal': path.resolve(import.meta.dirname, '../camera-gimbal/public'),
+    quadcopter: path.resolve(import.meta.dirname, '../Quadcopter/public'),
+    'dji-quadcopter': path.resolve(import.meta.dirname, '../DJI-Quadcopter/public'),
+    'dji-mini2': path.resolve(import.meta.dirname, '../DJI-Mini2/public'),
+    // Older saved local sources still resolve after the checkout rename.
+    'dji-mini-2': path.resolve(import.meta.dirname, '../DJI-Mini2/public'),
+    'dji-air-2s': path.resolve(import.meta.dirname, '../DJI-Air-2S/public'),
+  }
+  return {
+    name: 'osfs-dev-quad-mods',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use('/dev-mods', (req, res, next) => {
+        const url = (req.url ?? '/').split('?')[0] ?? '/'
+        const parts = decodeURIComponent(url).replace(/^\/+/, '').split('/')
+        const slug = parts[0]
+        const root = slug ? roots[slug] : undefined
+        if (!root) { next(); return }
+        const file = path.resolve(root, parts.slice(1).join('/'))
+        if (file !== root && !file.startsWith(root + path.sep)) { next(); return }
+        if (!existsSync(file) || !statSync(file).isFile()) { next(); return }
+        const type = file.endsWith('.json') ? 'application/json'
+          : file.endsWith('.xml') ? 'application/xml'
+          : file.endsWith('.js') ? 'text/javascript'
+          : 'application/octet-stream'
+        res.setHeader('content-type', type)
+        res.end(readFileSync(file))
+      })
+    },
+  }
+}
 
 /**
  * The dev server stamps `?v=<optimizer hash>` on a bare import of a linked
@@ -203,6 +243,8 @@ export default defineConfig({
     // Lazy flight/globe/phone modules reveal these only after the initial scan.
     // Prepare them together so opening the app does not trigger reload rounds.
     include: [
+      // Prepare the browser-safe encoder without fetching it until the shutter.
+      'jpeg-js',
       '3d-tiles-renderer/babylonjs',
       '3d-tiles-renderer/core/plugins',
       '@babylonjs/loaders/glTF',
@@ -256,6 +298,7 @@ export default defineConfig({
     bootTerminal({ title: '0SFS · Open Source Flight Simulator', theme: 'dark', waitFor: ['src/flight/createFlightSimApp.ts'], pages: page => page === '/index.html' }),
     browserRecovery({ appId: '0sfs' }),
     oneUrlPerSourceFile(),
+    serveDevQuadMods(),
     localSource(),
     localSource({ root: import.meta.dirname }),
     { name: 'osfs-link-packs', config: () => { linkPackPublicFiles(import.meta.dirname) } },
@@ -284,6 +327,7 @@ export default defineConfig({
       'src/**/*.{test,spec}.{ts,tsx}',
       'scripts/**/*.{test,spec}.{ts,tsx,js,mjs}',
       'benchmarks/**/*.{test,spec}.{ts,tsx,js,mjs}',
+      '../camera-preview/tests/**/*.test.ts',
       // Phase 3 moved some scripts and benchmarks into their owning repos.
       '../{F135,exhaust,fuel,sound,SF-50,F-35B,aircraft,rc,research,ground-contact}/scripts/**/*.{test,spec}.{ts,tsx,js,mjs}',
       '../sound/benchmarks/**/*.{test,spec}.{ts,tsx,js,mjs}',

@@ -13,6 +13,7 @@ const appMocks = vi.hoisted(() => ({
   reportFailure: vi.fn(),
   isRecoveryPage: vi.fn(() => false),
   diagnosticsDestroy: vi.fn(),
+  diagnosticReport: vi.fn(async () => "0SFS report, 2026-10-28T00:00:00.000Z\nSettings: all at their defaults.\n"),
   addDiagnosticState: vi.fn(),
   trailStep: vi.fn(),
   diagnosticLog: [] as string[],
@@ -22,6 +23,7 @@ const appMocks = vi.hoisted(() => ({
       return options.log.print(entry);
     } },
     destroy: appMocks.diagnosticsDestroy,
+    report: appMocks.diagnosticReport,
     addState: appMocks.addDiagnosticState,
     trail: { step: appMocks.trailStep },
   })),
@@ -205,7 +207,7 @@ describe("application route", () => {
     await vi.waitFor(() => expect(document.querySelector('#app-log [data-tone="error"]')).not.toBeNull());
     expect(document.getElementById("app-log")!.hidden).toBe(false);
     expect(document.querySelector('#app-log [data-tone="error"] .game-log__actions button')!.textContent).toBe("Reload and try again");
-    expect(document.querySelector('#app-log .game-log__line[data-tone="error"]')!.textContent).toContain("could not initialize. Copy the loading report for details, then reload to try again.\nError: Offline");
+    expect(document.querySelector('#app-log .game-log__line[data-tone="error"]')!.textContent).toContain("could not initialize. Open the report for details, then reload to try again.\nError: Offline");
     expect(window.osfsLoadingDiagnostics?.()).toMatchObject({
       version: 2, operations: [
         { operation: expect.stringContaining("Import flight"), state: "ready" },
@@ -217,7 +219,8 @@ describe("application route", () => {
     expect(readState()).toContain('"operation": "Initialize flight application"');
     expect(appMocks.trailStep).toHaveBeenCalledWith("Startup failed: Initialize flight application");
     expect(appMocks.trailStep).toHaveBeenCalledWith(expect.stringContaining("main.tsx:"));
-    expect(appMocks.diagnosticsDestroy).toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(appMocks.diagnosticsDestroy).toHaveBeenCalledOnce());
+    expect(appMocks.diagnosticReport).toHaveBeenCalledWith({ allSettings: true });
     expect(appMocks.reportFailure).toHaveBeenCalledExactlyOnceWith(document, "The application could not initialize.");
     expect(appMocks.markReady).not.toHaveBeenCalled();
   });

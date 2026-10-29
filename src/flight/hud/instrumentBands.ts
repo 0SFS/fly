@@ -137,8 +137,10 @@ export const STALL_MARGIN = 1.3;
  * The stall ends follow the flaps, and the stall speed the weight. Neither is
  * tinted on the ground, nor the stall speed while the lift system holds the
  * aircraft up; the angle of attack is not tinted at a hover.
+ * Aircraft without declared bands keep their readings untinted.
  */
-export function readingTints(bands: InstrumentBands, reading: InstrumentReading): ReadingTints {
+export function readingTints(bands: InstrumentBands | undefined, reading: InstrumentReading): ReadingTints {
+  if (!bands) return { ias: null, aoa: null, g: null, vs: null };
   const { iasKt, aoaDeg, g, vsFpm, flaps, weightLb, onGround, jetBorne } = reading;
   let ias: ReadingTint = null;
   if (Number.isFinite(iasKt)) {

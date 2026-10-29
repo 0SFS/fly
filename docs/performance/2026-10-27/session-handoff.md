@@ -1,5 +1,7 @@
 # Performance wrap-up — October 27, 2026
 
+Superseded for resumption by [the October 28 handoff](../2026-10-28/session-handoff.md). The decisions below still hold. The “no new investigation” line applied only to that closed session.
+
 The user authorized exact-output optimization through 09:00 America/Chicago
 (14:00 UTC), long CPU/GPU-intensive validation and local commits. Their latest
 instruction is to finish work already started, save useful knowledge and close

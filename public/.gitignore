@@ -53,6 +53,10 @@ mods/aim-120/0sfs-mod.json
 mods/aim-9x/0sfs-mod.json
 mods/asraam/0sfs-mod.json
 mods/c172/0sfs-mod.json
+mods/camera-gimbal/0sfs-mod.json
+mods/dji-fc3411/0sfs-mod.json
+mods/dji-fc7303/0sfs-mod.json
+mods/drone-camera/0sfs-mod.json
 mods/f-35b-external-tank/0sfs-mod.json
 mods/f-35b/0sfs-mod.json
 mods/f135/0sfs-mod.json
@@ -62,5 +66,6 @@ mods/gbu-12/0sfs-mod.json
 mods/gbu-32/0sfs-mod.json
 mods/io320/0sfs-mod.json
 mods/paveway-iv/0sfs-mod.json
+mods/rotating-prop/0sfs-mod.json
 mods/sf-50/0sfs-mod.json
 rc.webmanifest

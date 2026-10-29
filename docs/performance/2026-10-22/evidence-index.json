@@ -161,7 +161,7 @@
       "branch": "main",
       "status_at_capture": [
         " M AGENTS.md",
-        "?? docs/agent-native.md"
+        "?? docs/agent-wasm.md"
       ]
     },
     {
@@ -170,7 +170,7 @@
       "branch": "main",
       "status_at_capture": [
         " M AGENTS.md",
-        "?? docs/agent-native.md"
+        "?? docs/agent-wasm.md"
       ]
     }
   ],

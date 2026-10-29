@@ -11,6 +11,11 @@ const reading = (overrides: Partial<InstrumentReading>): InstrumentReading => ({
 });
 
 describe("instrument bands", () => {
+  it("keeps a mod aircraft without declared limits untinted", () => {
+    expect(readingTints(undefined, reading({ iasKt: 1, aoaDeg: 90, g: 5, vsFpm: 2500 })))
+      .toEqual({ ias: null, aoa: null, g: null, vs: null });
+  });
+
   it("has a band for every aircraft, green before red", () => {
     for (const id of AIRCRAFT_IDS) {
       const bands = INSTRUMENT_BANDS[id];
