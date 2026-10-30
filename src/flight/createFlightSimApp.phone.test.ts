@@ -133,7 +133,7 @@ vi.mock("@0sfs/fuel/createExternalTankVisuals", () => ({ createExternalTankVisua
   setLifetimeSeconds: vi.fn(), setMaxDetachedTanks: vi.fn(), resetDetached: vi.fn(), dispose: vi.fn(),
 }) }));
 vi.mock("@0sfs/aircraft/aircraftAnimation", () => ({ applyAircraftRig: vi.fn(), readControlSurfaceState: vi.fn(() => ({ gearDownNorm: 1 })) }));
-vi.mock("./physics/fixedStepLoop", () => ({ createFixedStepPhysicsLoop: () => mocks.physics }));
+vi.mock("./physics/fixedStepLoop", () => ({ HARD_GROUND_IMPACT_FAULT: "Hard ground impact. Reposition the aircraft to recover.", createFixedStepPhysicsLoop: () => mocks.physics }));
 vi.mock("@0sfs/ground-contact/terrainContact", () => ({ createTerrainContact: () => mocks.terrainContact }));
 vi.mock("@0sfs/ground-contact/visibleMeshCollision", () => ({ createVisibleMeshCollision: () => mocks.visibleMeshCollision }));
 vi.mock("@0sfs/controls/flightCameraInput", () => ({ attachFlightCameraInput: () => vi.fn() }));

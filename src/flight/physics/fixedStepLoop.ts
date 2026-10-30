@@ -3,7 +3,7 @@ import { readFlightState } from "@0sfs/ground-contact/ecefBridge";
 import { interpolateFlightState, type FlightState } from "@0sfs/ground-contact/flightState";
 import { flightLog } from "@0sfs/logging/flightLog";
 import { readContactDiagnostics } from "@0sfs/ground-contact/contactDiagnostics";
-import { groundContactClearanceMeters } from "@0sfs/ground-contact/groundContactClearance";
+import { groundContactClearanceMeters, lowestGroundContact } from "@0sfs/ground-contact/groundContactClearance";
 import {
   createSimulationRecorder, invalidFlightStateReasons, restoreSimulation,
 } from "@0sfs/ground-contact/safeFlightState";
@@ -13,6 +13,19 @@ import { maxCatchUpSteps, physicsStepSeconds, type PhysicsHz } from "./physicsRa
 // Beyond normal suspension compression, this is a hard impact. Feeding deep
 // penetration into an unbounded spring turns a cliff into a launch pad.
 const MAX_GROUND_PENETRATION_METERS = 0.5;
+
+/** The fault raised instead of loading the gear springs with a deep penetration. */
+export const HARD_GROUND_IMPACT_FAULT = "Hard ground impact. Reposition the aircraft to recover.";
+
+/** Where a hard ground impact stopped the aircraft. */
+export interface GroundImpact {
+  /** How far its lowest contact was inside the floor, in metres. */
+  depthMeters: number;
+  /** The floor JSBSim was given, in metres above sea level. */
+  floorMeters: number;
+  /** That contact's property prefix, such as `contact/unit[4]/`; null for a model that reports none. */
+  contact: string | null;
+}
 
 export interface FixedStepPhysicsOptions {
   /**
@@ -57,6 +70,8 @@ export interface FixedStepPhysicsLoop {
   reset(): void;
   getLatestState(): FlightState | null;
   getFault(): string | null;
+  /** The impact behind a `HARD_GROUND_IMPACT_FAULT`, until reset. */
+  getGroundImpact(): GroundImpact | null;
   getTimeAccounting(): PhysicsTimeAccounting;
 }
 
@@ -87,6 +102,7 @@ export function createFixedStepPhysicsLoop(
   let currState: FlightState | null = null;
   let paused = false;
   let fault: string | null = null;
+  let impact: GroundImpact | null = null;
   let receivedSeconds = 0;
   let acceptedSteps = 0;
   let discardedSeconds = 0;
@@ -137,9 +153,13 @@ export function createFixedStepPhysicsLoop(
         const terrainMeters = sdk.getPropertyValue("position/terrain-elevation-asl-ft") * 0.3048;
         const groundPenetration = terrainMeters + groundContactClearanceMeters(sdk, before.rollRad, before.pitchRad) - before.altMeters;
         if (!options.getArcadeGroundLaunches?.() && groundPenetration > MAX_GROUND_PENETRATION_METERS) {
-          fault = "Hard ground impact. Reposition the aircraft to recover.";
+          fault = HARD_GROUND_IMPACT_FAULT;
+          impact = {
+            depthMeters: groundPenetration, floorMeters: terrainMeters,
+            contact: lowestGroundContact(sdk, before.rollRad, before.pitchRad)?.prefix ?? null,
+          };
           flightLog.error("physics", "Stopped a deep ground impact before loading the gear springs", {
-            penetrationMeters: Number(groundPenetration.toFixed(3)),
+            penetrationMeters: Number(groundPenetration.toFixed(3)), contact: impact.contact,
             terrainMeters, state: before,
           });
           prevState = currState = before;
@@ -218,6 +238,7 @@ export function createFixedStepPhysicsLoop(
       assertNativeStep(sdk, physicsHz, dt);
       if (fault) flightLog.info("physics", "Fault cleared; physics resuming", { clearedFault: fault });
       fault = null;
+      impact = null;
       discardBacklog();
       currState = state;
       prevState = currState;
@@ -226,6 +247,7 @@ export function createFixedStepPhysicsLoop(
       return currState;
     },
     getFault: () => fault,
+    getGroundImpact: () => impact,
     getTimeAccounting: () => ({
       physicsHz, dtSeconds: dt, maxStepsPerUpdate: maxSteps, receivedSeconds,
       acceptedSteps, simulatedSeconds: acceptedSteps * dt,

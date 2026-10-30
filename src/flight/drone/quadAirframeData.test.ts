@@ -50,6 +50,13 @@ describe.each(cases)("$directory quad airframe data", ({ directory, spec, mass, 
     for (const force of forces) expect(location(force)).toEqual(cg);
   });
 
+  it("draws the model about the CG, where the app places the JSBSim position", () => {
+    // The structural frame (x aft, y right, z up) and the model share an origin; the model's offset is left, up, forward.
+    const [aft, right, up] = quad.cgM as number[];
+    expect(definition.modelYawRad ?? 0).toBe(0);
+    expect(definition.modelOffset).toEqual({ x: right! + 0, y: -up! + 0, z: aft! + 0 });
+  });
+
   it("uses the shared body wrench properties and initializes all six", () => {
     const reactions = [...xml.querySelectorAll("external_reactions > force, external_reactions > moment")];
     const expected = ["fx", "fy", "fz", "l", "m", "n"].map(key => shared.properties[key]);

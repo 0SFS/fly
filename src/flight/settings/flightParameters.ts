@@ -1112,6 +1112,20 @@ export const OSFS_PARAMETERS = [
     appliesLive: true,
     source: "src/flight/physics/fixedStepLoop.ts",
   },
+  {
+    id: "osfs.ground.automaticMoveMeters",
+    label: "Move onto the ground without asking",
+    description: "When the map puts the ground this close above or below the aircraft, it is moved onto the ground at once. Further than this, a card asks first. Zero always asks.",
+    unit: "m",
+    kind: "number",
+    step: 0.1,
+    bounds: within(0, 5),
+    default: 1,
+    defaultReason: "Map detail that loads under a landed aircraft moves the ground by centimetres; asking about that interrupts for nothing. A metre still asks before lifting an aircraft out of a hill or a building.",
+    home: main(GROUND),
+    appliesLive: true,
+    source: "ground-contact/src/terrainContact.ts",
+  },
 
   // Sound: the tiers are separate synthesis engines, so the tier is a choice
   // (docs/sound.md). A stored preference never restores louder sound than the

@@ -54,6 +54,7 @@ import {
   type FlightPerformanceSummary,
 } from "@0sfs/logging/flightPerformanceCapture";
 import type { FlightState } from "@0sfs/ground-contact/flightState";
+import type { CollisionDebugLegend } from "@0sfs/ground-contact/createCollisionDebugOverlay";
 import { KEY_PAIRS, KEYBOARD_AXES, keyboardAxisParameterId, readKeyboardAxes } from "@0sfs/controls/keyboardAxisBindings";
 import {
   KEYBOARD_STICK_PARAMETER_IDS,
@@ -161,6 +162,8 @@ export interface FlightControlPanelSnapshot {
   /** A complete aircraft is being prepared; resuming is blocked until it is ready. */
   aircraftSwitching?: boolean;
   collisionDebugEnabled: boolean;
+  /** What the collision geometry shows for this aircraft, once shown. */
+  collisionLegend?: CollisionDebugLegend | null;
   wheelSpinMode: WheelSpinMode | "off";
   tireSoundEnabled: boolean;
   tireAudioStatus: string | null;
@@ -706,6 +709,8 @@ function KeyboardModeParameters({ settings, parameters }: { settings: SettingsRe
   return <RegistryControls settings={settings} ids={[...fields, "expo"].map(field => `osfs.input.keyboard.${field}`)} />;
 }
 
+const countOf = (count: number, noun: string): string => `${count} ${noun}${count === 1 ? "" : "s"}`;
+
 function DebugPanel({ snapshot, settings, onCollisionDebugChange, onWheelSpinModeChange, onTireSoundChange }: Pick<FlightControlPanelProps,
   "snapshot" | "settings" | "onCollisionDebugChange" | "onWheelSpinModeChange" | "onTireSoundChange">) {
   return (
@@ -744,14 +749,18 @@ function DebugPanel({ snapshot, settings, onCollisionDebugChange, onWheelSpinMod
               These are contact points, not a solid collision mesh. Marker sizes and lines from the centre
               are visual guides. Body probes sweep between physics steps near the ground.
             </p>
-            <p>Shows the current C172 physics geometry, including when a different visual aircraft is selected.</p>
+            <p>Shows the flight model's points for the aircraft you are flying, which is what the physics touches the ground with.</p>
+            <p>Each contact is a spring that sinks into the ground under the aircraft's weight, so a resting contact sits a little below its drawn wheel or foot.</p>
           </HelpTip>
         </div>
         {snapshot.collisionDebugEnabled &&
           <div className="flight-panel__metrics" aria-label="Collision geometry legend">
-            <Metric label="Cyan" value="5 swept body probes" />
-            <Metric label="Amber" value="3 wheel contacts" />
-            <Metric label="Purple" value="4 structural contacts" />
+            {!!snapshot.collisionLegend?.bodyProbes &&
+              <Metric label="Cyan" value={countOf(snapshot.collisionLegend.bodyProbes, "swept body probe")} />}
+            {!!snapshot.collisionLegend?.wheels &&
+              <Metric label="Amber" value={countOf(snapshot.collisionLegend.wheels, "wheel contact")} />}
+            {!!snapshot.collisionLegend?.structures &&
+              <Metric label="Purple" value={countOf(snapshot.collisionLegend.structures, "structural contact")} />}
             <Metric label="White" value="Centre of gravity" />
           </div>}
       </fieldset>

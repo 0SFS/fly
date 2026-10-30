@@ -16,6 +16,7 @@ import { createDroneController, planDroneCommand, type DroneController, type Dro
 import type { DroneStickCommand } from "./droneGate";
 import { resolveQuadPropeller } from "./quadRegistry";
 import { buildDroneProfile } from "./droneTypes";
+import { drawnModelFeet, standingPitchRad } from "../testing/modelLowestPoints";
 
 const DT = 1 / 120, FT = 0.3048, LBF = 4.4482216152605, INERTIA = LBF * FT;
 const SLUG = 14.5939029, DENSITY = 515.3788184, DEG = Math.PI / 180, RPM = 30 / Math.PI;
@@ -29,7 +30,9 @@ const cases = ["DJI-Mini2", "DJI-Air-2S"].map(directory => {
   const cameraDirectory = directory === "DJI-Mini2" ? "DJI-FC7303" : "DJI-FC3411";
   const camera = JSON.parse(readFileSync(root + cameraDirectory + "/public/0sfs-mod.json", "utf8")).camera;
   const quad = { ...manifest.quad as QuadVehicleModData, propeller: resolveQuadPropeller(manifest.quad) };
-  return { directory, id, manifest, quad, profile: manifest.aircraft.fdmProfiles[id],
+  // Its model's feet tilt it a little nose-up when it stands on flat ground.
+  const restPitchDeg = standingPitchRad(drawnModelFeet(root + directory)) / DEG;
+  return { directory, id, manifest, quad, restPitchDeg, profile: manifest.aircraft.fdmProfiles[id],
     droneProfile: buildDroneProfile(id, manifest.name, shared, dji, quad, camera) };
 });
 type TestCase = (typeof cases)[number];
@@ -50,6 +53,8 @@ const slots = Object.fromEntries(reads.map((path, i) => [path, i])) as Record<(t
 
 interface Lab {
   id: string;
+  /** Pitch it stands at on flat ground, in degrees. */
+  restPitchDeg: number;
   sdk: JSBSimSdk;
   multirotor: Multirotor;
   sample: AircraftSample;
@@ -121,7 +126,7 @@ async function boot(testCase: TestCase, heightM: number): Promise<Lab> {
     const sample: AircraftSample = { vn: 0, ve: 0, vd: 0, u: 0, v: 0, w: 0, p: 0, q: 0, r: 0,
       phi: 0, theta: 0, psi: 0, massKg: 0, ixx: 0, iyy: 0, izz: 0, rho: 0, aglM: NaN };
     const lab: Lab = {
-      id: testCase.id, sdk, multirotor, sample, values, batch, warnings, steps: 0, stepMs: 0,
+      id: testCase.id, restPitchDeg: testCase.restPitchDeg, sdk, multirotor, sample, values, batch, warnings, steps: 0, stepMs: 0,
       read() {
         batch!.read(values);
         sample.vn = values[0] * FT; sample.ve = values[1] * FT; sample.vd = values[2] * FT;
@@ -169,6 +174,8 @@ function command(mode: QuadFlightModeData, overrides: Partial<FlightCommand> = {
     tanTiltMax: Math.tan(mode.tiltMaxDeg * DEG), yawRateMaxRad: mode.yawRateDeg * DEG, ...overrides };
 }
 const height = (lab: Lab) => lab.values[slots["position/h-agl-ft"]] * FT;
+/** Degrees of pitch away from how it stands on flat ground. */
+const pitchFromRest = (lab: Lab) => lab.sample.theta / DEG - lab.restPitchDeg;
 const tilt = (lab: Lab) => Math.acos(Math.min(1, Math.max(-1, Math.cos(lab.sample.phi) * Math.cos(lab.sample.theta)))) / DEG;
 const wow = (lab: Lab) => Array.from(lab.values.slice(18, 22));
 const groundSpeed = (lab: Lab) => Math.hypot(lab.sample.vn, lab.sample.ve);
@@ -258,7 +265,7 @@ function controlledLanding(lab: Lab, controller: DroneController, sport: boolean
   expect.soft(peakLoad).toBeLessThan(3); expect.soft(bounce).toBeLessThan(0.005);
   expect.soft(low).toBeGreaterThan(0); expect.soft(wow(lab)).toEqual([1, 1, 1, 1]);
   expect.soft(Math.abs(lab.sample.phi / DEG)).toBeLessThan(1);
-  expect.soft(Math.abs(lab.sample.theta / DEG)).toBeLessThan(1);
+  expect.soft(Math.abs(pitchFromRest(lab))).toBeLessThan(1);
   expect.soft(result?.armed).toBe(false);
   expect.soft(lab.sdk.getPropertyValue("multirotor/armed")).toBe(0);
   expect.soft(maxTerrainDifference).toBeLessThan(0.001);
@@ -271,15 +278,15 @@ describe.each(cases)("$id real JSBSim and multirotor", testCase => {
     let settledAtS = 0;
     advance(lab, 2, cmd, t => {
       if (!wow(lab).every(value => value === 1) || Math.abs(lab.sample.phi / DEG) >= 1
-        || Math.abs(lab.sample.theta / DEG) >= 1 || Math.abs(lab.sample.vd) >= 0.01) settledAtS = t;
+        || Math.abs(pitchFromRest(lab)) >= 1 || Math.abs(lab.sample.vd) >= 0.01) settledAtS = t;
     });
     const at2 = { phi: lab.sample.phi / DEG, theta: lab.sample.theta / DEG, wow: wow(lab) };
     const north0 = lab.values[22], east0 = lab.values[23];
-    let creep = 0, low = height(lab), high = low, maxRoll = Math.abs(at2.phi), maxPitch = Math.abs(at2.theta);
+    let creep = 0, low = height(lab), high = low, maxRoll = Math.abs(at2.phi), maxPitch = Math.abs(pitchFromRest(lab));
     const allFeet = [1, 1, 1, 1];
     advance(lab, 10, cmd, () => {
       low = Math.min(low, height(lab)); high = Math.max(high, height(lab));
-      maxRoll = Math.max(maxRoll, Math.abs(lab.sample.phi / DEG)); maxPitch = Math.max(maxPitch, Math.abs(lab.sample.theta / DEG));
+      maxRoll = Math.max(maxRoll, Math.abs(lab.sample.phi / DEG)); maxPitch = Math.max(maxPitch, Math.abs(pitchFromRest(lab)));
       for (let i = 0; i < 4; i++) allFeet[i] = Math.min(allFeet[i], lab.values[18 + i]);
       creep = Math.max(creep, Math.hypot((lab.values[22] - north0) * 6378137,
         (lab.values[23] - east0) * 6378137 * Math.cos(north0)));
@@ -473,7 +480,7 @@ describe.each(cases)("$id real JSBSim and multirotor", testCase => {
   it("lands from a one metre per second descent without a hard impact or bounce", async () => {
     const lab = await boot(testCase, 2);
     const touchdownAglM = groundContactClearanceMeters(lab.sdk, 0, 0);
-    expect(touchdownAglM).toBeCloseTo(testCase.directory === "DJI-Mini2" ? .0232 : .0347, 8);
+    expect(touchdownAglM).toBeCloseTo(testCase.directory === "DJI-Mini2" ? .035 : .0558, 8);
     const sticks: DroneStickCommand = { pitch: 0, roll: 0, vertical: -1 / testCase.quad.modes.normal.descentMps,
       yaw: 0, yawMode: "angularVelocity", yawAngleDeg: null, gimbalPitchDeg: 0, sport: false, shutter: false, capture360: false };
     let armed = true, disarmSeconds = 0;

@@ -168,7 +168,12 @@ describe("flight input method selector", () => {
     section.remove();
     const rendererButton = container.querySelector<HTMLElement>("#flightRendererButton")!;
     expect(rendererButton.classList.contains("is-rendering")).toBe(true);
+    // Frames drawn one at a time stop and start rendering every frame, so the button waits a moment before it says idle.
+    vi.useFakeTimers();
     activityListener(false);
+    expect(rendererButton.dataset.renderState).toBe("rendering");
+    vi.advanceTimersByTime(1000);
+    vi.useRealTimers();
     expect(rendererButton.dataset.renderState).toBe("idle");
     expect(rendererButton.classList.contains("is-rendering")).toBe(false);
     activityListener(true);

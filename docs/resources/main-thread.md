@@ -144,6 +144,25 @@ physics steps. Resume ignores the idle interval; it also attempts physics/contac
 recovery if a prior fault exists. Shared settings, destruction, switching and
 an open aircraft dialog can block resume.
 
+An aircraft at rest is held the same way without being paused
+([aircraftRest.ts](../../src/flight/physics/aircraftRest.ts)). It rests after 3 s
+of flight on the ground with nothing turning (every JSBSim engine and propeller
+spooled down, or a drone's motors stopped), no input held, no autopilot, no
+terrain question, and nothing moving: under 1 cm/s, 0.005 rad/s, and no
+control surface, flap, gear or nozzle travelling. A parked C172 and the landed
+DJI drones settle to about 10⁻⁶ m/s with real JSBSim
+([measured](../../src/flight/physics/aircraftRest.integration.test.ts)). At rest
+physics stops stepping, audio is held (`"rest"`, which suspends the audio
+context), the flight is saved once and the simulation-running demand is
+released; the pause buttons still show running, and frames drawn for the
+camera, map or flashing lights do not advance physics. `wakeFromRest` starts it
+again, ignoring the time spent resting, on local input (keys, controller, HUD,
+engine lever), phone input, a multiplayer combat message, a weather change, a
+changed `osfs.*` setting value (notes under a control do not count), a pause
+or resume, a placement or recovery, and ground that moves the aircraft or asks
+about it. While multiplayer is connected its own 30 Hz frame demand still draws
+frames at rest.
+
 Startup placement requires terrain. In the current composition, terrain
 streaming is intended not to pause an established flight. The pre-step contact
 callback nevertheless handles explicit refusal by dropping the pending step

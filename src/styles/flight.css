@@ -1613,8 +1613,11 @@ html[data-world-edges="flush"] .flight-toolbar-instruments :where(.flight-hud__t
 .flight-loading-status__override-detail { color: #c1cedd; font-size: 0.9rem; }
 .flight-loading-status__progress { width: 100%; }
 .flight-loading-status__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.flight-terrain-overlap { top: auto; bottom: 4rem; transform: translateX(-50%); }
-/* After Resume flight here: a status line and any recovery move, not a second question. */
-.flight-terrain-overlap--compact { width: auto; max-width: min(28rem, calc(100vw - 2rem)); padding: 0.5rem 0.75rem; }
-.flight-terrain-overlap--compact .flight-loading-status__detail { margin: 0 0 0.4rem; font-size: 0.9rem; }
+/* One small card at the bottom: a title, one line and two buttons. */
+.flight-terrain-overlap { top: auto; bottom: 4rem; transform: translateX(-50%); width: auto; max-width: min(22rem, calc(100vw - 2rem)); padding: 0.6rem 0.8rem; }
+.flight-terrain-overlap .flight-loading-status__title { margin: 0 0 0.2rem; font-size: 1rem; }
+.flight-terrain-overlap .flight-loading-status__detail { margin: 0 0 0.5rem; font-size: 0.9rem; }
+/* After Stay here: the status line and any move, not a second question. */
+.flight-terrain-overlap--compact { padding: 0.5rem 0.75rem; }
+.flight-terrain-overlap--compact .flight-loading-status__detail { margin: 0 0 0.4rem; }
 

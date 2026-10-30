@@ -67,7 +67,7 @@ import { initialWeapon, isFireableWeapon, weaponCount, weaponStation, weaponType
 import { createArmamentWidget } from "@0sfs/stores/armamentWidget";
 import { createProjectileView } from "./combat/projectileView";
 import type { CombatMessage } from "@0sfs/multiplayer/protocol";
-import { createEngineControl } from "@0sfs/engines/engineControl";
+import { createEngineControl, engineIndices } from "@0sfs/engines/engineControl";
 import {
   applySavedControls,
   captureSavedFlight,
@@ -118,7 +118,7 @@ import {
   type AircraftLodId,
   type AircraftSelection,
 } from "@0sfs/aircraft/aircraftCatalog";
-import { applyAircraftRig, readControlSurfaceState, readGearDownNorm } from "@0sfs/aircraft/aircraftAnimation";
+import { applyAircraftRig, readControlSurfaceState, readGearDownNorm, type ControlSurfaceState } from "@0sfs/aircraft/aircraftAnimation";
 import { createControlPositionReader } from "./controlPositions";
 import { flightLog } from "@0sfs/logging/flightLog";
 import { createFlightRecorder } from "@0sfs/logging/flightRecorder";
@@ -256,7 +256,9 @@ import type { OrbitInvertSettings } from "foss-earth/input";
 import { createJsbsimRuntime } from "./jsbsim/createJsbsimRuntime";
 import { CONTROL_LAW_MODE_VALUES, getFdmProfile, resolveEngineModel } from "./jsbsim/fdmProfiles";
 import { createAircraftEngineVisuals } from "@0sfs/aircraft/createAircraftEngineVisuals";
-import { createFixedStepPhysicsLoop } from "./physics/fixedStepLoop";
+import { createFixedStepPhysicsLoop, type GroundImpact, HARD_GROUND_IMPACT_FAULT } from "./physics/fixedStepLoop";
+import { createAircraftRest, enginesTurning, readAircraftMotion, touchingGround } from "./physics/aircraftRest";
+import { groundContactUnits } from "@0sfs/ground-contact/groundContactClearance";
 import { maxCatchUpSteps, PHYSICS_RATE_PARAMETER_ID, physicsStepSeconds, readPhysicsHz } from "./physics/physicsRate";
 import { readPilotG } from "@0sfs/g-forces/gForce";
 import { createFlightPilot, PILOT_PARAMETER_IDS, readFlightPilotSettings, type PilotTransition } from "./createFlightPilot";
@@ -328,6 +330,9 @@ const RADIANS_PER_DEGREE = Math.PI / 180;
  * which is why a swipe there and a swipe on the phone feel like one gesture.
  */
 const PHONE_SWIPE_RADIANS = 5;
+
+/** How far above the floor it hit Move up leaves the lowest contact after a hard impact. */
+const IMPACT_LIFT_MARGIN_METERS = 0.1;
 
 /** The flight's instruments, as the cockpit screen and a headset's HUD pick them. */
 const FLIGHT_INSTRUMENTS = ".flight-hud-root, .flight-status-root";
@@ -1031,6 +1036,21 @@ async function createFlightSimSession(
   let controlBlend: ControlBlend | null = null;
   const pausedAtStart = session.switching || startupPause.isPaused();
   startupPause.dispose();
+  // A parked aircraft left alone stops stepping physics and drawing frames;
+  // wakeFromRest, below, starts both again.
+  const aircraftRest = createAircraftRest();
+  // A flight setting can change what moves the aircraft: its weight, its
+  // controls, its ground. Only a changed value counts; a note under a control
+  // changes as renderers report, and moves nothing.
+  let restSettings: Map<string, string> | null = null;
+  const settingValue = (id: string): string => JSON.stringify(settings.get(id));
+  stopWatching.push(settings.subscribe(changed => {
+    if (!restSettings) return;
+    for (const id of changed) {
+      const before = restSettings.get(id);
+      if (before !== undefined && before !== settingValue(id)) { wakeFromRest("setting"); return; }
+    }
+  }));
   const inputManager = createFlightInputManager({
     parameters,
     initialThrottle: jsbsim.sdk.getPropertyValue("fcs/throttle-cmd-norm"),
@@ -1044,7 +1064,7 @@ async function createFlightSimSession(
     // waiting for the next frame is what keeps the two in step while the
     // simulation is paused and the render loop is idle.
     onGearChange: (down) => { flightHud.setGearDown(down); runtime.requestRender(); },
-    onLocalInput: () => { localInputRevision += 1; phoneSession?.noteLocalInput(); },
+    onLocalInput: () => { localInputRevision += 1; phoneSession?.noteLocalInput(); wakeFromRest("input"); },
     keyboardStickSettings: readKeyboardStickSettings(parameters),
     getBodyRates: () => ({
       rollRateRad: jsbsim.sdk.getPropertyValue("velocities/p-rad_sec"),
@@ -1337,6 +1357,7 @@ async function createFlightSimSession(
     runtime.surface.sample(state.latDeg, state.lonDeg)?.heightMeters ?? null;
   const terrainContact = createTerrainContact(jsbsim.sdk, flightSurface, getFdmProfile(initialAircraftId).stance, {
     bodyProbes: getFdmProfile(initialAircraftId).bodyCollisionProbes,
+    automaticMoveMeters: () => parameters.get("osfs.ground.automaticMoveMeters"),
   });
   const visibleMeshCollision = createVisibleMeshCollision(jsbsim.sdk, flightSurface, {
     bodyProbes: getFdmProfile(initialAircraftId).bodyCollisionProbes,
@@ -1508,11 +1529,12 @@ async function createFlightSimSession(
       getReading: () => engineControl.reading(),
       // Holding the lever is local pilot input; it preserves the selected device priority.
       onStartHold: (held) => {
-        if (held) phoneSession?.noteLocalInput();
+        if (held) { phoneSession?.noteLocalInput(); wakeFromRest("input"); }
         localStartHeld = held;
       },
       onShutdown: () => {
         phoneSession?.noteLocalInput();
+        wakeFromRest("input");
         engineControl.shutdown();
       },
     },
@@ -2048,6 +2070,10 @@ async function createFlightSimSession(
   // fault, so track how long that has been true to tell a stall from a hitch.
   let terrainBlockedSinceMs: number | null = null;
   let terrainBlockedReason: ReturnType<typeof terrainContact.getBlockReason> = null;
+  /** The physics faults of this visit, for the bug report: a fault can clear before the report is made. */
+  const faultHistory: { shown: string | null; last: string | null; atMs: number; count: number; impact: GroundImpact | null } = {
+    shown: null, last: null, atMs: 0, count: 0, impact: null,
+  };
   let inputMode = loadInputModePreference(new Set(["mouse", "trackpad"]));
   let inputSensitivity = loadInputSensitivityPreference();
   // FOSS Earth's orbit inversion, shared with the globe's camera.
@@ -2746,7 +2772,7 @@ async function createFlightSimSession(
     return {
       flightState,
       fps: runtime.engine.getFps(),
-      paused: inputManager.isPaused(),
+      paused: displayPaused(),
       aircraftSwitching,
       savedFlight: lastSavedFlight === null ? null : {
         savedAtMs: lastSavedFlight.savedAtMs, latDeg: lastSavedFlight.latDeg, lonDeg: lastSavedFlight.lonDeg,
@@ -2762,6 +2788,7 @@ async function createFlightSimSession(
       modelTriangles: modelState.triangles,
       modelError: modelState.error,
       collisionDebugEnabled,
+      collisionLegend: collisionDebugEnabled ? collisionDebugOverlay?.legend() ?? null : null,
       wheelSpinMode,
       tireSoundEnabled,
       tireAudioStatus: tireAudio.getStatus(),
@@ -2806,7 +2833,39 @@ async function createFlightSimSession(
     };
   };
 
+  /** Back to the last valid pre-fault state, with terrain contact judging the ground afresh. */
+  const recoverFromFault = (): void => {
+    wakeFromRest("recovery");
+    try {
+      physicsLoop.reset();
+    } catch (error) {
+      // A failed reset is exactly the case where the aircraft cannot be
+      // recovered without repositioning.
+      flightLog.error("sim", "Resume failed: physics could not be reset", {
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    }
+    terrainContact.reset();
+    visibleMeshCollision.reset();
+    resetWheelSpin("fault");
+  };
+  /**
+   * Something can move a resting aircraft again: step physics and draw frames
+   * again. Also called on every pause, placement and recovery, so rest is
+   * judged afresh afterwards; it does nothing to an aircraft not resting.
+   */
+  function wakeFromRest(reason: string): void {
+    if (!aircraftRest.wake()) return;
+    restSettings = null;
+    flightLog.info("sim", "Woken from rest", { reason });
+    flightAudio.setHeld(false, "rest");
+    // Do not integrate the time spent resting.
+    skipResumeDelta = true;
+    runtime.setSimRunning(!inputManager.isPaused() && !worldLoading);
+    runtime.requestRender();
+  }
   const syncSimulationPaused = (paused: boolean): void => {
+    wakeFromRest(paused ? "pause" : "resume");
     // Sample again on resume: a binding may have been pressed while ticking stopped.
     cancelArmament();
     // All input routes, including keyboard, gamepad and phone, share this boundary.
@@ -2819,22 +2878,11 @@ async function createFlightSimSession(
     const priorFault = physicsLoop.getFault();
     flightLog.info("sim", paused ? "Paused" : "Resume requested",
       priorFault ? { clearingFault: priorFault } : undefined);
+    // Resume is a recovery action as well as a pause toggle; teleport is not
+    // required merely to clear a transient terrain-contact fault.
     if (!paused && priorFault) {
-      // The fixed-step loop restores its last valid pre-fault state. Resume is
-      // therefore a recovery action as well as a pause toggle; teleport is not
-      // required merely to clear a transient terrain-contact fault.
-      try {
-        physicsLoop.reset();
-      } catch (error) {
-        // Resume is also the recovery action, so a failed reset is exactly the
-        // case where the aircraft cannot be recovered without repositioning.
-        flightLog.error("sim", "Resume failed: physics could not be reset", {
-          reason: error instanceof Error ? error.message : String(error),
-        });
-      }
-      terrainContact.reset();
-      visibleMeshCollision.reset();
-      resetWheelSpin("fault");
+      if (priorFault === HARD_GROUND_IMPACT_FAULT) flyOnFromImpact();
+      else recoverFromFault();
     }
     // Pausing discards partial feedback windows and is a safe settings boundary.
     if (paused) {
@@ -2857,8 +2905,60 @@ async function createFlightSimSession(
     phoneSession?.syncStatus();
   };
   const setSimulationPaused = (paused: boolean): void => inputManager.setPaused(paused);
+  /** A terrain question is holding physics until the pilot answers it. */
+  const heldByTerrainQuestion = (): boolean =>
+    terrainBlockedReason === "relocation" && terrainContact.getRelocationProposal() !== null;
+  /** The hard ground impact physics is holding on until the pilot answers its card. */
+  const pendingImpact = (): GroundImpact | null =>
+    physicsLoop.getFault() === HARD_GROUND_IMPACT_FAULT ? physicsLoop.getGroundImpact() : null;
+  /** What the pause buttons show: paused whenever the aircraft is not moving because of any of these. */
+  const displayPaused = (): boolean => inputManager.isPaused() || heldByTerrainQuestion() || pendingImpact() !== null;
+  /** The pilot keeps this position: the card's Stay here, or play while the card holds physics. */
+  const stayInsideTerrain = (): void => {
+    const pending = terrainContact.getRelocationProposal();
+    if (pending) terrainContact.declineRelocation(pending.id);
+    else if (!terrainContact.isTerrainIgnored()) return;
+    visibleMeshCollision.setTerrainOverlapIgnored(true);
+    setSimulationPaused(false);
+    runtime.requestRender();
+  };
+  /**
+   * Fly on from a hard ground impact, from where it stopped: the floor is held
+   * under the lowest contact until the aircraft is clear of the surface, so the
+   * next step does not stop on the same impact again.
+   */
+  function flyOnFromImpact(): void {
+    const impact = pendingImpact();
+    if (!impact) return;
+    wakeFromRest("impact");
+    try {
+      terrainContact.flyOnFromImpact();
+      physicsLoop.reset();
+    } catch (error) {
+      flightLog.error("sim", "Could not fly on from the impact", { reason: error instanceof Error ? error.message : String(error) });
+      return;
+    }
+    flightLog.info("sim", "Flying on from a hard impact", { depthMeters: Number(impact.depthMeters.toFixed(3)) });
+    visibleMeshCollision.reset();
+    visibleMeshCollision.setTerrainOverlapIgnored(true);
+    resetWheelSpin("fault");
+  }
+  /** The impact card's Resume, or play while only the impact holds physics. */
+  const resumeFromImpact = (): void => {
+    flyOnFromImpact();
+    setSimulationPaused(false);
+    updateTerrainOverlap();
+    runtime.requestRender();
+  };
+  /** A pause button pressed: play while only a card holds physics answers that card. */
+  const requestPaused = (paused: boolean, apply: (paused: boolean) => void): void => {
+    if (!paused && !inputManager.isPaused() && pendingImpact()) { resumeFromImpact(); return; }
+    if (!paused && !inputManager.isPaused() && heldByTerrainQuestion()) { stayInsideTerrain(); return; }
+    apply(paused);
+  };
 
   const applyWeather = (nextWeather: FlightWeatherState): void => {
+    wakeFromRest("weather");
     weather.windDirectionDeg = nextWeather.windDirectionDeg;
     weather.windSpeedKts = nextWeather.windSpeedKts;
     const directionRad = (nextWeather.windDirectionDeg * Math.PI) / 180;
@@ -2901,6 +3001,7 @@ async function createFlightSimSession(
     overlapNotice.update(null);
     placementAbort.abort();
     const abort = placementAbort = new AbortController();
+    wakeFromRest("placement");
     worldLoading = true;
     tireAudio.setPaused(true);
     flightAudio.setHeld(true, "loading");
@@ -3005,7 +3106,64 @@ async function createFlightSimSession(
     });
   };
 
+  /** 3 cm, 0.9 m, 12.4 m: a move short enough to read at a glance. */
+  const formatShortDistance = (meters: number): string => {
+    const size = Math.abs(meters);
+    return size < 1 ? `${Math.max(1, Math.round(size * 100))} cm` : `${size.toFixed(1)} m`;
+  };
+  /** After the aircraft was moved: physics, contact and the world carry on from where it is now. */
+  const carryOnAfterMove = (): void => {
+    physicsLoop.reset();
+    visibleMeshCollision.reset();
+    visibleMeshCollision.setTerrainOverlapIgnored(false);
+    const state = readFlightState(jsbsim.sdk);
+    floatingOrigin?.apply(state);
+    regionPreparation.update(state, aircraftBodyRadius, true);
+    flightAudio.beginEpoch();
+    saveFlight();
+  };
+  /**
+   * A hard impact asks on the card at the bottom, clear of the aircraft:
+   * Resume flies on from there, and the move lifts the lowest contact out of
+   * the floor it hit.
+   */
+  const showImpact = (impact: GroundImpact): void => {
+    const lift = impact.depthMeters + IMPACT_LIFT_MARGIN_METERS;
+    overlapNotice.update({
+      title: "Hard impact",
+      message: `Stopped ${formatShortDistance(impact.depthMeters)} into the ground.`,
+      resumeLabel: "Resume",
+      onResume: resumeFromImpact,
+      teleportLabel: `Move up ${formatShortDistance(lift)}`,
+      onTeleport: () => {
+        const pose = readFlightState(jsbsim.sdk);
+        const signal = placementAbort.signal;
+        // The impact already holds physics; nothing moves while asked.
+        void placement.request({ destination: describeDestination(pose, pose.altMeters + lift),
+          reason: `Move up ${formatShortDistance(lift)} out of the ground.`,
+          signal,
+        }).then(accepted => {
+          // Only the impact that was shown may be answered: Resume may have come first.
+          if (disposed || signal.aborted || !accepted || pendingImpact() !== impact) return;
+          wakeFromRest("impact");
+          try {
+            terrainContact.liftFromImpact(lift);
+          } catch (error) {
+            flightLog.error("sim", "Could not move up out of the impact", { reason: error instanceof Error ? error.message : String(error) });
+            return;
+          }
+          flightLog.info("sim", "Moved up out of a hard impact", { liftMeters: Number(lift.toFixed(3)) });
+          carryOnAfterMove();
+          resetWheelSpin("fault");
+          updateTerrainOverlap();
+          runtime.requestRender();
+        });
+      },
+    });
+  };
   const updateTerrainOverlap = (): void => {
+    const impact = pendingImpact();
+    if (impact) { showImpact(impact); return; }
     const proposal = terrainContact.getRelocationProposal();
     const ignored = terrainContact.isTerrainIgnored();
     visibleMeshCollision.setTerrainOverlapIgnored(ignored);
@@ -3017,20 +3175,16 @@ async function createFlightSimSession(
     // only a status and an upward recovery move remain until the aircraft is clear.
     const teleportAltitude = proposal ? proposal.altitudeMeters
       : ground !== null && ground + clearance > current.altMeters + 0.01 ? ground + clearance : null;
+    const up = !proposal || proposal.deltaMeters >= 0;
     overlapNotice.update({
       compact: !proposal,
+      title: up ? "Inside terrain" : "Ground moved",
       message: proposal
-        ? `The current map suggests moving you ${proposal.deltaMeters.toFixed(1)} m (${proposal.reason}). Your position has been kept.`
-        : ground === null ? "Terrain contact is off until the aircraft is clear of the surface. Ground height here is unknown."
-        : "Flying inside the terrain surface. Normal contact resumes once the aircraft is clear of it.",
-      onResume: () => {
-        const pending = terrainContact.getRelocationProposal();
-        if (pending) terrainContact.declineRelocation(pending.id);
-        else if (!terrainContact.isTerrainIgnored()) return;
-        visibleMeshCollision.setTerrainOverlapIgnored(true);
-        setSimulationPaused(false);
-        runtime.requestRender();
-      },
+        ? `Ground is ${formatShortDistance(proposal.deltaMeters)} ${up ? "above" : "below"} you.`
+        : ground === null ? "Inside terrain. Ground height unknown."
+        : "Inside terrain. Contact resumes once you're clear.",
+      teleportLabel: up ? "Move up" : "Move down",
+      onResume: stayInsideTerrain,
       ...(teleportAltitude === null ? {} : { onTeleport: () => {
         const pose = readFlightState(jsbsim.sdk);
         const pending = terrainContact.getRelocationProposal();
@@ -3041,8 +3195,9 @@ async function createFlightSimSession(
         // around it would decline it. Flight inside terrain holds still while asked.
         const wasPaused = inputManager.isPaused();
         if (!pending) setSimulationPaused(true);
+        const move = altitude - pose.altMeters;
         void placement.request({ destination: describeDestination(pose, altitude),
-          reason: `Move ${(altitude - pose.altMeters).toFixed(1)} m to the currently available terrain surface. Higher map detail may change it.`,
+          reason: `Move ${move >= 0 ? "up" : "down"} ${formatShortDistance(move)} onto the ground.`,
           signal,
         }).then(accepted => {
           if (disposed || signal.aborted) return;
@@ -3058,14 +3213,7 @@ async function createFlightSimSession(
               restoreSimulation(jsbsim.sdk, snapshot);
               terrainContact.reset();
             }
-            physicsLoop.reset();
-            visibleMeshCollision.reset();
-            visibleMeshCollision.setTerrainOverlapIgnored(false);
-            const state = readFlightState(jsbsim.sdk);
-            floatingOrigin?.apply(state);
-            regionPreparation.update(state, aircraftBodyRadius, true);
-            flightAudio.beginEpoch();
-            saveFlight();
+            carryOnAfterMove();
           }
           // No keeps the position and the card's choices.
           if (!pending) setSimulationPaused(wasPaused);
@@ -3152,7 +3300,7 @@ async function createFlightSimSession(
         return true;
       },
       getGoogleKey: () => settings.get<string>("map.source.googleKey")?.trim() || mapConfig.googleApiKey || null,
-      onCombat: (message: CombatMessage) => { engagement.ingest(message); runtime.requestRender(); },
+      onCombat: (message: CombatMessage) => { engagement.ingest(message); wakeFromRest("combat"); runtime.requestRender(); },
       share: {
         settings,
         getSource: () => {
@@ -3256,7 +3404,7 @@ async function createFlightSimSession(
         if (axis === "pitch" ? controlCapabilities.pitchTrim : controlCapabilities.rollTrim)
           parameters.set(axis === "pitch" ? "osfs.assist.autoTrim" : "osfs.assist.autoRollTrim", enabled);
       } : undefined,
-      onPhoneInput: hostFlightUi.notePhoneInput,
+      onPhoneInput: () => { hostFlightUi.notePhoneInput(); wakeFromRest("phone"); },
       // The same path the HUD lever's ring takes.
       shutdownEngine: () => engineControl.shutdown(),
     });
@@ -3364,7 +3512,18 @@ async function createFlightSimSession(
   diagnostics.addState(() => `Compute scheduling: ${JSON.stringify(earthComputeScheduling(runtime))}`);
   diagnostics.addState(() => `Isolation: ${describeIsolation(window)}`);
   diagnostics.addState(() => `Aircraft: ${aircraftId}; generation ${aircraftGenerationId ?? "default"}; LOD ${aircraftLodId}; model ${modelState.status}; active LOD ${modelState.activeLodId ?? "none"}; ${modelState.triangles} triangles.`);
-  diagnostics.addState(() => `Flight: ${worldLoading ? "loading" : inputManager.isPaused() ? "paused" : "running"}; view ${aircraft?.getViewMode() ?? "third"}; physics fault ${physicsLoop.getFault() ?? "none"}.`);
+  diagnostics.addState(() => {
+    const current = physicsLoop.getFault();
+    const sentence = (fault: string): string => fault.replace(/\.$/, "");
+    const flight = `Flight: ${worldLoading ? "loading" : inputManager.isPaused() ? "paused" : "running"}; view ${aircraft?.getViewMode() ?? "third"}; physics fault ${current ? sentence(current) : "none"}.`;
+    // The fault that took the aircraft out of the pilot's hands may have cleared by now; the report still says what it was.
+    const { last, impact } = faultHistory;
+    const history = last === null ? ""
+      : ` Faults this visit: ${faultHistory.count}; the last ${((performance.now() - faultHistory.atMs) / 1000).toFixed(1)} s ago${last === current ? "" : `, ${sentence(last)}`}.`;
+    const depth = impact ? ` Last impact ${impact.depthMeters.toFixed(3)} m into the floor at ${impact.floorMeters.toFixed(2)} m, at ${impact.contact ?? "no reported contact"}.` : "";
+    const card = overlapNotice.describe();
+    return flight + history + depth + (card ? ` On screen: ${card}` : "");
+  });
   diagnostics.addState(() => `Flight progress: ${JSON.stringify({ ticks: flightTicks,
     lastTickAgeMs: lastFlightTickAtMs === null ? null : Math.max(0, performance.now() - lastFlightTickAtMs),
     nativeTimeSeconds: jsbsim.sdk.getSimTime(), physics: physicsLoop.getTimeAccounting(),
@@ -3513,7 +3672,7 @@ async function createFlightSimSession(
     location: flightLocation,
     locationSearchSection: { id: "search", title: settings.getSectionTitle("location", "search"), element: locationSearchParameters.element, defaultOpen: false },
     onWeatherChange: applyWeather,
-    onPausedChange: setSimulationPaused,
+    onPausedChange: (paused) => requestPaused(paused, setSimulationPaused),
     onNewFlight: startNewFlight,
     onSharedSettingsPatch: patch => {
       setSimulationPaused(true);
@@ -3703,7 +3862,7 @@ async function createFlightSimSession(
     runtimeStatus: runtime.status,
     onInputModeChange: (mode) => { inputMode = mode; },
     onInputSensitivityChange: (settings) => { inputSensitivity = settings; },
-    onPausedChange: setSimulationPaused,
+    onPausedChange: (paused) => requestPaused(paused, setSimulationPaused),
     mapDetail: mapDetail!,
     onSettingsClick: () => panelRoot.querySelector<HTMLButtonElement>('[aria-label="Open right panel"]')?.click(),
     onBugReportClick: () => controlPanel?.toggleTab("bug-report"),
@@ -3764,9 +3923,7 @@ async function createFlightSimSession(
       // Single-frame misses are normal while tiles stream in; only say
       // something once the aircraft has actually stopped moving.
       if (heldSeconds >= 0.4) {
-        state = terrainBlockedReason === "relocation"
-          ? { kind: "waiting", message: "Your position has been kept", heldSeconds,
-              detail: "Use Resume flight here to keep this altitude, or Teleport above ground to review a proposed move." }
+        state = terrainBlockedReason === "relocation" ? null
           : terrainBlockedReason === "coarse"
           ? {
               kind: "waiting", message: "World detail is too coarse for flight", heldSeconds,
@@ -3860,6 +4017,44 @@ async function createFlightSimSession(
     if (result.draw.length) runtime.requestRender();
   };
 
+  const jsbsimEngines = engineIndices(jsbsim.sdk);
+  /** Nothing turns: a drone's motors, or every engine and its propeller, spooled down. */
+  const enginesStill = (surfaces: ControlSurfaceState): boolean => {
+    const motors = droneMotorTelemetry()?.motors;
+    if (motors) return motors.every(motor => Math.abs(motor.rpm) < 1);
+    // A drone's JSBSim model has no engines to read: without its motors' telemetry, nothing says they stopped.
+    if (droneAircraft) return false;
+    return !(surfaces.propellerRadPerSec >= 0.1) && engineControl.reading().state !== "starting"
+      && !enginesTurning(jsbsim.sdk, jsbsimEngines);
+  };
+  /** Wheels and structure contacts alike: a drone stands on structure contacts, which have no gear/unit WOW. */
+  const contactPrefixes = (): readonly string[] => {
+    try { return groundContactUnits(jsbsim.sdk).map(unit => unit.prefix); }
+    catch { return ["gear/unit[0]/", "gear/unit[1]/", "gear/unit[2]/"]; }
+  };
+  /**
+   * Once a frame, with the flight time physics advanced: an aircraft that has
+   * stayed still on the ground with nothing turning and nobody flying it
+   * rests, until wakeFromRest.
+   */
+  const observeRest = (surfaces: ControlSurfaceState, dtSeconds: number): void => {
+    if (aircraftRest.isResting()) return;
+    const eligible = !engineTest && !benchmarkRouteRun && !worldLoading && !inputManager.isPaused()
+      && terrainContact.getRelocationProposal() === null && !lastApResult.engaged && !pilot.isOut()
+      && !(inputManager.hasActiveFlightInput() || localStartHeld || flightHud.isPilotHolding())
+      && touchingGround(jsbsim.sdk, contactPrefixes()) && enginesStill(surfaces);
+    const pose = [surfaces.aileronLeftRad, surfaces.aileronRightRad, surfaces.elevatorRad, surfaces.rudderRad,
+      surfaces.ruddervatorLeftRad, surfaces.ruddervatorRightRad, surfaces.flapRad, surfaces.gearDownNorm,
+      surfaces.stovlPositionNorm ?? 0, surfaces.nozzlePitchRad ?? 0, surfaces.nozzleYawRad ?? 0];
+    if (!aircraftRest.observe({ eligible, ...readAircraftMotion(jsbsim.sdk), pose }, dtSeconds)) return;
+    flightLog.info("sim", "At rest: drawing frames only on demand until something moves the aircraft");
+    restSettings = new Map(settings.list().filter(spec => spec.id.startsWith("osfs.")).map(spec => [spec.id, settingValue(spec.id)]));
+    physicsLoop.setPaused(true);
+    tireAudio.setPaused(true);
+    flightAudio.setHeld(true, "rest");
+    saveFlight();
+    runtime.setSimRunning(false);
+  };
   runtime.setSimTick((deltaSeconds) => {
     if (disposed) return;
     if (worldLoading) {
@@ -3923,12 +4118,16 @@ async function createFlightSimSession(
       physicsLoop.reset();
       visibleMeshCollision.reset();
       wheelCues.setGroundRevision(++groundRevision);
+      wakeFromRest("ground moved");
     }
+    // A question about the ground needs physics: a standing aircraft keeps flying while it is asked.
+    if (terrainContact.getRelocationProposal()) wakeFromRest("terrain question");
     updateTerrainOverlap();
     frameProfiler.add("flight/terrain", sectionStarted);
 
     sectionStarted = frameProfiler.clock();
-    physicsLoop.setPaused(gearPipelineWarmup || inputManager.isPaused());
+    const physicsHeld = gearPipelineWarmup || inputManager.isPaused() || aircraftRest.isResting();
+    physicsLoop.setPaused(physicsHeld);
     if (flightGamepadPolling.claimFlightFrame()) flightGamepadSource.tick();
     const controls = inputManager.poll(deltaSeconds);
     // A manual key/controller move also takes over while physics is paused.
@@ -4082,7 +4281,7 @@ async function createFlightSimSession(
     });
     frameProfiler.add("flight/physics", physicsStarted);
     sectionStarted = frameProfiler.clock();
-    const feedbackHeld = inputManager.isPaused() || terrainBlocked || !!physicsLoop.getFault();
+    const feedbackHeld = inputManager.isPaused() || terrainBlocked || !!physicsLoop.getFault() || aircraftRest.isResting();
     tireAudio.setPaused(feedbackHeld);
     const slipPowerWatts = slipAudio.takeMeanPowerWatts();
     if (slipPowerWatts !== null) tireAudio.update(slipPowerWatts);
@@ -4110,12 +4309,25 @@ async function createFlightSimSession(
     }
 
     const fault = physicsLoop.getFault();
-    updateStatusOverlay(fault, tickNowMs);
+    if (fault !== faultHistory.shown) {
+      faultHistory.shown = fault;
+      if (fault) {
+        faultHistory.last = fault;
+        faultHistory.atMs = tickNowMs;
+        faultHistory.count += 1;
+        faultHistory.impact = fault === HARD_GROUND_IMPACT_FAULT ? physicsLoop.getGroundImpact() : null;
+      }
+    }
+    // A hard impact asks on its own card at the bottom, clear of the aircraft,
+    // and holds physics and its sound until answered; it does not pause.
+    const impact = fault === HARD_GROUND_IMPACT_FAULT;
+    flightAudio.setHeld(impact, "fault");
+    updateStatusOverlay(impact ? null : fault, tickNowMs);
     if (fault) {
       benchmarkRouteRun?.fail(fault);
       runtime.status.lastError = fault;
       runtime.status.message = fault;
-      if (!inputManager.isPaused()) {
+      if (!impact && !inputManager.isPaused()) {
         // The fault detail was logged where it was raised; this records that
         // the fault is what took the simulator out of the user's hands.
         flightLog.warn("sim", "Pausing: physics reported a fault", { fault });
@@ -4191,6 +4403,7 @@ async function createFlightSimSession(
         propellerDiscs: parameters.get("osfs.aircraft.propellerDiscs"),
       });
       aircraftModel.updateGearVisibility(surfaceState.gearDownNorm, true);
+      observeRest(surfaceState, physicsHeld || terrainBlocked || !!physicsLoop.getFault() ? 0 : deltaSeconds);
     }
     engineVisuals.updateRig(rig ?? null, true);
     frameProfiler.add("flight/view", sectionStarted);
@@ -4219,7 +4432,7 @@ async function createFlightSimSession(
       controlPanel?.update(createPanelSnapshot(displayState));
       const armament = armamentState();
       if (armament) armamentWidget?.update(armament);
-      hudBar?.update(displayState, runtime.status, measuredFps, inputManager.isPaused(), sampledSurfaceHeight);
+      hudBar?.update(displayState, runtime.status, measuredFps, displayPaused(), sampledSurfaceHeight);
       mapPanel.update(runtime.status);
       frameProfiler.add("flight/panels", sectionStarted);
     }

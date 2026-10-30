@@ -14,8 +14,10 @@ describe("terrain overlap notice", () => {
     expect(card.hidden).toBe(true);
     notice.update({ message: "The downloaded surface is above this position.", onResume: vi.fn() });
     expect(card.hidden).toBe(false);
-    expect(card.textContent).toContain("map detail loads");
-    expect(card.textContent).toContain("below the current surface");
+    // One title, one line and the choices: nothing else to read.
+    expect(card.querySelector("h2")?.textContent).toBe("Inside terrain");
+    expect(card.querySelectorAll("p")).toHaveLength(1);
+    expect([...card.querySelectorAll("button")].map(button => button.textContent)).toEqual(["Stay here", "Move up"]);
     expect(card.querySelector('[role="status"]')?.textContent).toContain("above this position");
     expect(card.hasAttribute("aria-modal")).toBe(false);
     expect(document.querySelector("[inert]")).toBeNull();
@@ -34,8 +36,10 @@ describe("terrain overlap notice", () => {
     expect(teleport.hidden).toBe(true);
     resume.click();
     expect(firstResume).toHaveBeenCalledOnce();
-    notice.update({ message: "Ground available", onResume: nextResume, onTeleport });
+    notice.update({ title: "Ground moved", message: "Ground available", onResume: nextResume, onTeleport, teleportLabel: "Move down" });
     expect(teleport.hidden).toBe(false);
+    expect(teleport.textContent).toBe("Move down");
+    expect(card.querySelector("h2")?.textContent).toBe("Ground moved");
     resume.click();
     teleport.click();
     expect(nextResume).toHaveBeenCalledOnce();
@@ -62,6 +66,22 @@ describe("terrain overlap notice", () => {
     notice.update({ message: "A new proposal", onResume: vi.fn() });
     expect(card.classList.contains("flight-terrain-overlap--compact")).toBe(false);
     expect([title.hidden, resume.hidden, teleport.hidden]).toEqual([false, false, true]);
+    notice.dispose();
+  });
+
+  it("names its own choices and says what it shows for a bug report", () => {
+    const notice = createTerrainOverlapNotice(document);
+    const card = document.querySelector<HTMLElement>(".flight-terrain-overlap")!;
+    expect(notice.describe()).toBeNull();
+    notice.update({ title: "Hard impact", message: "Stopped 54 cm into the ground.", resumeLabel: "Resume",
+      onResume: vi.fn(), onTeleport: vi.fn(), teleportLabel: "Move up 64 cm" });
+    expect([...card.querySelectorAll("button")].map(button => button.textContent)).toEqual(["Resume", "Move up 64 cm"]);
+    expect(notice.describe()).toBe("Hard impact: Stopped 54 cm into the ground. Choices: Resume, Move up 64 cm.");
+    notice.update({ message: "Inside terrain. Contact resumes once you're clear.", compact: true, onResume: vi.fn(), onTeleport: vi.fn() });
+    expect(card.querySelector("button")!.textContent).toBe("Stay here");
+    expect(notice.describe()).toBe("Inside terrain. Contact resumes once you're clear. Choices: Move up.");
+    notice.update(null);
+    expect(notice.describe()).toBeNull();
     notice.dispose();
   });
 

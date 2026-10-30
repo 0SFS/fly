@@ -98,6 +98,11 @@ describe("ground impact uses actual C172 contact geometry", () => {
       loop.update(LEGACY_FIXED_DT_120, () => true);
       expect(loop.getFault()).toBe("Hard ground impact. Reposition the aircraft to recover.");
       expect(run).not.toHaveBeenCalled();
+      // The card offers to move it up by this much, and the log names the contact.
+      const impact = loop.getGroundImpact()!;
+      expect(impact.depthMeters).toBeGreaterThan(0.5);
+      expect(impact.contact).toMatch(/^contact\/unit(\[\d+\])?\/$/);
+      expect(impact.floorMeters).toBeCloseTo(sdk.getPropertyValue("position/terrain-elevation-asl-ft") * 0.3048, 6);
     } finally { sdk.destroy(); }
   });
 });

@@ -73,17 +73,17 @@ vi.mock("@0sfs/ground-contact/ecefBridge", () => ({ readFlightState: () => mocks
 vi.mock("./bridge/floatingOrigin", () => ({ createFloatingOrigin: () => ({ aircraftRoot: { setEnabled: vi.fn() }, apply: vi.fn(), dispose: vi.fn() }) }));
 vi.mock("./hud/flightCompass", () => ({ createFlightCompass: () => ({ update: vi.fn(), destroy: vi.fn() }) }));
 vi.mock("@0sfs/aircraft/createPlaceholderAircraft", () => ({ createPlaceholderAircraft: () => mocks.aircraft }));
-vi.mock("@0sfs/ground-contact/createCollisionDebugOverlay", () => ({ createCollisionDebugOverlay: vi.fn(() => ({ setEnabled: vi.fn(), update: vi.fn(), dispose: vi.fn() })) }));
+vi.mock("@0sfs/ground-contact/createCollisionDebugOverlay", () => ({ createCollisionDebugOverlay: vi.fn(() => ({ setEnabled: vi.fn(), update: vi.fn(), dispose: vi.fn(), legend: vi.fn(() => null) })) }));
 vi.mock("@0sfs/ground-contact/createWheelSpinDebugOverlay", () => ({ createWheelSpinDebugOverlay: vi.fn(() => ({ setEnabled: vi.fn(), update: vi.fn(), dispose: vi.fn() })) }));
 vi.mock("@0sfs/ground-contact/createWheelSpinExperiment", () => ({ createWheelSpinExperiment: () => mocks.wheelSpin }));
 vi.mock("@0sfs/sound/createTireAudio", () => ({ createTireAudio: () => mocks.tireAudio }));
 vi.mock("@0sfs/aircraft/createAircraftModel", () => ({ createAircraftModel: () => mocks.aircraftModel }));
 vi.mock("@0sfs/aircraft/createAircraftLights", () => ({ createAircraftLights: () => ({ refresh: vi.fn(), dispose: vi.fn() }) }));
 vi.mock("@0sfs/aircraft/aircraftAnimation", () => ({ applyAircraftRig: vi.fn(), readControlSurfaceState: () => ({ gearDownNorm: 1 }) }));
-vi.mock("./physics/fixedStepLoop", () => ({ createFixedStepPhysicsLoop: vi.fn(() => mocks.physics) }));
+vi.mock("./physics/fixedStepLoop", () => ({ HARD_GROUND_IMPACT_FAULT: "Hard ground impact. Reposition the aircraft to recover.", createFixedStepPhysicsLoop: vi.fn(() => mocks.physics) }));
 vi.mock("@0sfs/ground-contact/terrainContact", () => ({ createTerrainContact: () => mocks.terrainContact }));
 vi.mock("@0sfs/ground-contact/visibleMeshCollision", () => ({ createVisibleMeshCollision: vi.fn(() => mocks.visibleMeshCollision) }));
-vi.mock("./hud/flightHud", () => ({ createFlightHud: () => ({ update: vi.fn(), setLayout: vi.fn(), setReadingTints: vi.fn(), destroy: vi.fn() }) }));
+vi.mock("./hud/flightHud", () => ({ createFlightHud: () => ({ update: vi.fn(), isPilotHolding: () => false, setLayout: vi.fn(), setReadingTints: vi.fn(), destroy: vi.fn() }) }));
 vi.mock("./jsbsim/resetFlightLocation", () => ({ resetFlightLocation: () => mocks.state }));
 vi.mock("./hud/createFlightHudBar", () => ({ createFlightHudBar: () => ({ update: vi.fn(), setLayout: vi.fn(), destroy: vi.fn() }) }));
 

@@ -60,13 +60,23 @@ the usual question, to raise the aircraft to stand just above it. No keeps the
 card. Downloads continue afterward.
 
 Terrain that appears through an aircraft creates a proposal, not an altitude
-write. It offers Resume flight here or Teleport above ground. Pausing and
-resuming does not answer it. An aircraft standing on its ground (its lowest
+write, unless the move is small. A move of at most "Move onto the ground without
+asking" (`osfs.ground.automaticMoveMeters`, 1 m by default, up or down) is made
+at once, the same way Yes would make it, and nothing is shown; zero asks about
+every move. The cut-off is measured against the topmost surface, so an
+aircraft whose wheels or legs are less than that distance under the top of a
+bridge deck is lifted onto the deck too. This stays so until the ground is
+searched for downward from the aircraft instead of from the top.
+A larger move is asked. One small card at the bottom of the screen asks it: "Inside terrain",
+how far the ground is above (or, after a lower refinement, below) the
+aircraft, and Stay here or Move up (Move down). Pausing and resuming around
+another prompt does not answer it. While the question holds physics the pause
+buttons show paused, and play answers Stay here. An aircraft standing on its ground (its lowest
 contact within 2 cm of JSBSim's floor, or pressed into it) keeps that floor and
 keeps flying while asked: its props keep turning and nothing drops it. Any other
 aircraft is held, with native support withheld, until the pilot answers.
 
-Resume flight here acknowledges the current overlap and gives the aircraft back
+Stay here acknowledges the current overlap and gives the aircraft back
 the floor it had: the one it stands on, or the last one under a flying aircraft,
 so it can still land where the ground was. Containing-world collision hits are
 withheld until the overlap ends: the aircraft's complete contact/hull footprint
@@ -74,12 +84,28 @@ clears the real surface, or the surface under the aircraft comes back down to
 that floor. An aircraft without a trusted floor, such as one placed below its
 support, flies on with native support withheld. Tile revisions do not reset this
 acknowledgement. Meanwhile a compact status says contact resumes once the
-aircraft is clear, and still offers Teleport above ground; No keeps the status
+aircraft is clear, and still offers Move up; No keeps the status
 and the position. Ordinary collision behavior resumes after exit. Actual terrain
 remains visible and available to readiness/HUD diagnostics.
 
+A hard ground impact stops physics before the step that would load the
+contacts' springs with it: the aircraft's lowest contact, by its attitude, is
+more than 0.5 m under JSBSim's floor. It does not pause. The same card at the
+bottom of the screen says "Hard impact" and how deep, and offers Resume or
+Move up by that depth plus 10 cm. Physics and engine sound hold until one is
+chosen; the pause buttons show paused, and play answers Resume. Both stop the
+aircraft's fall, which was the impact, and keep its speed along the ground.
+Resume flies on from where it stopped, on a floor held under its lowest
+contact, as Stay here does, until it is clear of the surface, so the next step
+cannot stop on the same impact again. Move up asks through the usual question,
+then lifts it straight up and lets it settle onto the same ground; a banked or
+pitched aircraft is not asked about that ground again. The bug report's
+flight state names the last fault, how many there were, the last impact's depth
+and contact, and what the card shows.
+
 A finer surface under an aircraft standing on its ground is a "surface
-refinement" proposal, asked even for small changes. A drone hovering a few
+refinement" proposal, asked only when it moves the ground further than the
+cut-off above. A drone hovering a few
 centimetres up to land is flying, not standing, so a finer map under it is not
 asked about unless it comes up through its legs. Accepting a refinement moves
 only the aircraft's height by the difference, from where it is now: velocities,

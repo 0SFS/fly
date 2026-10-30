@@ -92,7 +92,7 @@ const mocks = vi.hoisted(() => {
       }),
       setSimRunning: vi.fn(), requestRender: vi.fn(), setMapSource: vi.fn(), setTerrainSource: vi.fn(), destroy: vi.fn(),
     },
-    collisionOverlay: { setEnabled: vi.fn(), update: vi.fn(), dispose: vi.fn() },
+    collisionOverlay: { setEnabled: vi.fn(), update: vi.fn(), dispose: vi.fn(), legend: vi.fn(() => ({ bodyProbes: 5, wheels: 3, structures: 6 })) },
     forcesOverlay: { setSettings: vi.fn(), update: vi.fn(), dispose: vi.fn() },
     wheelOverlay: { setEnabled: vi.fn(), update: vi.fn(), dispose: vi.fn() },
     wheelSpin: { step: vi.fn(), reset: vi.fn(), getStates: () => [] },
@@ -133,11 +133,11 @@ const mocks = vi.hoisted(() => {
       setLifetimeSeconds: vi.fn(), setMaxDetachedStores: vi.fn(), resetDetached: vi.fn(), dispose: vi.fn(),
     },
     useRealFlightHud: false,
-    flightHud: { update: vi.fn(), destroy: vi.fn(), refreshVtolConversion: vi.fn(), refreshFlaps: vi.fn(), setLayout: vi.fn(), setReadingTints: vi.fn() },
+    flightHud: { update: vi.fn(), destroy: vi.fn(), refreshVtolConversion: vi.fn(), refreshFlaps: vi.fn(), setLayout: vi.fn(), setReadingTints: vi.fn(), isPilotHolding: vi.fn(() => false) },
     applyAircraftRig: vi.fn(),
-    terrainContact: { reset: vi.fn(), update: vi.fn(() => true), getRelocationProposal: vi.fn(() => null), declineRelocation: vi.fn(), acceptRelocation: vi.fn(), ignoreTerrainOverlap: vi.fn(), isTerrainIgnored: vi.fn(() => false), dispose: vi.fn() },
+    terrainContact: { reset: vi.fn(), update: vi.fn(() => true), getRelocationProposal: vi.fn(() => null), declineRelocation: vi.fn(), acceptRelocation: vi.fn(), ignoreTerrainOverlap: vi.fn(), isTerrainIgnored: vi.fn(() => false), flyOnFromImpact: vi.fn(), liftFromImpact: vi.fn(), dispose: vi.fn() },
     visibleMeshCollision: { reset: vi.fn(), update: vi.fn(() => false), dispose: vi.fn(), setTerrainOverlapIgnored: vi.fn() },
-    physics: { reset: vi.fn(), setPaused: vi.fn(), update: vi.fn((_delta, applyInputs) => { applyInputs(); return state; }), getLatestState: () => state, getFault: () => null,
+    physics: { reset: vi.fn(), setPaused: vi.fn(), update: vi.fn((_delta, applyInputs) => { applyInputs(); return state; }), getLatestState: () => state, getFault: () => null, getGroundImpact: () => null,
       getTimeAccounting: () => ({ physicsHz: 60, dtSeconds: 1 / 60, maxStepsPerUpdate: 3, receivedSeconds: 0,
         acceptedSteps: 0, simulatedSeconds: 0, discardedSeconds: 0, catchUpDiscardedSeconds: 0, pendingSeconds: 0 }) },
     hudBarOptions: null as HudBarClicks | null,
@@ -243,7 +243,7 @@ vi.mock("@0sfs/aircraft/aircraftAnimation", () => ({
   applyAircraftRig: mocks.applyAircraftRig,
   readControlSurfaceState: (...args: unknown[]) => { mocks.readControlSurfaceState(...args); return mocks.surfaceState; },
 }));
-vi.mock("./physics/fixedStepLoop", () => ({ createFixedStepPhysicsLoop: vi.fn(() => mocks.physics) }));
+vi.mock("./physics/fixedStepLoop", () => ({ HARD_GROUND_IMPACT_FAULT: "Hard ground impact. Reposition the aircraft to recover.", createFixedStepPhysicsLoop: vi.fn(() => mocks.physics) }));
 vi.mock("@0sfs/ground-contact/terrainContact", () => ({ createTerrainContact: () => mocks.terrainContact }));
 vi.mock("@0sfs/ground-contact/visibleMeshCollision", () => ({ createVisibleMeshCollision: vi.fn(() => mocks.visibleMeshCollision) }));
 vi.mock("./hud/flightHud", async importOriginal => {
@@ -705,6 +705,53 @@ describe("0SFS render demand", () => {
     } finally { await act(async () => app.destroy()); }
     expect(mocks.runtime.setSimTick).toHaveBeenLastCalledWith(null);
   });
+});
+
+it("rests a parked aircraft with nothing turning: no frames or physics until the pilot presses a key", async () => {
+  const t = await mountAircraftSelection();
+  const runtime = await vi.mocked(createJsbsimRuntime).mock.results.at(-1)!.value;
+  const previousRead = vi.mocked(runtime.sdk.getPropertyValue).getMockImplementation()!;
+  try {
+    await act(async () => mocks.hudBarOptions!.onPausedChange(false));
+    expect(mocks.runtime.setSimRunning).toHaveBeenLastCalledWith(true);
+    // Parked: on its three wheels, the engine off, nothing moving.
+    mocks.onGround = true;
+    vi.mocked(runtime.sdk.getPropertyValue).mockImplementation(property =>
+      property.endsWith("/set-running") ? 0 : property === "gear/num-units" ? 3 : previousRead(property));
+    runtime.sdk.queryPropertyCatalog = vi.fn((check: string) => check === "/unit"
+      ? [0, 1, 2].map(unit => `gear/unit[${unit}]/x-position \n`).join("") : "");
+    const tick = mocks.runtime.setSimTick.mock.calls.at(-1)![0] as (dt: number) => void;
+    for (let frame = 0; frame < 2.5 * 60; frame++) tick(1 / 60);
+    expect(mocks.runtime.setSimRunning).toHaveBeenLastCalledWith(true);
+    for (let frame = 0; frame < 1 * 60; frame++) tick(1 / 60);
+    expect(mocks.runtime.setSimRunning).toHaveBeenLastCalledWith(false);
+    expect(mocks.physics.setPaused).toHaveBeenLastCalledWith(true);
+    // A frame drawn for the camera does not step physics, and is not shown as paused.
+    tick(1 / 60);
+    expect(mocks.physics.setPaused).toHaveBeenLastCalledWith(true);
+    expect(t.root.querySelector('[aria-label="Resume simulation"]')).toBeNull();
+    // A note under a setting moves nothing; a changed value can.
+    getAppSettings().setNote("osfs.ground.arcadeLaunches", "a renderer reported something");
+    expect(mocks.runtime.setSimRunning).toHaveBeenLastCalledWith(false);
+    getAppSettings().set("osfs.ground.arcadeLaunches", true);
+    expect(mocks.runtime.setSimRunning).toHaveBeenLastCalledWith(true);
+    getAppSettings().reset("osfs.ground.arcadeLaunches");
+    getAppSettings().setNote("osfs.ground.arcadeLaunches", null);
+    for (let frame = 0; frame < 3.5 * 60; frame++) tick(1 / 60);
+    expect(mocks.runtime.setSimRunning).toHaveBeenLastCalledWith(false);
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyF" }));
+    window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyF" }));
+    expect(mocks.runtime.setSimRunning).toHaveBeenLastCalledWith(true);
+    tick(1);
+    // The time spent resting is not flown.
+    expect(mocks.physics.update).toHaveBeenLastCalledWith(0, expect.any(Function));
+    expect(mocks.physics.setPaused).toHaveBeenLastCalledWith(false);
+  } finally {
+    mocks.onGround = false;
+    vi.mocked(runtime.sdk.getPropertyValue).mockImplementation(previousRead);
+    delete (runtime.sdk as { queryPropertyCatalog?: unknown }).queryPropertyCatalog;
+    await act(async () => t.app.destroy());
+  }
 });
 
 it("samples visible terrain contact in Google mode and resets a recoverable fault on Resume", async () => {
@@ -1790,6 +1837,115 @@ it("keeps a terrain proposal's question until its own card answers it, then only
   }
 });
 
+it("shows a terrain question holding physics as paused, and play answers Stay here", async () => {
+  const t = await mountAircraftSelection();
+  const proposal = { id: 9, reason: "placement" as const, currentAltitudeMeters: 249.1,
+    altitudeMeters: 250, groundHeightMeters: 248.7, deltaMeters: 0.9 };
+  const contact = mocks.terrainContact as typeof mocks.terrainContact & { getBlockReason?: () => string };
+  const now = vi.spyOn(performance, "now");
+  try {
+    const tick = mocks.runtime.setSimTick.mock.calls.at(-1)![0] as (dt: number) => void;
+    await act(async () => mocks.controlPanelOptions!.onPausedChange(false));
+    mocks.terrainContact.getRelocationProposal.mockImplementation(() => proposal);
+    mocks.terrainContact.update.mockImplementation(() => false);
+    contact.getBlockReason = () => "relocation";
+    now.mockReturnValue(1e9);
+    await act(async () => tick(1 / 60));
+    now.mockReturnValue(1e9 + 1000);
+    await act(async () => tick(1 / 60));
+    const card = document.querySelector<HTMLElement>(".flight-terrain-overlap")!;
+    expect(card.hidden).toBe(false);
+    expect(card.querySelector("h2")!.textContent).toBe("Inside terrain");
+    expect(card.querySelector("p")!.textContent).toBe("Ground is 90 cm above you.");
+    // The card is the only notice: nothing else covers the aircraft.
+    expect(document.querySelector(".flight-status-overlay")).toBeNull();
+    const play = t.root.querySelector<HTMLButtonElement>('[aria-label="Resume simulation"]');
+    expect(play).not.toBeNull();
+    await act(async () => play!.click());
+    expect(mocks.terrainContact.declineRelocation).toHaveBeenCalledWith(9);
+    expect(mocks.visibleMeshCollision.setTerrainOverlapIgnored).toHaveBeenLastCalledWith(true);
+  } finally {
+    now.mockRestore();
+    delete contact.getBlockReason;
+    mocks.terrainContact.update.mockImplementation(() => true);
+    mocks.terrainContact.getRelocationProposal.mockImplementation(() => null);
+    await act(async () => t.app.destroy());
+  }
+});
+
+it("asks about a hard ground impact on the bottom card, holding physics without pausing, and never asks again from the same place", async () => {
+  const t = await mountAircraftSelection();
+  const impact = { depthMeters: 0.544, floorMeters: 222.82, contact: "contact/unit[5]/" };
+  let faulted = false;
+  mocks.physics.getFault = () => faulted ? "Hard ground impact. Reposition the aircraft to recover." : null;
+  const physics = mocks.physics as typeof mocks.physics & { getGroundImpact: () => typeof impact | null };
+  physics.getGroundImpact = () => faulted ? impact : null;
+  mocks.physics.reset.mockImplementation(() => { faulted = false; });
+  let ignored = false;
+  mocks.terrainContact.flyOnFromImpact.mockImplementation(() => { ignored = true; });
+  mocks.terrainContact.isTerrainIgnored.mockImplementation(() => ignored);
+  try {
+    const tick = mocks.runtime.setSimTick.mock.calls.at(-1)![0] as (dt: number) => void;
+    await act(async () => mocks.controlPanelOptions!.onPausedChange(false));
+    const contactResets = mocks.terrainContact.reset.mock.calls.length;
+    faulted = true;
+    await act(async () => tick(1 / 60));
+    const card = document.querySelector<HTMLElement>(".flight-terrain-overlap")!;
+    const [resume, move] = card.querySelectorAll<HTMLButtonElement>("button");
+    expect(card.hidden).toBe(false);
+    expect(card.querySelector("h2")!.textContent).toBe("Hard impact");
+    expect(card.textContent).toContain("Stopped 54 cm into the ground.");
+    expect([resume!.textContent, move!.textContent]).toEqual(["Resume", "Move up 64 cm"]);
+    // Nothing covers the aircraft and nothing pauses: the impact itself holds physics.
+    expect(document.querySelector(".flight-status-overlay")).toBeNull();
+    expect(mocks.runtime.setSimRunning).toHaveBeenLastCalledWith(true);
+    expect(mocks.terrainContact.reset).toHaveBeenCalledTimes(contactResets);
+    const report = await shellCapture.diagnosticsSource!.report();
+    expect(report).toContain("physics fault Hard ground impact. Reposition the aircraft to recover. Faults this visit: 1; the last 0.0 s ago.");
+    expect(report).toContain("Last impact 0.544 m into the floor at 222.82 m, at contact/unit[5]/.");
+    expect(report).toContain("On screen: Hard impact: Stopped 54 cm into the ground. Choices: Resume, Move up 64 cm.");
+
+    // Resume flies on from there, with the floor under the aircraft, instead of stopping on the same impact.
+    await act(async () => resume!.click());
+    expect(mocks.terrainContact.flyOnFromImpact).toHaveBeenCalledOnce();
+    expect(mocks.physics.reset).toHaveBeenCalled();
+    expect(mocks.visibleMeshCollision.setTerrainOverlapIgnored).toHaveBeenLastCalledWith(true);
+    await act(async () => tick(1 / 60));
+    expect(mocks.terrainContact.flyOnFromImpact).toHaveBeenCalledOnce();
+    // Flying on inside the surface, the card keeps only its status until the aircraft is clear.
+    expect(card.classList.contains("flight-terrain-overlap--compact")).toBe(true);
+    expect(card.querySelector("[role=\"status\"]")!.textContent).toMatch(/^Inside terrain\./);
+    ignored = false;
+    await act(async () => tick(1 / 60));
+    expect(card.hidden).toBe(true);
+
+    // Move up lifts it out by the depth, once the pilot agrees to the move.
+    faulted = true;
+    await act(async () => tick(1 / 60));
+    expect(card.hidden).toBe(false);
+    await act(async () => move!.click());
+    expect(document.querySelector(".flight-placement-dialog")!.textContent).toContain("64 cm");
+    await act(async () => confirmTeleport());
+    expect(mocks.terrainContact.liftFromImpact).toHaveBeenCalledOnce();
+    expect(mocks.terrainContact.liftFromImpact.mock.calls[0]![0]).toBeCloseTo(0.644);
+    expect(faulted).toBe(false);
+    expect(card.hidden).toBe(true);
+
+    // Play while the impact holds physics is Resume too.
+    faulted = true;
+    await act(async () => tick(1 / 60));
+    await act(async () => mocks.controlPanelOptions!.onPausedChange(false));
+    expect(mocks.terrainContact.flyOnFromImpact).toHaveBeenCalledTimes(2);
+    expect(faulted).toBe(false);
+  } finally {
+    mocks.physics.reset.mockImplementation(() => {});
+    mocks.terrainContact.flyOnFromImpact.mockImplementation(() => {});
+    mocks.terrainContact.isTerrainIgnored.mockImplementation(() => false);
+    physics.getGroundImpact = () => null;
+    await act(async () => t.app.destroy());
+  }
+});
+
 it("uses aircraft-local detail targets without overwriting the pilot's map detail choice", async () => {
   const values = new Map<string, string>([["osfs.world-detail-target", "16384"]]);
   const t = await mountAircraftSelection([...values]);
@@ -1946,6 +2102,8 @@ it("enables collision geometry from Debug while paused, skips disabled work and 
     expect(mocks.collisionOverlay.update).not.toHaveBeenCalled();
     expect(mocks.runtime.requestRender).toHaveBeenCalledOnce();
     expect(root.textContent).toContain("5 swept body probes");
+    expect(root.textContent).toContain("6 structural contacts");
+    expect(root.textContent).not.toContain("C172");
     expect(root.textContent).toContain("not a solid collision mesh");
 
     await act(async () => checkbox.click());
