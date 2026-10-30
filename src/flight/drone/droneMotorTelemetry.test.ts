@@ -9,13 +9,13 @@ describe("quadcopter motor telemetry", () => {
     expect(MOTOR_POSITIONS.map(droneMotorDirection)).toEqual([1, -1, -1, 1]);
   });
   it("retains simulated RPM, physical direction and maximum speed until the aircraft changes", () => {
-    noteActiveAircraft("dji-mini-2");
-    const telemetry = { aircraftId: "dji-mini-2", label: "Mini 2", source: "simulated" as const,
+    noteActiveAircraft("dji-mini2");
+    const telemetry = { aircraftId: "dji-mini2", label: "Mini 2", source: "simulated" as const,
       hoverRpm: 9000, maxRpm: 13300, simTimeS: 1,
       motors: MOTOR_POSITIONS.map((position, index) => ({ position, rpm: 8800 + index * 100, direction: droneMotorDirection(position) })) };
     try {
       setDroneMotorTelemetry(telemetry);
-      noteActiveAircraft("dji-mini-2");
+      noteActiveAircraft("dji-mini2");
       expect(droneMotorTelemetry()).toBe(telemetry);
       noteActiveAircraft("cessna-172");
       expect(droneMotorTelemetry()).toBeNull();

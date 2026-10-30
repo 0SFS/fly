@@ -5,6 +5,21 @@ import type { FlightControlPanelOptions } from "./hud/FlightControlPanel";
 
 const mocks = vi.hoisted(() => {
   const state = { latDeg: 1, lonDeg: 2, altMeters: 1000, headingRad: 0, rollRad: 0, pitchRad: 0, verticalSpeedFps: 0, airspeedKts: 110 };
+  // Every region the flight asks for is ready at once, over ground at 250 m.
+  // Moving a region reports it again, as the runtime does.
+  const createRegionLease = (request: import("foss-earth/runtime").TerrainRegionOptions) => {
+    const progress: import("foss-earth/runtime").TerrainRegionProgress = {
+      state: "ready", minimumReady: true, finalReady: true, readyTiles: 1, totalTiles: 1, pendingTiles: 0,
+      estimatedRemainingMs: null, reason: null, groundHeightMeters: 250, sourceGeneration: 1,
+    };
+    let released = false;
+    return {
+      read: () => progress,
+      update: vi.fn<(region: import("foss-earth/runtime").TerrainRegion) => void>(() => queueMicrotask(() => { if (!released) request.onProgress?.(progress); })),
+      release: vi.fn(() => { released = true; }),
+      setVisible: vi.fn(),
+    };
+  };
   return {
     state,
     properties: {} as Record<string, number>,
@@ -28,6 +43,7 @@ const mocks = vi.hoisted(() => {
       prepareTerrain: vi.fn(async (request: { altitudeMeters?: number; altitudeAboveGroundMeters?: number }) => ({
         groundHeightMeters: 250, altitudeMeters: request.altitudeMeters ?? 250 + (request.altitudeAboveGroundMeters ?? 1524),
       })),
+      prepareTerrainRegion: vi.fn(createRegionLease),
       surface: { sample: vi.fn(() => null) },
       getWorldRoot: () => ({}), sky: { getEnvironment: () => null, subscribe: () => () => {}, setGroundLights: vi.fn(), setGroundLightReceiver: vi.fn() }, registerFocusPoint: vi.fn(() => () => {}), setSimViewState: vi.fn(), setSimTick: vi.fn(), setSimRunning: vi.fn(),
       getGoogleTerrainDetailState: vi.fn(() => null),
@@ -53,8 +69,8 @@ const mocks = vi.hoisted(() => {
       getState: () => ({ status: "ready" }), getRig: () => null,
       setAircraft: vi.fn(), setLod: vi.fn(), setRenderStowedGear: vi.fn(), updateGearVisibility: vi.fn(), refreshAutoLod: vi.fn(), dispose: vi.fn(),
     },
-    terrainContact: { update: vi.fn(() => true), reset: vi.fn() },
-    visibleMeshCollision: { update: vi.fn(() => false), reset: vi.fn(), dispose: vi.fn() },
+    terrainContact: { update: vi.fn(() => true), reset: vi.fn(), getRelocationProposal: vi.fn(() => null), declineRelocation: vi.fn(), acceptRelocation: vi.fn(), ignoreTerrainOverlap: vi.fn(), isTerrainIgnored: vi.fn(() => false) },
+    visibleMeshCollision: { update: vi.fn(() => false), reset: vi.fn(), dispose: vi.fn(), setTerrainOverlapIgnored: vi.fn() },
     physics: {
       reset: vi.fn(), setPaused: vi.fn(), update: vi.fn(), getLatestState: () => state, getFault: () => null,
     },
@@ -108,6 +124,7 @@ vi.mock("./jsbsim/resetFlightLocation", () => ({ resetFlightLocation: vi.fn((_sd
 
 import { getAppSettings, resetAppSettings } from "foss-earth/settings";
 import { createFlightSimApp } from "./createFlightSimApp";
+import { flightParameterDefaults } from "./settings/flightParameters";
 
 let app: Awaited<ReturnType<typeof createFlightSimApp>> | null = null;
 let tick: (dt: number) => void;
@@ -147,6 +164,12 @@ async function mount() {
   app = await createFlightSimApp(root);
   tick = mocks.runtime.setSimTick.mock.calls.at(-1)![0];
   return root;
+}
+
+/** The altitude the start's map region settled on: where the new flight is placed. */
+function startRegionAltitude(): number | undefined {
+  const lease = mocks.runtime.prepareTerrainRegion.mock.results[0]?.value;
+  return lease?.update.mock.calls.at(-1)?.[0].center.altitudeMeters;
 }
 
 function hudOptions(): FlightHudOptions {
@@ -210,14 +233,15 @@ describe("0SFS autopilot engage path", () => {
     await mount();
     expect(window.osfsFlightRoute).toBeUndefined();
     expect(getAppSettings().get("osfs.start.resume")).toBe(true);
-    expect(mocks.runtime.prepareTerrain.mock.calls[0]?.[0]).toMatchObject({ clearanceMeters: 1000 });
+    // An ordinary new flight starts at the usual height over its ground, not the route's.
+    expect(startRegionAltitude()).toBe(250 + flightParameterDefaults().get("osfs.start.heightAboveGround"));
   });
 
   it("starts the dev route through AP with 150m terrain placement and reversible visit settings", async () => {
     window.history.replaceState(null, "", "/fly/?dev=1&route=low");
     mocks.runtime.status.mode = "google-tiles";
     await mount();
-    expect(mocks.runtime.prepareTerrain.mock.calls[0]?.[0]).toMatchObject({ altitudeAboveGroundMeters: 150, clearanceMeters: 0 });
+    expect(startRegionAltitude()).toBe(400);
     expect(getAppSettings().get("osfs.start.resume")).toBe(false);
     expect(window.osfsFlightPerformance).toBeDefined();
     expect(window.osfsFlightRoute?.snapshot()).toMatchObject({ aircraft: "cessna-172", status: "running", elapsedSeconds: 0,

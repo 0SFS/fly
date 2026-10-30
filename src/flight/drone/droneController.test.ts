@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({ create: vi.fn(), clearance: vi.fn() }));
 vi.mock("./droneFlightModel", () => ({ createDroneFlightModel: mocks.create }));
 vi.mock("@0sfs/ground-contact/groundContactClearance", () => ({ groundContactClearanceMeters: mocks.clearance }));
 
-const profile = buildDroneProfile("dji-mini-2", "Mini 2", common.quadcopter, dji.dji, mini.quad as QuadVehicleModData, camera.camera);
+const profile = buildDroneProfile("dji-mini2", "Mini 2", common.quadcopter, dji.dji, mini.quad as QuadVehicleModData, camera.camera);
 const hover: DroneStickCommand = {
   pitch: 0, roll: 0, vertical: 0, yaw: 0, yawMode: "angularVelocity", yawAngleDeg: null,
   gimbalPitchDeg: 0, sport: false, shutter: false, capture360: false,

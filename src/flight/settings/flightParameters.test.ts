@@ -18,6 +18,32 @@ afterEach(() => { vi.unstubAllGlobals(); resetAppSettings(); });
 const FOSS_EARTH_SECTIONS = new Set(["map/detail", "controls/orbit"]);
 
 describe("flight parameter catalogue", () => {
+  it("keeps explicit camera choices over a quadcopter's Yaw default, including after reload", () => {
+    const saved = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => saved.get(key) ?? null,
+      setItem: (key: string, value: string) => { saved.set(key, value); },
+      removeItem: (key: string) => { saved.delete(key); },
+    };
+    let settings = createSettingsRegistry({ storage });
+    settings.register(OSFS_PARAMETERS);
+    expect(settings.get("osfs.camera.chaseFrame")).toBe("aircraft");
+    expect(settings.get("osfs.camera.yawSpringTime")).toBe(.12);
+    settings.setHostDefault("osfs.camera.chaseFrame", "yaw", "quadcopter camera");
+    expect(settings.get("osfs.camera.chaseFrame")).toBe("yaw");
+    settings.set("osfs.camera.chaseFrame", "momentum");
+    settings = createSettingsRegistry({ storage });
+    settings.register(OSFS_PARAMETERS);
+    settings.setHostDefault("osfs.camera.chaseFrame", "yaw", "quadcopter camera");
+    expect(settings.get("osfs.camera.chaseFrame")).toBe("momentum");
+    settings.reset("osfs.camera.chaseFrame");
+    expect(settings.get("osfs.camera.chaseFrame")).toBe("yaw");
+    settings.setHostDefault("osfs.camera.chaseFrame", "aircraft", "fixed wing camera");
+    expect(settings.get("osfs.camera.chaseFrame")).toBe("aircraft");
+    expect(settings.set("osfs.camera.yawSpringTime", 0)).toEqual({ ok: true });
+    expect(settings.set("osfs.camera.yawSpringTime", 1.1).ok).toBe(false);
+  });
+
   it("ignores saved exclusive takeover policies and retains only shared input priority", () => {
     const saved = new Map([[SETTINGS_STORAGE_KEY, JSON.stringify({ version: 1, values: {
       "osfs.remote.sharing": "exclusive", "osfs.remote.handover": "auto",
@@ -75,22 +101,22 @@ describe("flight parameter catalogue", () => {
     const parameters = registerFlightSettings(getAppSettings());
     const credit = { artist: "0SFS", note: "test" };
     const family = {
-      id: "dji-quadcopter", label: "DJI", summary: "test",
-      thumbnail: { path: "", credit }, defaultAircraftId: "dji-mini-2", variantLabel: "Aircraft",
-      variants: [{ id: "mini-2", aircraftId: "dji-mini-2", label: "Mini 2" }],
+      id: "dji-mini2", label: "DJI Mini 2", summary: "test",
+      thumbnail: { path: "", credit }, defaultAircraftId: "dji-mini2",
+      variants: [{ id: "dji-mini2", aircraftId: "dji-mini2", label: "DJI Mini 2" }],
     } as unknown as AircraftFamilyDefinition;
     const definition = {
-      id: "dji-mini-2", familyId: "dji-quadcopter", label: "DJI Mini 2", summary: "test",
+      id: "dji-mini2", familyId: "dji-mini2", label: "DJI Mini 2", summary: "test",
       modelYawRad: 0, modelOffset: { x: 0, y: 0, z: 0 }, propellerBlades: 0,
       lods: [{ id: "lod0", label: "Procedural", triangles: 12, path: "", autoFromMeters: 0, credit }],
     } as unknown as AircraftDefinition;
     try {
       registerAircraftMod(family, [definition]);
-      const choice = { aircraftId: "dji-mini-2" as AircraftId, generationId: "mini-2", lodId: "auto" } as const;
+      const choice = { aircraftId: "dji-mini2" as AircraftId, generationId: "dji-mini2", lodId: "auto" } as const;
       expect(parameters.setMany(aircraftSelectionValues(choice))).toEqual({ ok: true });
-      expect(readAircraftSelection(parameters).aircraftId).toBe("dji-mini-2");
+      expect(readAircraftSelection(parameters).aircraftId).toBe("dji-mini2");
     } finally {
-      unregisterAircraftMod("dji-quadcopter", ["dji-mini-2"]);
+      unregisterAircraftMod("dji-mini2", ["dji-mini2"]);
     }
   });
 

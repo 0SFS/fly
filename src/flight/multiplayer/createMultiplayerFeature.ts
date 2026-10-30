@@ -6,6 +6,7 @@ import { createServerlessSession } from "@0sfs/multiplayer/serverlessSession";
 import type { Scene } from "@babylonjs/core";
 import { createRemoteAircraft, type RemoteAircraftFrame } from "./remoteAircraft";
 import { createMultiplayerInvitation } from "./createMultiplayerInvitation";
+import { createFlightShare, type FlightShareOptions } from "./createFlightShare";
 import { readInvitationStart, type InvitationStart } from "./invitationStart";
 import type { InvitationStartControlsProps } from "./InvitationStartControls";
 import type { FlightLocation } from "../location/flightLocation";
@@ -27,6 +28,8 @@ export function createMultiplayerFeature(options: {
   initialSharedSettings?: SharedFlightSettings;
   onSharedSettingsChange?(state: SharedSettingsPanelState): void;
   onCombat?(message: CombatMessage): void;
+  /** Shares the flight in progress as a link that starts another like it. */
+  share?: Pick<FlightShareOptions, "getSource" | "settings">;
 }) {
   const remote = new Map<string, ReturnType<typeof createRemoteAircraft>>();
   let guestStart: InvitationStart = {};
@@ -91,6 +94,7 @@ export function createMultiplayerFeature(options: {
   });
   const renew = button("New invitation", () => { try { current().invite(options.baseUrl); } catch (cause) { error = cause instanceof Error ? cause.message : String(cause); } refresh(); });
   const invitation = createMultiplayerInvitation(options.invitationControls);
+  const share = options.share ? createFlightShare({ ...options.share, baseUrl: options.baseUrl, getGoogleKey: options.getGoogleKey }) : null;
   const joinGroup = document.createElement("div"); joinGroup.append(joinInput, join);
   const help = document.createElement("details");
   const summary = document.createElement("summary"); summary.textContent = "?"; summary.setAttribute("aria-label", "Multiplayer connection details");
@@ -190,9 +194,12 @@ export function createMultiplayerFeature(options: {
       const session = current();
       return { connected: session.snapshot().status === "connected", selfId: session.selfId(), nowMs: session.nowMs(), remotes: session.remotePoses() };
     },
-    mount(element: HTMLElement) { mounted = element; element.append(panel); refresh(); return () => { if (mounted === element) { mounted = null; panel.remove(); } }; },
+    mount(element: HTMLElement) {
+      mounted = element; element.append(panel, ...(share ? [share.element] : [])); refresh();
+      return () => { if (mounted === element) { mounted = null; panel.remove(); share?.element.remove(); } };
+    },
     diagnostics() { return { ...current().snapshot(), invitationUrl: undefined }; },
     hasInvitation: Boolean(options.invitation && (readInvitation(options.invitation) || readServerInvitation(options.invitation))),
-    dispose() { disposed = true; clearInterval(timer); options.scene.onBeforeRenderObservable.remove(frame); direct.dispose(); server.dispose(); for (const slot of remote.values()) slot.dispose(); invitation.dispose(); panel.remove(); },
+    dispose() { disposed = true; clearInterval(timer); options.scene.onBeforeRenderObservable.remove(frame); direct.dispose(); server.dispose(); for (const slot of remote.values()) slot.dispose(); invitation.dispose(); share?.dispose(); panel.remove(); },
   };
 }

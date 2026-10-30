@@ -1,9 +1,8 @@
 import { AIRCRAFT_CATALOG, registerAircraftMod, type AircraftDefinition, type AircraftFamilyDefinition } from "@0sfs/aircraft/aircraftCatalog";
 import type { AircraftId } from "@0sfs/aircraft/aircraftIds";
-import { getRegisteredEngine, registerEngine, type RegisteredEngine } from "@0sfs/engines/engineRegistry";
+import { registerEngine } from "@0sfs/engines/engineRegistry";
 import type { LoadedModRecord } from "@0sfs/mods";
-import { registerAircraftAudioInstallation } from "@0sfs/sound/aircraftAudioProfiles";
-import { registerEngineAcousticDefinition, telemetryById } from "@0sfs/sound/engineAcousticDefinitions";
+import { installAudioMod } from "@0sfs/sound/installAudioMod";
 import { registerPayloadInstallation } from "@0sfs/stores/stationTable";
 import { registerPayloadStore, registerRefusedStore, registerStorePresets, storeByKey, type StoreCard } from "@0sfs/stores/storeCatalog";
 import { FDM_PROFILES, registerFdmProfile } from "../jsbsim/fdmProfiles";
@@ -34,19 +33,16 @@ export function applyDynamicMod(record: LoadedModRecord): void {
 }
 
 function applyOne(record: LoadedModRecord): void {
-  applyQuadLayer(record);
   const manifest = record.manifest;
+  if (manifest.audioRenderer || manifest.engine?.acousticProfile || manifest.aircraft?.audio) {
+    installAudioMod(manifest, { baseUrl: record.baseUrl, bundled: record.source.bundled, owner: record.source.bundled ? manifest.id : record.source.canonicalKey });
+  }
+  if (manifest.kind === "engine" && manifest.engine) registerEngine(manifest.engine, record.source.bundled ? manifest.id : record.source.canonicalKey);
+  applyQuadLayer(record);
   if (manifest.cameraPreview) installCameraPreview(record);
   if (manifest.kind === "payload" && manifest.payload?.payloadType === "store" && manifest.payload.store) {
     const store = manifest.payload.store as StoreCard;
     if (!storeByKey(store.key)) registerPayloadStore(store);
-  }
-  if (manifest.kind === "engine" && manifest.engine && !getRegisteredEngine(manifest.engine.id)) {
-    const engine = manifest.engine as RegisteredEngine & { acousticProfile?: { id: string; telemetryId: string; parameters: never; engineClass: string; manufacturerFamily: string; rendererId: string; label: string; approximation: string } };
-    registerEngine(engine);
-    const acoustic = engine.acousticProfile;
-    const telemetry = acoustic ? telemetryById(acoustic.telemetryId) : undefined;
-    if (acoustic && telemetry) registerEngineAcousticDefinition({ ...acoustic, telemetry, parameters: acoustic.parameters });
   }
   if (manifest.kind !== "aircraft" || !manifest.aircraft) return;
   const assetPath = (path: string): string => !path || /^(?:[a-z][a-z0-9+.-]*:|\/)/i.test(path)
@@ -61,10 +57,6 @@ function applyOne(record: LoadedModRecord): void {
   for (const [id, profile] of Object.entries(manifest.aircraft.fdmProfiles)) {
     if (FDM_PROFILES[id as AircraftId]) continue;
     registerFdmProfile(id as AircraftId, profile as Parameters<typeof registerFdmProfile>[1]);
-  }
-  const audio = manifest.aircraft.audio?.engineDefinitionId;
-  if (audio) {
-    for (const definition of definitions) registerAircraftAudioInstallation(definition.id, audio);
   }
   const installation = manifest.aircraft.payloadInstallation as Parameters<typeof registerPayloadInstallation>[0] & {
     stationClearances?: Record<string, { stations: number[]; ratingException: StoreCard["ratingException"] }>;

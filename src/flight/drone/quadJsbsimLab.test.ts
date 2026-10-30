@@ -1,15 +1,20 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { NullEngine, Scene, TransformNode, Vector3 } from "@babylonjs/core";
 import { JSBSimSdk, type PropertyBatch } from "@felipegalind0/jsbsim";
 import { wasmBinaryUrl, wasmModuleUrl } from "@felipegalind0/jsbsim/wasm";
+import { createCameraFollow } from "@0sfs/aircraft/cameraFollow";
+import { createPlaceholderAircraft } from "@0sfs/aircraft/createPlaceholderAircraft";
 import { createAirframe, G } from "@0sfs/multirotor/airframe";
 import { CONTROL, PLANT } from "@0sfs/multirotor/layout";
 import { createMultirotor, type AircraftSample, type FlightCommand, type Multirotor } from "@0sfs/multirotor/multirotor";
+import { readFlightState, releaseFlightStateReads } from "@0sfs/ground-contact/ecefBridge";
 import { groundContactClearanceMeters } from "@0sfs/ground-contact/groundContactClearance";
 import type { QuadFlightModeData, QuadVehicleModData } from "@0sfs/mods/schema";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { createDroneController, planDroneCommand, type DroneController, type DroneControllerStep } from "./droneController";
 import type { DroneStickCommand } from "./droneGate";
+import { resolveQuadPropeller } from "./quadRegistry";
 import { buildDroneProfile } from "./droneTypes";
 
 const DT = 1 / 120, FT = 0.3048, LBF = 4.4482216152605, INERTIA = LBF * FT;
@@ -23,7 +28,7 @@ const cases = ["DJI-Mini2", "DJI-Air-2S"].map(directory => {
   const id = manifest.aircraft.definitions[0].id as string;
   const cameraDirectory = directory === "DJI-Mini2" ? "DJI-FC7303" : "DJI-FC3411";
   const camera = JSON.parse(readFileSync(root + cameraDirectory + "/public/0sfs-mod.json", "utf8")).camera;
-  const quad = manifest.quad as QuadVehicleModData;
+  const quad = { ...manifest.quad as QuadVehicleModData, propeller: resolveQuadPropeller(manifest.quad) };
   return { directory, id, manifest, quad, profile: manifest.aircraft.fdmProfiles[id],
     droneProfile: buildDroneProfile(id, manifest.name, shared, dji, quad, camera) };
 });
@@ -195,6 +200,35 @@ function controlledStep(lab: Lab, controller: DroneController, sticks: DroneStic
 }
 function controlledAdvance(lab: Lab, controller: DroneController, seconds: number, sticks: DroneStickCommand) {
   for (let step = 0; step < Math.round(seconds / DT); step++) controlledStep(lab, controller, sticks);
+}
+
+interface ViewFrame { phase: string; viewDeg: number; droneDeg: number; speedMps: number }
+const wrapDeg = (deg: number) => deg - 360 * Math.floor((deg + 180) / 360);
+/**
+ * Flies the legs through the shipped controller and, like the app at 60
+ * frames a second, turns the actual chase camera with the Momentum frame
+ * built from the flight state the app reads. Records where the camera looks
+ * and where the drone points, as compass headings, each frame.
+ */
+function watchMomentumView(lab: Lab, controller: DroneController, legs: readonly { phase: string; seconds: number; sticks: DroneStickCommand }[]): ViewFrame[] {
+  const engine = new NullEngine(), scene = new Scene(engine);
+  scene.useRightHandedSystem = true;
+  const aircraft = createPlaceholderAircraft(scene, new TransformNode("origin", scene));
+  const follow = createCameraFollow(), frames: ViewFrame[] = [];
+  try {
+    for (const leg of legs) for (let frame = 0; frame < Math.round(leg.seconds * 60); frame++) {
+      controlledStep(lab, controller, leg.sticks);
+      controlledStep(lab, controller, leg.sticks);
+      const state = readFlightState(lab.sdk);
+      aircraft.setChaseFrame(follow.update("momentum", state, 1 / 60));
+      // A new frame, so the chase pivot's world matrix is computed again.
+      scene.incrementRenderId();
+      const look = Vector3.TransformNormal(new Vector3(0, 0, -1), aircraft.thirdPersonCamera.getViewMatrix(true).clone().invert());
+      frames.push({ phase: leg.phase, viewDeg: Math.atan2(look.x, -look.z) / DEG, droneDeg: state.headingRad / DEG,
+        speedMps: Math.hypot(state.northVelocityFps, state.eastVelocityFps) * FT });
+    }
+  } finally { releaseFlightStateReads(lab.sdk); aircraft.dispose(); scene.dispose(); engine.dispose(); }
+  return frames;
 }
 function controlledLanding(lab: Lab, controller: DroneController, sport: boolean, scenario: string) {
   let contactStep = -1, peakLoad = 0, low = Infinity, bounce = 0, maxVd = 0, impactSpeed = 0;
@@ -386,6 +420,41 @@ describe.each(cases)("$id real JSBSim and multirotor", testCase => {
     controlledAdvance(lab, controller, 9, { ...centered, pitch: 1 });
     controlledAdvance(lab, controller, 5, centered);
     controlledLanding(lab, controller, false, "browser sequence landing");
+  });
+
+  it("keeps the Momentum camera behind the drone after a stop, a turn in place and a fly-off", async () => {
+    const lab = await boot(testCase, 20), controller = createDroneController(testCase.droneProfile);
+    controllers.push(controller);
+    const frames = watchMomentumView(lab, controller, [
+      { phase: "forward", seconds: 5, sticks: { ...centered, pitch: 1 } },
+      { phase: "stop", seconds: 6, sticks: centered },
+      { phase: "turn", seconds: 1.5, sticks: { ...centered, yaw: 1 } },
+      { phase: "turned", seconds: 1, sticks: centered },
+      { phase: "fly off", seconds: 4, sticks: { ...centered, pitch: 1 } },
+    ]);
+    const of = (phase: string) => frames.filter(frame => frame.phase === phase);
+    const offset = (frame: ViewFrame) => Math.abs(wrapDeg(frame.viewDeg - frame.droneDeg));
+    const stopped = of("stop").at(-1)!, turned = of("turned").at(-1)!, flyOff = of("fly off");
+    let swing = 0, peakRate = 0, previous = turned;
+    for (const frame of flyOff) {
+      swing = Math.max(swing, Math.abs(wrapDeg(frame.viewDeg - turned.viewDeg)));
+      peakRate = Math.max(peakRate, Math.abs(wrapDeg(frame.viewDeg - previous.viewDeg)) * 60);
+      previous = frame;
+    }
+    const stillSpeed = Math.max(...[...of("turn"), ...of("turned")].map(frame => frame.speedMps));
+    const turnDeg = wrapDeg(turned.droneDeg - stopped.droneDeg);
+    report(lab, "momentum turn in place", { turnDeg, stillSpeedMps: stillSpeed, offsetAfterTurnDeg: offset(turned),
+      flyOffSwingDeg: swing, flyOffPeakRateDegS: peakRate, flyOffSpeedMps: flyOff.at(-1)!.speedMps });
+    // The scenario itself: behind the drone at the stop, a turn without moving, then a real fly-off.
+    expect(offset(stopped)).toBeLessThan(3);
+    expect(stillSpeed).toBeLessThan(.5);
+    expect(Math.abs(turnDeg)).toBeGreaterThan(60);
+    expect(flyOff.at(-1)!.speedMps).toBeGreaterThan(5);
+    // Standing still there is no course, so the view turns with the drone,
+    // and flying off along the new heading does not swing it.
+    expect.soft(offset(turned), "view off the drone's heading after turning in place, degrees").toBeLessThan(5);
+    expect.soft(swing, "view swing while flying off, degrees").toBeLessThan(10);
+    expect.soft(peakRate, "peak view turn rate while flying off, degrees per second").toBeLessThan(30);
   });
 
   it("leans into a ten metre per second north wind with downwind body drag", async () => {

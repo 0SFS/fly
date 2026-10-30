@@ -10,8 +10,10 @@ records. There is no report text to paste.
 Bug report, Settings → Diagnostics, loading failures and failed aircraft changes all use
 the same FOSS Earth report viewer. Read `index.txt` first: it names the failure as
 `file:line` and quotes that line. `index.json` contains the same references and each file's
-line count. A long file stays closed until a needle or search result names a line;
-search results open exactly that line. **Download this file** saves the selected text
+line count. Every file opens directly in pages of 100 lines. Use **Previous**, **Next**, or
+**Go to line** to read it all. Search results highlight their line with surrounding
+context. File tabs remember their page positions. **Copy this file** and **Copy all**
+are available alongside downloads; reading requires neither downloads nor clipboard access. **Download this file** saves the selected text
 file; **Download all** saves every file in a store-method zip. Failed dynamic imports
 include a reminder that the dev-server log is outside the report.
 
@@ -46,8 +48,45 @@ before reloading. The loading snapshot describes startup and stops collecting wh
 startup finishes; the shared report also includes the current flight observations.
 
 If the flight stops before you can reach Settings, open `/fly/?report` on the same site.
-That page reads the previous visit's retained trail and offers the report without starting
-the renderer or flight simulation.
+That page reads the previous visit's retained trail and startup checkpoints without
+starting or preloading the renderer or flight simulation. The report files named
+`latest-*` and `previous-*` belong to the saved startup attempts. Their checkpoint
+metadata identifies capture times, outcomes, and every shortened or omitted section.
+The recovery page's own build and environment are labeled separately. Opening the
+report repeatedly preserves the saved evidence.
+
+Startup capture begins before application modules run. It saves operation starts
+before invoking expensive work, including application import, renderer, JSBSim, and
+terrain preparation. Renderer and physics may run together: several running
+operations do not identify which allocation caused a crash. Loading phases also
+record aircraft downloads. Progress snapshots are coalesced to at most one per
+second; operation boundaries and failures save immediately. Each attempt is limited
+to 512 KiB of serialized browser storage, with two attempts retained per page path.
+Capture respects `diagnostics.trail`; disabling it removes those checkpoints.
+Unavailable or full storage is reported in the live report.
+
+The files include available JavaScript heap and WASM observations. Missing data
+says unavailable; those measurements do not represent total process memory or
+Edge's sandbox limit. A browser kill can run no error/unload handler, and can lose
+everything since the last saved checkpoint. An unfinished attempt has an unknown
+termination reason. On the report-only page, enter the observed browser error code
+and refresh the report to annotate it; the site cannot read Edge's crash screen.
+
+`SBOX_FATAL_MEMORY_EXCEEDED` is Chromium exit code 7012, meaning its sandbox job
+memory limit was exceeded. The code alone does not identify an allocation or prove
+a leak. Do not assume Xbox's physical RAM is the browser's allowed memory.
+
+Run the [desktop console-browser checks](console-browser-testing.md) first; reserve
+Xbox testing for final platform confirmation.
+
+For the local Xbox checklist, start `cd ~/gh/0sfs/fly && npm run dev`, then open
+`https://localhost:7470/fly/test/xbox-crash-report?report` on the laptop, or the same
+path after the network address printed by startup on Xbox. The checklist lives in
+`build/test-plans/xbox-crash-report.json`. Try normal `/fly/` first, then return to
+the report link after a crash. In **Test**, Finish displays feedback JSON in
+**Review file**, even with downloads disabled; the downloadable JSON remains
+available in browsers that support it. The custom link requires a server started
+with the current configuration.
 
 If loading stops, the log says so in one line: what stopped, and under it what was thrown,
 such as `AbortError: Terrain preparation was replaced by another destination.` The visit's

@@ -3,6 +3,7 @@ import { createAirframe, type AirframeSpec } from "@0sfs/multirotor/airframe";
 import { PLANT } from "@0sfs/multirotor/layout";
 import { createMultirotor, type AircraftSample, type FlightCommand, type MultirotorStatus } from "@0sfs/multirotor/multirotor";
 import { loadMultirotor, type MultirotorCore } from "@0sfs/multirotor/wasm";
+import type { DroneAcousticSample } from "./droneGate";
 import { PHYSICS_DT, type DroneProfile } from "./droneTypes";
 
 const METERS_PER_FOOT = 0.3048;
@@ -35,6 +36,7 @@ export interface DroneFlightSample extends AircraftSample {
 }
 
 export interface DroneFlightTelemetry {
+  readonly acoustic: DroneAcousticSample;
   /** Simulated speeds, in the airframe's rotor order. */
   rpm: readonly number[];
   hoverRpm: number;
@@ -65,7 +67,13 @@ export function createDroneFlightModel(sdk: JSBSimSdk, profile: AirframeSpec & P
   const values = new Float64Array(DRONE_READ_PATHS.length);
   const wrench = new Float64Array(7);
   const rpm = profile.rotors.map(() => 0);
+  const acousticRotors = profile.rotors.map(() => ({ rpm: 0, thrustN: 0, shaftTorqueNm: 0, inducedVelocityMps: 0, vrs: 0, valid: false }));
+  const airVelocityBodyMps: [number, number, number] = [0, 0, 0];
+  const acoustic: DroneAcousticSample = {
+    valid: false, armed: false, simTimeS: 0, airDensityKgM3: 0, airVelocityBodyMps, rotors: acousticRotors,
+  };
   const telemetry: DroneFlightTelemetry = {
+    acoustic,
     rpm, hoverRpm: 0, maxRpm: profile.propeller.maxRpm, onGround: false, aglM: null, simTimeS: 0,
   };
   const sample: DroneFlightSample = {
@@ -88,7 +96,12 @@ export function createDroneFlightModel(sdk: JSBSimSdk, profile: AirframeSpec & P
   function write() {
     try { writes.write(wrench); } catch { /* A disappearing SDK must not interrupt the frame loop. */ }
   }
+  function invalidateAcoustic() {
+    acoustic.valid = false;
+    for (const rotor of acousticRotors) rotor.valid = false;
+  }
   function zeroWrench() {
+    invalidateAcoustic();
     wrench.fill(0);
     wrench[6] = lastArmed ? 1 : 0;
     write();
@@ -96,6 +109,9 @@ export function createDroneFlightModel(sdk: JSBSimSdk, profile: AirframeSpec & P
   function reset() {
     m.reset();
     rpm.fill(0);
+    invalidateAcoustic();
+    acoustic.armed = false;
+    for (const rotor of acousticRotors) rotor.rpm = rotor.thrustN = rotor.shaftTorqueNm = rotor.inducedVelocityMps = rotor.vrs = 0;
     ready = false;
     spawn = true;
     lastTime = null;
@@ -105,6 +121,7 @@ export function createDroneFlightModel(sdk: JSBSimSdk, profile: AirframeSpec & P
     read(terrainMeters) {
       if (disposed) return null;
       ready = false;
+      invalidateAcoustic();
       try { reads.read(values); } catch { zeroWrench(); return null; }
       if (!values.every(Number.isFinite) || (terrainMeters !== null && !Number.isFinite(terrainMeters))) {
         zeroWrench();
@@ -156,6 +173,23 @@ export function createDroneFlightModel(sdk: JSBSimSdk, profile: AirframeSpec & P
         for (let i = 0; i < 6; i++) wrench[i] = output[i] / (i < 3 ? N_PER_LBF : NM_PER_FTLBF);
         if (!wrench.every(Number.isFinite)) throw new Error("The rotor wrench is not finite.");
         for (let i = 0; i < rpm.length; i++) rpm[i] = output[PLANT.output.globals + i * PLANT.output.stride + PLANT.output.OMEGA] * RPM_PER_RAD_S;
+        acoustic.simTimeS = sample.simTimeS;
+        acoustic.armed = armed;
+        acoustic.airDensityKgM3 = sample.rho;
+        airVelocityBodyMps[0] = sample.u; airVelocityBodyMps[1] = sample.v; airVelocityBodyMps[2] = sample.w;
+        for (let i = 0; i < rpm.length; i++) {
+          const offset = PLANT.output.globals + i * PLANT.output.stride;
+          const rotor = acousticRotors[i];
+          rotor.rpm = rpm[i];
+          rotor.thrustN = output[offset + PLANT.output.THRUST];
+          rotor.shaftTorqueNm = output[offset + PLANT.output.TORQUE];
+          rotor.inducedVelocityMps = output[offset + PLANT.output.INDUCED];
+          rotor.vrs = output[offset + PLANT.output.VRS];
+          rotor.valid = Number.isFinite(rotor.rpm) && Number.isFinite(rotor.thrustN) && Number.isFinite(rotor.shaftTorqueNm)
+            && Number.isFinite(rotor.inducedVelocityMps) && Number.isFinite(rotor.vrs);
+        }
+        acoustic.valid = acousticRotors.every(rotor => rotor.valid);
+        if (!acoustic.valid) throw new Error("The rotor acoustic input is not finite.");
         wrench[6] = armed ? 1 : 0;
         write();
       } catch {

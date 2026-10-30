@@ -1,8 +1,10 @@
 import { GOOGLE_ERROR_TARGET_BOUNDS } from "foss-earth/mapDetailPolicy";
 import type { ParameterSpec } from "foss-earth/settings";
+import { FLIGHT_REGION_PARAMETERS } from "./flightRegionSettings";
 import "../aircraft/fleet";
 import { AIRCRAFT_FAMILIES } from "@0sfs/aircraft/aircraftCatalog";
 import { AIRCRAFT_IDS } from "@0sfs/aircraft/aircraftIds";
+import { AIRCRAFT_URL_NAME, RENAMED_AIRCRAFT_IDS } from "../aircraft/aircraftAddress";
 import { DEFAULT_ENGINE_GAS_AXIAL_SAMPLES, DEFAULT_ENGINE_GAS_RADIAL_SAMPLES } from "@0sfs/exhaust/engineGasOptics";
 import {
   AIRCRAFT_PARAMETERS_1,
@@ -113,6 +115,8 @@ const GENERATION_CHOICES = AIRCRAFT_FAMILIES.flatMap(family => family.variants.m
   id: variant.id,
   label: family.variants.length > 1 ? `${family.label} ${variant.label}` : variant.label,
 })));
+// A drone's aircraft and generation share its id, so one list renames both.
+const RENAMED_AIRCRAFT_CHOICES = Object.entries(RENAMED_AIRCRAFT_IDS).map(([value, replacement]) => ({ value, replacement }));
 
 const main = <T extends { tab: string; section: string }>(home: T) => ({ ...home, level: "main" as const });
 const all = <T extends { tab: string; section: string }>(home: T) => ({ ...home, level: "all" as const });
@@ -199,6 +203,8 @@ export const OSFS_PARAMETERS = [
     kind: "choice",
     choices: AIRCRAFT_CHOICES,
     dynamicChoices: true,
+    urlNames: [AIRCRAFT_URL_NAME],
+    legacyValues: RENAMED_AIRCRAFT_CHOICES,
     default: "cessna-172",
     defaultReason: "The original default aircraft.",
     home: all(MODEL),
@@ -213,6 +219,7 @@ export const OSFS_PARAMETERS = [
     kind: "choice",
     choices: GENERATION_CHOICES,
     dynamicChoices: true,
+    legacyValues: RENAMED_AIRCRAFT_CHOICES,
     default: "cessna-172",
     defaultReason: "The default aircraft's only generation; another aircraft uses its own first generation.",
     home: all(MODEL),
@@ -221,7 +228,8 @@ export const OSFS_PARAMETERS = [
   },
   ...AIRCRAFT_PARAMETERS_2,
 
-  // Map → Detail: the low-spawn hold, a requirement on World detail.
+  ...FLIGHT_REGION_PARAMETERS,
+  // Retained for saved settings compatibility. Region profiles replace this hold.
   {
     id: "osfs.flight.minimum",
     label: "Flight minimum",
@@ -273,7 +281,7 @@ export const OSFS_PARAMETERS = [
     kind: "boolean",
     default: false,
     defaultReason: "The Flight minimum is a safety requirement; waiving it is a deliberate, temporary choice.",
-    home: main(MAP_DETAIL),
+    home: all(MAP_DETAIL),
     appliesLive: true,
     source: "src/flight/createFlightSimApp.ts",
     session: true,
@@ -719,6 +727,39 @@ export const OSFS_PARAMETERS = [
     source: "src/flight/hud/flightHud.ts",
   },
 
+  {
+    id: "osfs.hud.planeAttitudeSide",
+    label: "Plane attitude side",
+    description: "Which side holds the plane's attitude indicator and pitch/roll stick. The engine widget moves to the opposite side.",
+    unit: "none",
+    kind: "choice",
+    choices: [
+      { id: "left", label: "Left", description: "Attitude and pitch/roll on the left; engines on the right." },
+      { id: "right", label: "Right", description: "Attitude and pitch/roll on the right; engines on the left." },
+    ],
+    default: "left",
+    defaultReason: "Preserves the plane's existing control layout.",
+    home: main(HUD),
+    appliesLive: true,
+    source: "src/flight/hud/flightHud.ts",
+  },
+  {
+    id: "osfs.hud.droneAttitudeSide",
+    label: "Drone attitude side",
+    description: "Which side holds the drone's attitude indicator and pitch/roll stick. The climb/yaw motor widget moves to the opposite side.",
+    unit: "none",
+    kind: "choice",
+    choices: [
+      { id: "left", label: "Left", description: "Attitude and pitch/roll on the left; climb/yaw on the right." },
+      { id: "right", label: "Right", description: "Attitude and pitch/roll on the right; climb/yaw on the left." },
+    ],
+    default: "right",
+    defaultReason: "DJI Mode 2 places climb/yaw on the left and pitch/roll on the right.",
+    home: main(HUD),
+    appliesLive: true,
+    source: "src/flight/hud/flightHud.ts",
+  },
+
   // Renderer → Instruments.
   {
     id: "osfs.renderer.attitudeIndicator",
@@ -968,12 +1009,41 @@ export const OSFS_PARAMETERS = [
     unit: KNOTS,
     kind: "number",
     step: 1,
-    bounds: within(0, 400),
+    bounds: within(0, 800),
     default: 120,
     defaultReason: "The original start airspeed.",
     home: all(START),
     appliesLive: false,
     source: "src/flight/jsbsim/bootstrapC172.ts",
+  },
+  {
+    id: "osfs.start.pitch",
+    label: "Start pitch",
+    description: "How far the nose points above the horizon when a new flight starts; negative is below it. With the start climb angle it sets the wing's angle to the air.",
+    unit: "deg",
+    kind: "number",
+    step: 1,
+    bounds: within(-90, 90),
+    named: [{ id: "aircraft", label: "Aircraft's own", description: "The start attitude the aircraft defines for itself." }],
+    default: "aircraft",
+    defaultReason: "Each aircraft's own start attitude, as every flight started before a shared flight could give one.",
+    home: all(START),
+    appliesLive: false,
+    source: "src/flight/jsbsim/resetFlightLocation.ts",
+  },
+  {
+    id: "osfs.start.climbAngle",
+    label: "Start climb angle",
+    description: "The angle above the horizon a new flight starts moving along; negative descends.",
+    unit: "deg",
+    kind: "number",
+    step: 1,
+    bounds: within(-90, 90),
+    default: 0,
+    defaultReason: "Level flight, the original start.",
+    home: all(START),
+    appliesLive: false,
+    source: "src/flight/jsbsim/resetFlightLocation.ts",
   },
   ...CONTROLS_PARAMETERS_1,
   {

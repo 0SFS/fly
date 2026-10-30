@@ -23,7 +23,7 @@ describe("flight loading log", () => {
     const useMap = vi.fn();
     screen = createFlightLoadingScreen();
     screen.fail("Both map providers are unavailable.", { actions: [{ label: "Use OpenStreetMap", onClick: useMap }] });
-    expect(document.getElementById("root")!.hasAttribute("inert")).toBe(true);
+    expect(document.getElementById("root")!.hasAttribute("inert")).toBe(false);
     const recovery = [...newestLine().querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Use OpenStreetMap")!;
     expect(recovery.disabled).toBe(false);
     recovery.click();
@@ -35,14 +35,14 @@ describe("flight loading log", () => {
     expect(document.querySelectorAll("button")).not.toContain(recovery);
   });
 
-  it("prints beside the renderer root without covering it and holds flight input until hidden", () => {
+  it("shows central nonmodal progress and keeps the renderer controls usable", () => {
     const root = document.getElementById("root")!;
     screen = createFlightLoadingScreen();
     const log = document.getElementById("app-log")!;
 
     expect(root.contains(log)).toBe(false);
     expect(newestLine().textContent).toContain("Preparing your flight");
-    expect(root.hasAttribute("inert")).toBe(true);
+    expect(root.hasAttribute("inert")).toBe(false);
     expect(root.getAttribute("aria-busy")).toBe("true");
 
     screen.hide();
@@ -55,7 +55,7 @@ describe("flight loading log", () => {
   it("leaves a live control usable, including one the app builds while loading shows", async () => {
     const root = document.getElementById("root")!;
     screen = createFlightLoadingScreen();
-    expect(root.hasAttribute("inert")).toBe(true);
+    expect(root.hasAttribute("inert")).toBe(false);
 
     // The app's HUD arrives during loading, with its pause button marked live.
     root.insertAdjacentHTML("beforeend", `
@@ -68,18 +68,70 @@ describe("flight loading log", () => {
     const byId = (id: string) => document.getElementById(id)!;
     const inert = (element: Element): boolean => element.closest("[inert]") !== null;
     expect(inert(byId("pause"))).toBe(false);
-    for (const id of ["previous-focus", "canvas", "settings", "panel"]) expect(inert(byId(id))).toBe(true);
+    for (const id of ["previous-focus", "canvas", "settings", "panel"]) expect(inert(byId(id))).toBe(false);
     expect(root.getAttribute("aria-busy")).toBe("true");
 
     screen.hide();
     expect(document.querySelector("[inert]")).toBeNull();
 
-    // A teleport holds the app again around the same live control.
+    // A new destination also keeps settings and camera controls available.
     screen.show({ title: "Preparing your destination", reset: true });
     expect(inert(byId("pause"))).toBe(false);
-    expect(inert(byId("panel"))).toBe(true);
+    expect(inert(byId("panel"))).toBe(false);
     screen.hide();
     expect(document.querySelector("[inert]")).toBeNull();
+  });
+
+  it("explains the active wait centrally and offers a one-use override for the current destination", () => {
+    screen = createFlightLoadingScreen();
+    screen.setPhase("terrain", { state: "loading", detail: "Waiting for detailed ground near the drone" });
+    const status = document.querySelector<HTMLElement>(".flight-loading-status")!;
+    expect(status.hidden).toBe(false);
+    expect(status.textContent).toContain("Waiting for detailed ground near the drone");
+    expect(status.hasAttribute("aria-modal")).toBe(false);
+    expect(document.getElementById("root")!.hasAttribute("inert")).toBe(false);
+    const override = vi.fn();
+    screen.setSpawnOverride!({ onClick: override, detail: "Terrain may still change." });
+    const button = [...status.querySelectorAll<HTMLButtonElement>("button")].find(item => item.textContent === "Spawn now anyway")!;
+    expect(button.hidden).toBe(false);
+    button.click();
+    button.click();
+    expect(override).toHaveBeenCalledOnce();
+    expect(button.disabled).toBe(true);
+    screen.hide();
+    expect(status.hidden).toBe(true);
+    screen.show({ reset: true });
+    expect(button.hidden).toBe(true);
+    expect(button.disabled).toBe(false);
+  });
+
+  it("offers above-ground placement only when the caller knows the ground height", () => {
+    screen = createFlightLoadingScreen();
+    const override = vi.fn(), aboveGround = vi.fn();
+    const button = [...document.querySelectorAll<HTMLButtonElement>(".flight-loading-status button")].find(item => item.textContent === "Teleport above ground")!;
+    screen.setSpawnOverride!({ onClick: override, detail: "Ground height unknown" });
+    expect(button.hidden).toBe(true);
+    screen.setSpawnOverride!({ onClick: override, aboveGround: { onClick: aboveGround } });
+    expect(button.hidden).toBe(false);
+    button.click();
+    expect(aboveGround).toHaveBeenCalledOnce();
+    expect(override).not.toHaveBeenCalled();
+    screen.setSpawnOverride!(null);
+    expect(button.hidden).toBe(true);
+  });
+
+  it("keeps central recovery and log actions in sync", () => {
+    screen = createFlightLoadingScreen();
+    const retry = vi.fn();
+    screen.fail("Map is unavailable", { retry });
+    const status = document.querySelector<HTMLElement>(".flight-loading-status")!;
+    expect(status.textContent).toContain("Map is unavailable");
+    const retryButton = [...status.querySelectorAll<HTMLButtonElement>("button")].find(item => item.textContent === "Try again")!;
+    retryButton.click();
+    retryButton.click();
+    expect(retry).toHaveBeenCalledOnce();
+    expect(retryButton.disabled).toBe(true);
+    expect([...newestLine().querySelectorAll<HTMLButtonElement>("button")].find(item => item.textContent === "Try again")!.disabled).toBe(true);
   });
 
   it("reports measured progress in place and finishes with the elapsed time", () => {
@@ -128,7 +180,7 @@ describe("flight loading log", () => {
 
     screen.setPhase("terrain", { state: "loading", progress: 0 });
     expect(lines()).toHaveLength(before + 2);
-    expect(document.getElementById("root")!.hasAttribute("inert")).toBe(true);
+    expect(document.getElementById("root")!.hasAttribute("inert")).toBe(false);
   });
 
   it("keeps errors visible, renders untrusted messages as text, and retries in place", () => {
@@ -247,4 +299,19 @@ describe("flight loading log", () => {
 
     expect(document.getElementById("app-log")).toBeNull();
   });
+});
+
+it("checkpoints running operations before invoking them and preserves failure through cleanup", async () => {
+  const captures: Array<{ snapshot: { operations: Array<{ operation: string; state: string }> }; outcome?: string }> = [];
+  screen = createFlightLoadingScreen(undefined, undefined, (snapshot, _urgent, outcome) => {
+    captures.push({ snapshot: snapshot as typeof captures[number]["snapshot"], outcome });
+  });
+  await expect(screen.trace!("Allocate physics", async () => {
+    expect(captures.at(-1)?.snapshot.operations.at(-1)).toMatchObject({ operation: "Allocate physics", state: "running" });
+    throw new Error("allocation failed");
+  })).rejects.toThrow("allocation failed");
+  screen.fail("Startup failed", { cause: new Error("allocation failed") });
+  expect(captures.at(-1)?.outcome).toBe("failed");
+  screen.destroy();
+  expect(captures.at(-1)?.outcome).toBe("failed");
 });

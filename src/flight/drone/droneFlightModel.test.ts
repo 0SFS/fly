@@ -10,10 +10,11 @@ import { loadMultirotor, type MultirotorCore } from "@0sfs/multirotor/wasm";
 import common from "../../../../Quadcopter/public/0sfs-mod.json";
 import mini from "../../../../DJI-Mini2/public/0sfs-mod.json";
 import { createDroneFlightModel, DRONE_READ_PATHS, type DroneFlightModel } from "./droneFlightModel";
+import { resolveQuadPropeller } from "./quadRegistry";
 import { PHYSICS_DT } from "./droneTypes";
 
 vi.mock("@0sfs/multirotor/wasm", () => ({ loadMultirotor: vi.fn() }));
-const profile = { ...mini.quad as QuadVehicleModData, properties: common.quadcopter.properties };
+const profile = { ...mini.quad as QuadVehicleModData, propeller: resolveQuadPropeller(mini.quad as QuadVehicleModData), properties: common.quadcopter.properties };
 const flight: FlightCommand = {
   vn: 0, ve: 0, vd: 0, yawMode: CONTROL.YAW_RATE, yaw: 0, mode: CONTROL.MODE_FLYING,
   tanTiltMax: Math.tan(25 * Math.PI / 180), yawRateMaxRad: Math.PI / 3,
@@ -121,7 +122,25 @@ describe("JSBSim multirotor bridge", () => {
     const output = reference.plant.output;
     wrench(properties).forEach((value, i) => expect(value).toBeCloseTo(output[i] / (i < 3 ? 4.4482216152605 : 4.4482216152605 * .3048), 12));
     telemetry.rpm.forEach((rpm, i) => expect(rpm).toBeCloseTo(output[PLANT.output.globals + i * PLANT.output.stride + PLANT.output.OMEGA] * 30 / Math.PI, 10));
+    expect(telemetry.acoustic).toMatchObject({ valid: true, armed: true, simTimeS: sample.simTimeS, airDensityKgM3: sample.rho,
+      airVelocityBodyMps: [sample.u, sample.v, sample.w] });
+    telemetry.acoustic.rotors.forEach((rotor, i) => {
+      const at = PLANT.output.globals + i * PLANT.output.stride;
+      expect(rotor).toEqual({ valid: true, rpm: telemetry.rpm[i], thrustN: output[at + PLANT.output.THRUST],
+        shaftTorqueNm: output[at + PLANT.output.TORQUE], inducedVelocityMps: output[at + PLANT.output.INDUCED], vrs: output[at + PLANT.output.VRS] });
+    });
     reference.dispose();
+  });
+  it("invalidates acoustic inputs on bad reads and clears them on reset", () => {
+    const { model, properties } = fakeSdk();
+    model.read(null); model.step(flight, true);
+    expect(model.telemetry().acoustic.valid).toBe(true);
+    properties["atmosphere/rho-slugs_ft3"] = NaN;
+    expect(model.read(null)).toBeNull();
+    expect(model.telemetry().acoustic.valid).toBe(false);
+    expect(model.telemetry().acoustic.rotors.every(rotor => !rotor.valid)).toBe(true);
+    model.reset();
+    expect(model.telemetry().acoustic.rotors.every(rotor => rotor.rpm === 0 && rotor.thrustN === 0)).toBe(true);
   });
   it.each([0, 1, 2, 3])("uses STRUCTURE contact %s for ground state", foot => {
     const { model, properties } = fakeSdk({ [`contact/unit[${foot}]/WOW`]: 1, "gear/wow": 0 });
@@ -228,7 +247,7 @@ describe("bridge with real JSBSim aircraft", () => {
       try { initialBatch.write(Object.values(initialProperties)); expect(sdk.runIc()).toBe(true); }
       finally { initialBatch.dispose(); }
       const create = vi.spyOn(sdk, "createPropertyBatch");
-      model = createDroneFlightModel(sdk, { ...manifest.quad, properties: common.quadcopter.properties });
+      model = createDroneFlightModel(sdk, { ...manifest.quad, propeller: resolveQuadPropeller(manifest.quad), properties: common.quadcopter.properties });
       expect(create.mock.results[0].value.missing).toEqual([]);
       const initial = model.read(0)!;
       expect(initial).not.toBeNull();

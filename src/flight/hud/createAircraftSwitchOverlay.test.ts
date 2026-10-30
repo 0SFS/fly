@@ -65,14 +65,14 @@ it("offers shared file tabs, opens one search hit and downloads one file or the 
   ].join("\n"));
   const settings = dialog.querySelector<HTMLButtonElement>('[role="tab"][data-file="settings.txt"]')!;
   settings.click();
-  expect(dialog.querySelector("pre")).toBeNull();
+  expect(dialog.querySelector("pre")).not.toBeNull();
   const search = dialog.querySelector<HTMLInputElement>('[aria-label="Find a line in the error report"]')!;
   search.value = "osfs.example.49";
   search.dispatchEvent(new Event("input", { bubbles: true }));
   const hit = dialog.querySelector<HTMLButtonElement>('.foss-earth-issue-report__hits button')!;
   expect(hit.textContent).toContain("settings.txt:51");
   hit.click();
-  expect(dialog.querySelector("pre")?.textContent).toBe("51>   osfs.example.49 = 49");
+  expect(dialog.querySelector("mark")?.textContent).toContain("osfs.example.49 = 49");
   const single = dialog.querySelector<HTMLAnchorElement>('[aria-label="Download this file"]')!;
   single.addEventListener("click", event => event.preventDefault());
   single.click();

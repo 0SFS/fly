@@ -1,4 +1,5 @@
 import { noteCanvasDrawn } from "@foss-earth/ui/browser";
+import { INSTRUMENT_STICK_HALF_SHARE } from "@0sfs/controls/centeredStick";
 import type { FrameProfiler } from "foss-earth/perf";
 import {
   computeAttitudeScene,
@@ -11,7 +12,7 @@ import { createCanvasAttitudePainter, type AttitudeStick } from "./attitudeCanva
 import { createWebGpuAttitude, type WebGpuAttitude } from "./attitudeWebGpu";
 
 /** The instrument's half side as a share of its canvas's side; the rest is the gap to the levers beside it. */
-export const ATTITUDE_HALF_SHARE = 96 / 220;
+export const ATTITUDE_HALF_SHARE = INSTRUMENT_STICK_HALF_SHARE;
 
 export type AttitudeBackend = "webgpu" | "canvas2d";
 /** What the pilot asked for in Settings. Auto is WebGPU wherever the globe has it. */

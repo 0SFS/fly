@@ -14,7 +14,7 @@ const C172_STATIC_METERS = getFdmProfile("cessna-172").stance.staticMeters;
 describe("displayed terrain contact", () => {
   it("does not halt flight for a transient optional visible-mesh miss", () => {
     const sdk = {
-      getPropertyValue: vi.fn((property: string) => property === "position/lat-geod-deg" ? 34 : property === "position/long-gc-deg" ? -118 : 0),
+      getPropertyValue: vi.fn((property: string) => property === "position/lat-geod-deg" ? 34 : property === "position/long-gc-deg" ? -118 : property === "position/h-sl-ft" ? 10 : 0),
       setPropertyValue: vi.fn(),
       resetToInitialConditions: vi.fn(),
       runIc: vi.fn(() => true),
@@ -98,7 +98,9 @@ describe("displayed terrain contact", () => {
     expect(sdk.setPropertyValue).not.toHaveBeenCalledWith("position/terrain-elevation-asl-ft", expect.anything());
 
     hit = { heightMeters: 120, revision: 1 } as SurfaceHit;
-    expect(contact.update(false)).not.toBe(false);
+    expect(contact.update(false)).toBe(false);
+    expect(contact.getBlockReason()).toBe("relocation");
+    contact.declineRelocation(contact.getRelocationProposal()!.id);
 
     // A later miss is now genuinely transient and may be tolerated.
     hit = null;
@@ -223,7 +225,11 @@ describe("displayed terrain contact", () => {
     // gear model cannot resolve that penetration.
     properties["position/h-sl-ft"] = 200 / 0.3048;
     hit = { heightMeters: 260, revision: 2 } as SurfaceHit;
-    expect(contact.update(true)).toBe("reset");
+    expect(contact.update(true)).toBe(false);
+    const proposed = contact.getRelocationProposal()!;
+    expect(proposed.reason).toBe("surface regained above the aircraft");
+    expect(sdk.setPropertyValue).not.toHaveBeenCalledWith("ic/h-sl-ft", expect.anything());
+    expect(contact.acceptRelocation(proposed.id)).toBe(true);
     expect(sdk.setPropertyValue).toHaveBeenCalledWith("ic/h-sl-ft", expect.closeTo((260 + C172_STATIC_METERS) / 0.3048, 1));
   });
 

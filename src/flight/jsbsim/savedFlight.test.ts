@@ -8,11 +8,16 @@ import {
   restoreSavedFlight,
   SAVED_FLIGHT_STORAGE_KEY,
   savedFlightTerrainRequest,
+  savedFlightPreview,
   type SavedFlight,
 } from "./savedFlight";
-import { getFdmProfile } from "./fdmProfiles";
+
+import { EMPTY_FLIGHT_STATE } from "@0sfs/ground-contact/flightState";
+import { flightRegion } from "../flightRegion";
+import { flightParameterDefaults } from "../settings/flightParameters";
 
 const FT = 0.3048;
+const STANCE = { staticMeters: 1, staticPitchRad: 0, pitchArmMeters: 0, rollArmMeters: 0 };
 
 /** A simulator whose RunIC moves the aircraft to its initial conditions. */
 function fakeSdk(values: Record<string, number> = {}) {
@@ -68,11 +73,32 @@ describe("saved flight", () => {
     expect(savedFlightTerrainRequest(flight)).toEqual({ latDeg: 44.9, lonDeg: -93.2, altitudeMeters: flight.altMeters, clearanceMeters: 0 });
   });
 
-  it("prepares terrain for the saved height above the ground, with no climb over nearby hills", () => {
+  it("prepares terrain for the exact absolute pose, with no climb over nearby hills", () => {
     const flight = captureSavedFlight(asSdk(fakeSdk()), "cessna-172", false)!;
     expect(savedFlightTerrainRequest(flight)).toEqual({
-      latDeg: 44.9, lonDeg: -93.2, altitudeAboveGroundMeters: flight.aboveGroundMeters, clearanceMeters: 0,
+      latDeg: 44.9, lonDeg: -93.2, altitudeMeters: flight.altMeters, clearanceMeters: 0,
     });
+  });
+
+  it("previews saved attitude and ground motion with the correct vertical sign", () => {
+    const flight = captureSavedFlight(asSdk(fakeSdk()), "cessna-172", true)!;
+    const preview = savedFlightPreview(flight, EMPTY_FLIGHT_STATE);
+    expect(preview).toMatchObject({ latDeg: 44.9, lonDeg: -93.2, altMeters: flight.altMeters,
+      northVelocityFps: 100, eastVelocityFps: -50, verticalSpeedFps: -5, throttleNorm: 0.7 });
+    expect(preview.headingRad).toBeCloseTo(300 * Math.PI / 180);
+    expect(preview.rollRad).toBeCloseTo(10 * Math.PI / 180);
+    expect(preview.pitchRad).toBeCloseTo(3 * Math.PI / 180);
+    expect(flightRegion(preview, false, 10, flightParameterDefaults()).region.cone).toBeDefined();
+  });
+
+  it("previews a stopped save without inheriting a bootstrap velocity cone, and falls back for missing values", () => {
+    const flight = captureSavedFlight(asSdk(fakeSdk({ "velocities/v-north-fps": 0, "velocities/v-east-fps": 0, "velocities/v-down-fps": 0 })), "cessna-172", true)!;
+    const fallback = { ...EMPTY_FLIGHT_STATE, northVelocityFps: 200, rollRad: 0.4, pitchRad: 0.2 };
+    const preview = savedFlightPreview(flight, fallback);
+    expect(flightRegion(preview, false, 10, flightParameterDefaults()).region.cone).toBeUndefined();
+    delete flight.simulation.initial["ic/phi-deg"];
+    flight.simulation.initial["ic/theta-deg"] = NaN;
+    expect(savedFlightPreview(flight, fallback)).toMatchObject({ rollRad: 0.4, pitchRad: 0.2 });
   });
 
   it.each([
@@ -127,11 +153,11 @@ describe("saved flight", () => {
       const sdk = fakeSdk({ "fcs/brake-cmd-norm": 0 });
       applySavedControls(asSdk(sdk), flight, "cessna-172");
       expect(sdk.properties["fcs/brake-cmd-norm"]).toBe(0.6);
-      restoreSavedFlight(asSdk(sdk), flight, "cessna-172", { groundHeightMeters: 0, altitudeMeters: 3000 });
+      restoreSavedFlight(asSdk(sdk), flight, "cessna-172", { groundHeightMeters: 0, altitudeMeters: 3000 }, STANCE);
       expect(sdk.properties["fcs/brake-cmd-norm"]).toBe(0.6);
     });
 
-    it("keeps the height above the ground prepared this session, and the saved controls and engine", () => {
+    it("keeps absolute altitude when ground changes, along with saved controls and engine", () => {
       const flight = saved();
       const sdk = fakeSdk({
         "position/lat-geod-deg": 10, "position/long-gc-deg": 20, "attitude/psi-deg": 0,
@@ -142,10 +168,10 @@ describe("saved flight", () => {
       // The pilot's controls are made from these before the ground is ready.
       expect(sdk.properties["fcs/throttle-cmd-norm"]).toBe(0.7);
       expect(sdk.properties["fcs/flap-cmd-norm"]).toBe(0.5);
-      const state = restoreSavedFlight(asSdk(sdk), flight, "cessna-172", { groundHeightMeters: 400, altitudeMeters: 3150 });
+      const state = restoreSavedFlight(asSdk(sdk), flight, "cessna-172", { groundHeightMeters: 400, altitudeMeters: 3150 }, STANCE);
       expect(state.latDeg).toBe(44.9);
       expect(state.lonDeg).toBe(-93.2);
-      expect(state.altMeters).toBeCloseTo(3150);
+      expect(state.altMeters).toBeCloseTo(flight.altMeters);
       expect(state.headingRad * 180 / Math.PI).toBeCloseTo(300);
       expect(sdk.setPropertyValue).toHaveBeenCalledWith("ic/terrain-elevation-ft", 400 / FT);
       expect(sdk.setPropertyValue).toHaveBeenCalledWith("ic/vn-fps", 100);
@@ -154,10 +180,25 @@ describe("saved flight", () => {
       expect(sdk.properties["atmosphere/wind-north-fps"]).toBe(0);
     });
 
-    it("never places the aircraft lower than its stance above the prepared ground", () => {
+    it("does not move a saved aircraft when refined terrain appears above it", () => {
       const sdk = fakeSdk();
-      const state = restoreSavedFlight(asSdk(sdk), saved(), "cessna-172", { groundHeightMeters: 400, altitudeMeters: 400 });
-      expect(state.altMeters).toBeCloseTo(400 + getFdmProfile("cessna-172").stance.staticMeters + 0.17);
+      const flight = saved();
+      const state = restoreSavedFlight(asSdk(sdk), flight, "cessna-172", { groundHeightMeters: 4000, altitudeMeters: 5000 }, STANCE);
+      expect(state.altMeters).toBeCloseTo(flight.altMeters);
+      // That ground is withheld rather than starting the aircraft on contacts buried in it.
+      expect(sdk.setPropertyValue).toHaveBeenCalledWith("ic/terrain-elevation-ft", (flight.altMeters - 10_000) / FT);
+    });
+
+    it("switches Mini 2 to Air 2S near the ground without inheriting a terrain altitude jump", () => {
+      const sdk = fakeSdk({ "position/h-sl-ft": 250.1 / FT, "position/terrain-elevation-asl-ft": 250 / FT });
+      const flight = captureSavedFlight(asSdk(sdk), "dji-mini2" as SavedFlight["aircraftId"], true)!;
+      const request = savedFlightTerrainRequest(flight);
+      expect(request.altitudeMeters).toBeCloseTo(250.1);
+      expect(request.altitudeAboveGroundMeters).toBeUndefined();
+      const switched = restoreSavedFlight(asSdk(fakeSdk()), flight, "dji-air2s" as SavedFlight["aircraftId"], { groundHeightMeters: 350, altitudeMeters: 1350 }, STANCE);
+      expect(switched.latDeg).toBe(flight.latDeg);
+      expect(switched.lonDeg).toBe(flight.lonDeg);
+      expect(switched.altMeters).toBeCloseTo(250.1);
     });
 
     it("gives another aircraft the saved position and motion but keeps its own controls and engine", () => {
@@ -165,7 +206,7 @@ describe("saved flight", () => {
       const sdk = fakeSdk({ "fcs/throttle-cmd-norm": 0.35, "fcs/flap-cmd-norm": 0, "propulsion/engine/set-running": 0 });
       applySavedControls(asSdk(sdk), flight, "cirrus-vision-jet");
       expect(sdk.setPropertyValue).not.toHaveBeenCalled();
-      const state = restoreSavedFlight(asSdk(sdk), flight, "cirrus-vision-jet", { groundHeightMeters: 250, altitudeMeters: 3000 });
+      const state = restoreSavedFlight(asSdk(sdk), flight, "cirrus-vision-jet", { groundHeightMeters: 250, altitudeMeters: 3000 }, STANCE);
       expect(state.latDeg).toBe(44.9);
       expect(sdk.properties["fcs/throttle-cmd-norm"]).toBe(0.35);
       expect(sdk.properties["fcs/flap-cmd-norm"]).toBe(0);
@@ -176,7 +217,7 @@ describe("saved flight", () => {
       const flight = saved();
       const initial = Object.fromEntries(Object.entries(flight.simulation.initial).filter(([name]) => name !== "ic/vn-fps"));
       expect(() => restoreSavedFlight(asSdk(fakeSdk()), { ...flight, simulation: { ...flight.simulation, initial } },
-        "cessna-172", { groundHeightMeters: 250, altitudeMeters: 3000 })).toThrow("ic/vn-fps");
+        "cessna-172", { groundHeightMeters: 250, altitudeMeters: 3000 }, STANCE)).toThrow("ic/vn-fps");
     });
   });
 });

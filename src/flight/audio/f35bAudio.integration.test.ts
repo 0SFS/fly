@@ -12,7 +12,8 @@ import { resolveAircraftDataFiles } from "../jsbsim/hydrateJsbsimData";
 import { getAircraftAudioInstallation, getAircraftAudioProfile, resolveAircraftAudioInstallation } from "@0sfs/sound/aircraftAudioProfiles";
 import { AVAILABILITY } from "@0sfs/sound/audioSnapshot";
 import { computeListenerPose, createListenerPose } from "@0sfs/sound/audioPose";
-import { createDspHarness, peak, rms, TIER } from "@0sfs/sound/dspHarness";
+import { peak, rms, TIER } from "@0sfs/sound/dspHarness";
+import { createReferenceHarness as createDspHarness } from "../../../../sound/tests/fixtures/engineProfiles";
 import { createJsbsimAudioAdapter, toSnapshot, type AudioAdapter, type AudioAdapterReading } from "@0sfs/sound/jsbsimAudioAdapter";
 import { LEGACY_PHYSICS_HZ_120 } from "../physics/physicsRate";
 

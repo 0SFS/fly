@@ -1,14 +1,15 @@
 /**
  * The F-35B trigger.
  *
- * Hold fires the GAU-22/A. A press launches the selected missile once.
- * Internal missiles wait until the bay door is open, then the door shuts.
+ * Hold fires the selected GAU-22/A. A press launches one selected missile.
+ * Internal missiles wait for the bay door. Automatically opened bays shut after launch.
  * Nothing leaves while the master arm is safe or the flight is paused.
  */
 
 import { geodeticFrom, nedFrom, type Geodetic } from "@0sfs/multiplayer/geodetic";
 import { showPose } from "@0sfs/multiplayer/posePlayout";
 import type { AircraftPose, FireBurst, MissileLaunch } from "@0sfs/multiplayer/protocol";
+import { isFireableWeapon, weaponStation } from "@0sfs/stores/armamentControls";
 import { stationDefinition } from "@0sfs/stores/stationTable";
 import { bodyAxes, type NedVector } from "./kinematics";
 
@@ -70,15 +71,17 @@ export interface FireTarget extends Geodetic {
 
 export interface FireControlInput {
   dt: number;
-  /** Trigger held. A rising edge launches; the level fires the gun. */
+  /** Trigger held. A rising edge launches; the level fires the selected gun. */
   held: boolean;
+  /** A complete UI tap between simulation steps. Combined with the held edge. */
+  pressed?: boolean;
   armed: boolean;
   paused: boolean;
   rounds: number;
   gunPod: boolean;
   load: readonly (string | null)[];
   bayPos: readonly [number, number];
-  selectedStation: number | null;
+  selectedWeaponKey: string | null;
   shooterId: string;
   kinematics: ShooterKinematics | null;
   target: FireTarget | null;
@@ -95,8 +98,10 @@ export interface FireControlOutput {
   launches: MissileLaunch[];
   door: DoorCommand | null;
   consumedStation: number | null;
-  /** The station a press would launch, including the automatic first missile. */
+  /** First loaded station of the selected type; never falls back to another type. */
   selectedStation: number | null;
+  /** A queued internal missile, waiting for its door to open. */
+  pendingStation: number | null;
 }
 
 interface OpenBurst {
@@ -111,7 +116,7 @@ interface OpenBurst {
   count: number;
 }
 
-interface PendingLaunch {
+export interface PendingLaunch {
   station: number;
   key: string;
   bay: 0 | 1;
@@ -137,6 +142,18 @@ export function createFireControl() {
   let nextSeq = 1;
   let open: OpenBurst | null = null;
   let pending: PendingLaunch | null = null;
+  let flushBeforeNextStep = false;
+
+  /** The caller also stops gun recoil immediately and waits for trigger release. */
+  function cancel(): DoorCommand | null {
+    const door = pending ? { bay: pending.bay, open: false } : null;
+    pending = null;
+    held = false;
+    credit = 0;
+    // Already spent rounds still need to reach the engagement and remote peers.
+    flushBeforeNextStep = true;
+    return door;
+  }
 
   function flush(into: FireBurst[], shooterId: string): void {
     if (!open || open.count < 1) { open = null; return; }
@@ -156,13 +173,21 @@ export function createFireControl() {
     let consumedStation: number | null = null;
     let rounds = input.rounds;
     let firing = false;
-    const selectedStation = selectedMissileStation(input.load, input.selectedStation);
+    const selectedStation = isFireableWeapon(input.selectedWeaponKey)
+      ? weaponStation(input.load, input.selectedWeaponKey) : null;
     const canShoot = input.armed && !input.paused && input.kinematics !== null && input.dt >= 0;
+    const canceledPending = pending !== null && (!canShoot
+      || pending.key !== input.selectedWeaponKey || input.load[pending.station] !== pending.key);
+    if (canceledPending) door = cancel();
+    if (flushBeforeNextStep) {
+      flush(bursts, input.shooterId);
+      flushBeforeNextStep = false;
+    }
     const trigger = canShoot && input.held;
-    const pressed = trigger && !held;
+    const pressed = canShoot && !canceledPending && (input.pressed === true || (trigger && !held));
     held = trigger;
 
-    if (!canShoot || !input.gunPod || rounds <= 0) {
+    if (!canShoot || input.selectedWeaponKey !== "gau-22-pod" || selectedStation === null || !input.gunPod || rounds <= 0) {
       flush(bursts, input.shooterId);
       credit = 0;
     } else if (trigger) {
@@ -187,7 +212,6 @@ export function createFireControl() {
       credit = 0;
     }
 
-    if (pending && (!input.armed || input.paused)) pending = null;
     if (pending && input.kinematics) {
       const doorPos = input.bayPos[pending.bay] ?? 0;
       if (doorPos >= DOOR_OPEN) {
@@ -214,7 +238,6 @@ export function createFireControl() {
           if (launched) {
             launches.push(launched);
             consumedStation = selectedStation;
-            door = { bay: station.bay, open: false };
           }
         } else {
           pending = { station: selectedStation, key, bay: station.bay };
@@ -225,10 +248,11 @@ export function createFireControl() {
 
     return {
       rounds, firing, bursts, launches, door, consumedStation, selectedStation,
+      pendingStation: pending?.station ?? null,
     };
   }
 
-  return { step };
+  return { step, cancel, getPending: (): PendingLaunch | null => pending ? { ...pending } : null };
 }
 
 function muzzleVelocity(kinematics: ShooterKinematics): { northMps: number; eastMps: number; upMps: number } {

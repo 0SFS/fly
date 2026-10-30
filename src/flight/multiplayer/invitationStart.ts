@@ -1,8 +1,10 @@
 import { isAircraftId, type AircraftId } from "@0sfs/aircraft/aircraftIds";
 import type { FlightLocation } from "../location/flightLocation";
+import { AIRCRAFT_URL_NAME, currentAircraftId } from "../aircraft/aircraftAddress";
 
 export interface InvitationStart { aircraftId?: AircraftId; location?: FlightLocation }
-const AIRCRAFT_PARAM = "set.osfs.aircraft.id";
+// Older invitations wrote the aircraft's full setting name.
+const LONG_AIRCRAFT_PARAM = "set.osfs.aircraft.id";
 const bounded = (value: unknown, min: number, max: number): value is number => typeof value === "number" && Number.isFinite(value) && value >= min && value <= max;
 
 /** Copy only the finite location fields the flight's normal destination path accepts. */
@@ -30,7 +32,7 @@ export function invitationLocation(value: unknown): FlightLocation | undefined {
 export function readInvitationStart(href: string): InvitationStart {
   try {
     const url = new URL(href);
-    const aircraft = url.searchParams.get(AIRCRAFT_PARAM);
+    const aircraft = currentAircraftId(url.searchParams.get(LONG_AIRCRAFT_PARAM) ?? url.searchParams.get(AIRCRAFT_URL_NAME));
     const spawn = new URLSearchParams(url.hash.slice(1)).get("spawn");
     return { ...(isAircraftId(aircraft) ? { aircraftId: aircraft } : {}),
       ...(spawn && spawn.length <= 2000 ? { location: invitationLocation(JSON.parse(spawn)) } : {}) };
@@ -39,8 +41,9 @@ export function readInvitationStart(href: string): InvitationStart {
 
 export function withInvitationStart(href: string, start: InvitationStart): string {
   const url = new URL(href);
-  url.searchParams.delete(AIRCRAFT_PARAM);
-  if (start.aircraftId) url.searchParams.set(AIRCRAFT_PARAM, start.aircraftId);
+  url.searchParams.delete(LONG_AIRCRAFT_PARAM);
+  url.searchParams.delete(AIRCRAFT_URL_NAME);
+  if (start.aircraftId) url.searchParams.set(AIRCRAFT_URL_NAME, start.aircraftId);
   const fragment = new URLSearchParams(url.hash.slice(1));
   fragment.delete("spawn");
   const location = invitationLocation(start.location);

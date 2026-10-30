@@ -12,29 +12,41 @@ function source(relative: string): string {
 }
 
 describe("quadcopter mods", () => {
-  it("adds the family from the manifests and does not import the feature", () => {
+  it("adds each airframe as an aircraft of its own and does not import the feature", () => {
     expect(source("./applyDynamicMod.ts").includes("loadDroneFeature")).toBe(false);
     const quad = JSON.parse(source("../../../../Quadcopter/public/0sfs-mod.json"));
     const dji = JSON.parse(source("../../../../DJI-Quadcopter/public/0sfs-mod.json"));
     const camera = JSON.parse(source("../../../../DJI-FC7303/public/0sfs-mod.json"));
+    const airCamera = JSON.parse(source("../../../../DJI-FC3411/public/0sfs-mod.json"));
     const mini = JSON.parse(source("../../../../DJI-Mini2/public/0sfs-mod.json"));
+    const air = JSON.parse(source("../../../../DJI-Air-2S/public/0sfs-mod.json"));
     const record = (manifest: typeof mini, dependencies: LoadedModRecord[] = []): LoadedModRecord => ({
       manifest, dependencies, baseUrl: "http://local/",
       source: { canonicalKey: manifest.id, manifestUrl: "http://local/0sfs-mod.json", bundled: false, owner: "0SFS", repo: manifest.id },
       security: { requiresConfirmation: false, blockAutomaticUrl: false, reasons: [] },
     } as unknown as LoadedModRecord);
     const miniRecord = record(mini, [record(dji, [record(quad)]), record(camera)]);
+    const airRecord = record(air, [record(dji, [record(quad)]), record(airCamera)]);
+    const aircraftOf = (familyId: string) => AIRCRAFT_FAMILIES.find(family => family.id === familyId)?.variants.map(variant => variant.aircraftId);
     try {
       applyDynamicMod(miniRecord);
-      expect(AIRCRAFT_FAMILIES.some(family => family.id === "dji-quadcopter")).toBe(true);
-      const definition = getAircraftDefinition("dji-mini-2");
+      applyDynamicMod(airRecord);
+      expect(aircraftOf("dji-mini2")).toEqual(["dji-mini2"]);
+      expect(aircraftOf("dji-air2s")).toEqual(["dji-air2s"]);
+      expect(getAircraftDefinition("dji-air2s").familyId).toBe("dji-air2s");
+      expect(AIRCRAFT_FAMILIES.find(family => family.id === "dji-mini2")?.thumbnail.path).toBe("http://local/aircraft/thumbnails/dji-mini2.png");
+      expect(AIRCRAFT_FAMILIES.find(family => family.id === "dji-air2s")?.thumbnail.path).toBe("http://local/aircraft/thumbnails/dji-air2s.png");
+      const definition = getAircraftDefinition("dji-mini2");
       expect(definition.lods.find(lod => lod.id === "hd")?.path).toBe("http://local/3d_model/HD/dji-mini2.glb");
       expect(definition.lods.find(lod => lod.id === "lod0")?.path).toBe("");
       expect(definition.camera?.chaseZoomLimits?.min).toBe(.25);
     } finally {
-      unregisterAircraftMod("dji-quadcopter", ["dji-mini-2"]);
-      unregisterFdmProfile("dji-mini-2");
-      uninstallQuadVehicle("dji-mini-2");
+      unregisterAircraftMod("dji-mini2", ["dji-mini2"]);
+      unregisterAircraftMod("dji-air2s", ["dji-air2s"]);
+      for (const id of ["dji-mini2", "dji-air2s"]) {
+        unregisterFdmProfile(id);
+        uninstallQuadVehicle(id);
+      }
       uninstallQuadLayer("0sfs/quadcopter");
       uninstallQuadLayer("0sfs/dji-quadcopter");
     }

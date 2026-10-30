@@ -7,7 +7,7 @@ import { setDroneMeshHook } from "@0sfs/aircraft/droneMeshHook";
 import { readFlightState } from "@0sfs/ground-contact/ecefBridge";
 import type { DroneFeatureHooks, DroneMeshMount, DroneMotorPosition, DroneMotorReading, DroneStepContext, DroneViewContext } from "./droneGate";
 import {
-  activeAircraftId, droneHeldCapture, droneHeldGimbal, droneMotorTelemetry, droneRefusal, setDroneHeldGimbal, setDroneHeldCapture, setDroneMotorTelemetry, setDroneRefusal, setDroneTelemetry,
+  activeAircraftId, droneHeldCapture, droneHeldGimbal, droneMotorTelemetry, droneRefusal, setDroneHeldGimbal, setDroneHeldCapture, setDroneAcousticTelemetry, setDroneMotorTelemetry, setDroneRefusal, setDroneTelemetry,
 } from "./droneGate";
 import { mountDroneProceduralMesh } from "./buildDroneProceduralMesh";
 import { createCaptureRig, type CaptureRig } from "@0sfs/drone-camera/captureFrame";
@@ -43,6 +43,7 @@ export function attach(registration: {
   setQuadProfileBuilder(buildDroneProfile);
   let controller: DroneController | null = null;
   let bound = "";
+  let boundProfile: DroneProfile | null = null;
   let gimbal: DroneGimbalRig | null = null;
   let gimbalFor = "";
   let disposeMesh = () => {};
@@ -117,9 +118,11 @@ export function attach(registration: {
     controller?.dispose();
     controller = null;
     bound = "";
+    boundProfile = null;
     motorReadings = [];
     hoverRpm = motorSimTime = rotorSeconds = 0;
     setDroneMotorTelemetry(null);
+    setDroneAcousticTelemetry(null);
   }
   function setMountTarget(axis: "rollDeg" | "yawDeg", deg: number) {
     const current = profile();
@@ -131,9 +134,10 @@ export function attach(registration: {
     lastView?.requestRender();
   }
   const ensure = (next: DroneProfile): DroneController => {
-    if (!controller || bound !== next.id) {
+    if (!controller || bound !== next.id || boundProfile !== next) {
       releaseController();
       bound = next.id;
+      boundProfile = next;
       controller = createDroneController(next);
       motorReadings = next.rotors.map(rotor => ({ position: rotor.position, rpm: 0, direction: rotor.spin }));
       hoverRpm = 0;
@@ -161,8 +165,9 @@ export function attach(registration: {
   };
   const hooks: DroneFeatureHooks = {
     cameraTab: () => cameraPanel.element,
+    releaseAircraft(id) { if (bound === id) releaseController(); },
     createEngineMonitor(root, options) {
-      const monitor = createQuadEngineMonitor(root, options);
+      const monitor = createQuadEngineMonitor(root, { ...options, summaryMode: "passive" });
       return {
         update(_reader, held) { monitor.update(droneMotorTelemetry(), held); },
         // Quadcopter rotor speeds are separate from native combustion-engine
@@ -191,6 +196,7 @@ export function attach(registration: {
       const planned = sequence.command(requested);
       commandedGimbalDeg = planned.gimbalPitchDeg;
       const result = controllerNow.step(step.sdk, planned, step.dtSeconds, step.terrainMeters);
+      setDroneAcousticTelemetry({ aircraftId: current.id, propulsionId: current.propulsionId, ...result.acoustic });
       motorReadings = current.rotors.map((rotor, index) => ({
         position: rotor.position, rpm: result.rpm[index]!, direction: rotor.spin,
       }));
@@ -326,6 +332,7 @@ export function attach(registration: {
       registration.setMesh(null);
       setDroneTelemetry(null);
       setDroneMotorTelemetry(null);
+    setDroneAcousticTelemetry(null);
       setDroneRefusal(null);
     },
   };

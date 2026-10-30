@@ -1,6 +1,7 @@
 import type { JSBSimSdk } from '@felipegalind0/jsbsim';
 import type { SurfaceHit } from 'foss-earth/runtime';
 import { createTerrainContact } from '@0sfs/ground-contact/terrainContact';
+import { acceptTerrainRelocations } from '../testing/acceptTerrainRelocations';
 import { createFixedStepPhysicsLoop } from '../physics/fixedStepLoop';
 import { LEGACY_FIXED_DT_120, LEGACY_PHYSICS_HZ_120 } from '../physics/physicsRate';
 import { getFdmProfile } from '../jsbsim/fdmProfiles';
@@ -42,7 +43,8 @@ export function runSf50Rollout(sdk: JSBSimSdk, surfaceMode: RolloutSurface) {
   sdk.runIc = () => { runIcCount++; return runIc(); };
   const surface = { raycast: () => null,
     sample: () => ({ heightMeters: height, revision, quality: 15 } as SurfaceHit) };
-  const terrain = createTerrainContact(sdk, surface, profile.stance);
+  // The pilot answers Yes to each terrain correction during the rollout.
+  const terrain = acceptTerrainRelocations(createTerrainContact(sdk, surface, profile.stance));
   const loop = createFixedStepPhysicsLoop(sdk, undefined, { physicsHz: LEGACY_PHYSICS_HZ_120 });
   const pilot = new Sf50LandingPilot(SF50_DEFAULT_PILOT_PROFILE.landing);
   const pitch = new Sf50PitchController(SF50_DEFAULT_PILOT_PROFILE.landingPitch);

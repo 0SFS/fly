@@ -137,6 +137,11 @@ The [cockpit screen](docs/proposals/cockpit-screen.md) shows the flight's interf
 
 ## Performance work
 
+The current [resource administration reference](docs/resources/README.md)
+explains main-thread work, frame times, memory, worker CPU, GPU, network,
+persistent storage and audio: owners, controls, limits, cleanup and measurement
+gaps. It is the starting point for understanding or tuning resource use.
+
 Session notes are under [docs/performance/](docs/performance/). The latest
 handoff is [2026-10-27](docs/performance/2026-10-27/session-handoff.md). Earlier
 sessions are [2026-10-26](docs/performance/2026-10-26/session-handoff.md),

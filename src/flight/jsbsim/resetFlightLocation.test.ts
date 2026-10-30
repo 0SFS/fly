@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { JSBSimSdk } from "@felipegalind0/jsbsim";
 import { resetFlightLocation } from "./resetFlightLocation";
+import { getFdmProfile } from "./fdmProfiles";
 
 describe("resetFlightLocation", () => {
   function setup(success = true) {
@@ -30,6 +31,26 @@ describe("resetFlightLocation", () => {
     expect(sdk.setPropertyValue).toHaveBeenCalledWith("ic/vc-kts", 120);
     expect(sdk.runIc).toHaveBeenCalledTimes(2);
     expect(state).toMatchObject({ latDeg: 46.7867, lonDeg: -92.1005, altMeters: 3048 });
+  });
+  it("keeps a requested altitude below newly prepared terrain instead of silently raising it", () => {
+    const sdk = setup();
+    resetFlightLocation(sdk as unknown as JSBSimSdk, { latDeg: 45, lonDeg: -93, altMeters: 250 }, 400);
+    expect(sdk.setPropertyValue).toHaveBeenCalledWith("ic/h-sl-ft", 250 / 0.3048);
+    // JSBSim does not start on that ground: its gear would begin 150 m compressed.
+    expect(sdk.setPropertyValue).toHaveBeenCalledWith("ic/terrain-elevation-ft", (250 - 10_000) / 0.3048);
+  });
+  it("gives JSBSim the ground under an aircraft placed at or above its stance", () => {
+    const sdk = setup();
+    resetFlightLocation(sdk as unknown as JSBSimSdk, { latDeg: 45, lonDeg: -93, altMeters: 402 }, 400);
+    expect(sdk.setPropertyValue).toHaveBeenCalledWith("ic/h-sl-ft", 402 / 0.3048);
+    expect(sdk.setPropertyValue).toHaveBeenCalledWith("ic/terrain-elevation-ft", 400 / 0.3048);
+  });
+  it("stands the engine test stand on its gear rather than at the ground's height", () => {
+    const sdk = { ...setup(), setHoldDown: vi.fn() };
+    resetFlightLocation(sdk as unknown as JSBSimSdk, { latDeg: 45, lonDeg: -93, altMeters: 400 }, 400, "cessna-172", { holdDown: true });
+    const stance = getFdmProfile("cessna-172").stance.staticMeters + 0.17;
+    expect(sdk.setPropertyValue).toHaveBeenCalledWith("ic/h-sl-ft", (400 + stance) / 0.3048);
+    expect(sdk.setPropertyValue).toHaveBeenCalledWith("ic/terrain-elevation-ft", 400 / 0.3048);
   });
   it("sets runway departure heading, ground elevation, gear, brakes and zero ground speed", () => {
     const sdk = setup();
@@ -165,9 +186,34 @@ describe("resetFlightLocation", () => {
     sdk.runIc.mockReturnValueOnce(true).mockReturnValueOnce(false);
     expect(() => resetFlightLocation(sdk as unknown as JSBSimSdk, { latDeg: 45, lonDeg: -93 })).toThrow("initialize engines");
   });
+  it("starts a shared flight at its pitch, along its climb angle, with the angle to the air between them", () => {
+    const sdk = setup();
+    resetFlightLocation(sdk as unknown as JSBSimSdk, { latDeg: 45, lonDeg: -93, altMeters: 2500, pitchDeg: 8, flightPathDeg: 3 }, undefined, "f-35b");
+    const before = sdk.setPropertyValue.mock.calls.slice(0, sdk.setPropertyValue.mock.calls.findIndex(([path]) => path.startsWith("fcs/")));
+    expect(before).toContainEqual(["ic/gamma-deg", 3]);
+    expect(before).toContainEqual(["ic/alpha-deg", 5]);
+    // Without airspeed JSBSim levels the nose while fitting alpha: the pitch is set last.
+    expect(before.filter(([path]) => path === "ic/theta-deg").at(-1)).toEqual(["ic/theta-deg", 8]);
+    expect(before.findLastIndex(([path]) => path === "ic/theta-deg")).toBeGreaterThan(before.findIndex(([path]) => path === "ic/alpha-deg"));
+  });
+  it("keeps a runway preset's and a static fixture's own attitude over a shared one", () => {
+    const runway = setup();
+    resetFlightLocation(runway as unknown as JSBSimSdk, { latDeg: 45, lonDeg: -93, altMeters: 800, pitchDeg: 20, flightPathDeg: 10,
+      flightPreset: { mode: "arrival", headingDeg: 270, groundElevationMeters: 300, flightPathDeg: -3 } });
+    expect(runway.setPropertyValue).toHaveBeenCalledWith("ic/gamma-deg", -3);
+    expect(runway.setPropertyValue).toHaveBeenCalledWith("ic/alpha-deg", 6);
+    expect(runway.setPropertyValue).not.toHaveBeenCalledWith("ic/theta-deg", 20);
+    const base = setup();
+    const held = { ...base, setHoldDown: vi.fn(), queryPropertyCatalog: () => "" };
+    resetFlightLocation(held as unknown as JSBSimSdk, { latDeg: 45, lonDeg: -93, altMeters: 300, pitchDeg: 20, flightPathDeg: 10 }, 300, "cessna-172", { holdDown: true });
+    expect(held.setPropertyValue.mock.calls.filter(([path]) => path.startsWith("ic/theta-deg") || path === "ic/gamma-deg"))
+      .toEqual([["ic/theta-deg", 0], ["ic/gamma-deg", 0]]);
+  });
   it("rejects invalid input before mutating JSBSim and reports RunIC failure", () => {
     const sdk = setup(false);
     expect(() => resetFlightLocation(sdk as unknown as JSBSimSdk, { latDeg: NaN, lonDeg: 0 })).toThrow("Invalid");
+    expect(() => resetFlightLocation(sdk as unknown as JSBSimSdk, { latDeg: 0, lonDeg: 0, pitchDeg: 91 })).toThrow("Invalid");
+    expect(() => resetFlightLocation(sdk as unknown as JSBSimSdk, { latDeg: 0, lonDeg: 0, flightPathDeg: Number.NaN })).toThrow("Invalid");
     expect(sdk.setPropertyValue).not.toHaveBeenCalled();
     expect(() => resetFlightLocation(sdk as unknown as JSBSimSdk, { latDeg: 45, lonDeg: 0 })).toThrow("JSBSim");
   });

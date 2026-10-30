@@ -118,6 +118,8 @@ export function createDroneController(profile: DroneProfile): DroneController {
   let boundSdk: JSBSimSdk | null = null;
   let touchdownAglM = 0;
   const stopped: DroneFlightTelemetry = {
+    acoustic: { valid: false, armed: false, simTimeS: 0, airDensityKgM3: 0, airVelocityBodyMps: [0, 0, 0],
+      rotors: profile.rotors.map(() => ({ rpm: 0, thrustN: 0, shaftTorqueNm: 0, inducedVelocityMps: 0, vrs: 0, valid: false })) },
     rpm: profile.rotors.map(() => 0), hoverRpm: 0, maxRpm: profile.propeller.maxRpm, onGround: false, aglM: null, simTimeS: 0,
   };
   function clear() { hold = null; gimbal = 0; psi = 0; armed = null; disarmSeconds = 0; }

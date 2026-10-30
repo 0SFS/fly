@@ -253,6 +253,7 @@ export interface FlightControlPanelOptions {
   onArmamentDoor?(bay: 0 | 1, open: boolean): void;
   onArmamentMasterArm?(armed: boolean): void;
   onArmamentSelect?(station: number): void;
+  onArmamentSelectWeapon?(key: string): void;
   /** Hosts Engine's two sections, with the registry controls inside Settings. */
   attachEngineDetails(host: HTMLElement, settingsContent?: HTMLElement): () => void;
   /** The engine model this flight loaded, on an aircraft that offers a choice. */
@@ -917,7 +918,8 @@ export function FlightControlPanel(props: FlightControlPanelProps) {
                       onJettison={props.onArmamentJettison ?? (() => {})}
                       onDoor={props.onArmamentDoor ?? (() => {})}
                       onMasterArm={props.onArmamentMasterArm ?? (() => {})}
-                      onSelect={props.onArmamentSelect} />
+                      onSelect={props.onArmamentSelect}
+                      onSelectWeapon={props.onArmamentSelectWeapon} />
                   </div>
                 </ParameterSection>
                 : tabId === "damage" ? <DamagePanel state={props.snapshot.damage} onAction={props.onDamageAction} />

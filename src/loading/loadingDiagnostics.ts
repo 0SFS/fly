@@ -91,7 +91,7 @@ function readResources(entries?: PerformanceEntryList) {
   } catch { return []; }
 }
 
-export function createLoadingDiagnostics() {
+export function createLoadingDiagnostics(changed?: (urgent: boolean) => void) {
   let startedAt = performance.now();
   const operations: LoadingOperation[] = [];
   const events: BrowserFailure[] = [];
@@ -104,7 +104,7 @@ export function createLoadingDiagnostics() {
     recentResources = recentResources.slice(-80);
   };
   const elapsed = () => performance.now() - startedAt;
-  const record = (event: BrowserFailure) => { events.push(event); if (events.length > 40) events.shift(); };
+  const record = (event: BrowserFailure) => { events.push(event); if (events.length > 40) events.shift(); changed?.(true); };
   const onError = (event: Event) => {
     const target = event.target;
     if (target instanceof HTMLScriptElement || target instanceof HTMLLinkElement || target instanceof HTMLImageElement) {
@@ -156,6 +156,7 @@ export function createLoadingDiagnostics() {
       };
       operations.push(entry);
       if (operations.length > 40) operations.shift();
+      changed?.(true);
       try {
         const result = await run();
         entry.state = "ready";
@@ -164,7 +165,7 @@ export function createLoadingDiagnostics() {
         entry.state = "failed";
         entry.error = describeLoadingCause(error);
         throw error;
-      } finally { entry.elapsedMs = elapsed() - entry.startedMs; }
+      } finally { entry.elapsedMs = elapsed() - entry.startedMs; changed?.(true); }
     },
     snapshot() {
       let build = null;

@@ -30,7 +30,14 @@ await writeFile(path.join(fixtureRoot, "entry.ts"), String.raw`
 import ${source("src/styles/globe.css")};
 import ${source("src/styles/flight.css")};
 import {getAppSettings} from 'foss-earth/settings';
-const test=window.__aircraftSwitch={ready:false,error:null,running:false};
+const test=window.__aircraftSwitch={ready:false,error:null,running:false,mapOverrides:0};
+// This fixture deliberately has no map provider. Exercise the explicit bypass;
+// never present its offline globe as proof of regional terrain readiness.
+const overrideTimer=setInterval(()=>{
+ const button=[...document.querySelectorAll('.flight-loading-status button')].find(b=>!b.hidden&&!b.disabled&&b.textContent==='Spawn now anyway');
+ if(button){test.mapOverrides++;button.click();}
+},100);
+window.addEventListener('pagehide',()=>clearInterval(overrideTimer),{once:true});
 getAppSettings(); // As in main.tsx, diagnostics precede aircraft registration.
 import(${source("src/flight/createFlightSimApp.ts")}).then(({createFlightSimApp})=>createFlightSimApp(document.getElementById('root'),{googleApiKey:null,preferGoogleTiles:false})).then(app=>{
  test.app=app;test.runtime=app.runtime;test.canvas=document.querySelector('canvas.flight-app__canvas');
@@ -129,7 +136,7 @@ const generation = async value => {
   await clickText("Confirm");
 };
 const ready = async id => {
-  await wait(`window.osfsJsbsimBuild?.aircraftId===${JSON.stringify(id)}&&window.__aircraftSwitch.snapshot?.aircraftId===${JSON.stringify(id)}&&window.__aircraftSwitch.snapshot?.modelStatus==='ready'&&!document.querySelector('.flight-aircraft-switch:not([hidden])')`);
+  await wait(`window.osfsJsbsimBuild?.aircraftId===${JSON.stringify(id)}&&window.__aircraftSwitch.snapshot?.aircraftId===${JSON.stringify(id)}&&window.__aircraftSwitch.snapshot?.modelStatus==='ready'&&!document.querySelector('.flight-aircraft-switch:not([hidden])')&&!document.querySelector('.flight-loading-status:not([hidden])')`);
   await openAircraft();
   await wait(`document.querySelector('.flight-panel__aircraft-picker')?.getAttribute('aria-busy')==='false'`);
   const result = await run(`({id:window.osfsJsbsimBuild.aircraftId,origin:performance.timeOrigin,sameCanvas:document.querySelector('canvas.flight-app__canvas')===window.__aircraftSwitch.canvas,sameRuntime:window.__aircraftSwitch.app.runtime===window.__aircraftSwitch.runtime,sameWorld:window.__aircraftSwitch.app.runtime.getWorldRoot()===window.__aircraftSwitch.world,worldDisposed:window.__aircraftSwitch.world.isDisposed(),running:window.__aircraftSwitch.running,model:window.__aircraftSwitch.snapshot.modelStatus,triangles:window.__aircraftSwitch.snapshot.modelTriangles,geometry:window.__aircraftSwitch.app.runtime.scene.meshes.filter(m=>m.getTotalVertices()>0).length})`);
@@ -188,12 +195,18 @@ try {
   await select("Cirrus Vision Jet");
   await ready("cirrus-vision-jet");
   await screenshot("switched.png");
+  // The fallback globe never proves regional map readiness: every placement
+  // here must have taken the explicit override rather than a silent bypass.
+  const overridesBeforeReload = await run("window.__aircraftSwitch.mapOverrides");
   await chrome.send("Page.reload", { ignoreCache: true }, sessionId);
   firstOrigin = undefined;
   await wait("window.__aircraftSwitch?.ready===true");
   if (await run("window.__aircraftSwitch.error")) throw new Error(await run("window.__aircraftSwitch.error"));
   await ready("cirrus-vision-jet");
   checks.push({ savedSelectionRestored: true });
+  const mapOverrides = { beforeReload: overridesBeforeReload, afterReload: await run("window.__aircraftSwitch.mapOverrides") };
+  if (!(mapOverrides.beforeReload > 0 && mapOverrides.afterReload > 0)) throw new Error("A placement finished without Spawn now anyway: " + JSON.stringify(mapOverrides));
+  checks.push({ mapOverrides });
   await run("window.__aircraftSwitch.app.destroy()");
 } catch (error) {
   failures.push(error.stack ?? String(error));

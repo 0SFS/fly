@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } 
 import path from 'node:path'
 import { defaultClientConditions, defaultServerConditions, type Plugin } from 'vite'
 import { babylonBarrels, babylonShaderChunks, builtFrom, crossOriginIsolation, deployedIsolation, headsetEmulator, localSource, networkHttps } from 'foss-earth/vite'
-import { appFiles, bootTerminal, browserRecovery } from '@foss-earth/ui/vite'
+import { appFiles, bootTerminal, browserRecovery, testPlans } from '@foss-earth/ui/vite'
 import { findLanAddress } from './scripts/dev-lan.mjs'
 import { linkPackPublicFiles } from './scripts/link-packs.mjs'
 import { pageHtmlFor } from './scripts/pages-html.mjs'
@@ -26,9 +26,17 @@ function serveDevQuadMods(): Plugin {
     quadcopter: path.resolve(import.meta.dirname, '../Quadcopter/public'),
     'dji-quadcopter': path.resolve(import.meta.dirname, '../DJI-Quadcopter/public'),
     'dji-mini2': path.resolve(import.meta.dirname, '../DJI-Mini2/public'),
-    // Older saved local sources still resolve after the checkout rename.
+    'dji-air2s': path.resolve(import.meta.dirname, '../DJI-Air-2S/public'),
+    'dji-mini2-propulsion': path.resolve(import.meta.dirname, '../DJI-Mini2-propulsion/public'),
+    'dji-air2s-propulsion': path.resolve(import.meta.dirname, '../DJI-Air-2S-propulsion/public'),
+    // Older saved local sources still resolve after the renames.
     'dji-mini-2': path.resolve(import.meta.dirname, '../DJI-Mini2/public'),
     'dji-air-2s': path.resolve(import.meta.dirname, '../DJI-Air-2S/public'),
+    'dji-air-2s-propulsion': path.resolve(import.meta.dirname, '../DJI-Air-2S-propulsion/public'),
+    'engine-sound': path.resolve(import.meta.dirname, '../engine-sound/public'),
+    'turbine-sound': path.resolve(import.meta.dirname, '../turbine-sound/public'),
+    'piston-sound': path.resolve(import.meta.dirname, '../piston-sound/public'),
+    'electric-sound': path.resolve(import.meta.dirname, '../electric-sound/public'),
   }
   return {
     name: 'osfs-dev-quad-mods',
@@ -310,6 +318,8 @@ export default defineConfig({
     react(), copyIndexToPagesPaths(), lanOriginPlugin(), builtFrom({ describe: jsbsimBuild }), babylonBarrels(), babylonShaderChunks(),
     // npm run dev only: a page opened with ?headsetEmulator=quest3 gets an emulated VR headset (FOSS Earth's docs/agent-testing.md).
     headsetEmulator(),
+    // npm run dev only: /fly/test/<name> opens the Test tab with build/test-plans/<name>.json (FOSS Earth's docs/docs/test-feedback.md).
+    testPlans(),
   ],
   test: {
     maxWorkers: '50%',

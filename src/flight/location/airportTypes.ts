@@ -19,6 +19,10 @@ export interface FlightLocation extends GeodeticLocation {
   /** A multiplayer arrival may match its host without selecting a runway preset. */
   headingDeg?: number;
   airspeedKts?: number;
+  /** A shared flight's attitude: the nose above the horizon, without a runway preset. */
+  pitchDeg?: number;
+  /** A shared flight's path above the horizon, without a runway preset; level when absent. */
+  flightPathDeg?: number;
 }
 
 /**

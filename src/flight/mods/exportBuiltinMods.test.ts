@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { AIRCRAFT_CATALOG, AIRCRAFT_FAMILIES } from "@0sfs/aircraft/aircraftCatalog";
 import { F135_ENGINE_GEOMETRY } from "@0sfs/f135/generated/f135EngineData";
-import { F135_DEFINITION, FJ33_DEFINITION, IO320_DEFINITION } from "@0sfs/sound/engineAcousticDefinitions";
+import { F135_DEFINITION, FJ33_DEFINITION, IO320_DEFINITION } from "../../../../sound/tests/fixtures/engineProfiles";
 import { C172_ROTOR_BLADES, F135_ROTOR_BLADES, FJ33_ROTOR_BLADES } from "@0sfs/engines/engineRotorDefinitions";
 import { STORE_CARDS, STORE_PRESETS, WEAPON_PAYLOAD_LIMIT_LBS } from "@0sfs/stores/storeCatalog";
 import {

@@ -2,6 +2,7 @@ import { Quaternion, NullEngine, Scene, TransformNode, Vector3, type UniversalCa
 import { describe, expect, it } from "vitest";
 import { flightAttitudeToQuaternion } from "@0sfs/ground-contact/ecefBridge";
 import { createPlaceholderAircraft } from "@0sfs/aircraft/createPlaceholderAircraft";
+import { createCameraFollow } from "@0sfs/aircraft/cameraFollow";
 import { getAircraftDefinition } from "@0sfs/aircraft/aircraftCatalog";
 import { getAppSettings, resetAppSettings } from "foss-earth/settings";
 import { registerFlightSettings } from "../settings/registerFlightSettings";
@@ -13,6 +14,9 @@ describe("aircraft chase camera", () => {
     const engine = new NullEngine(); const scene = new Scene(engine); const parent = new TransformNode("origin", scene);
     const settings = getAppSettings(); const parameters = registerFlightSettings(settings);
     const camera = manifest.aircraft.definitions[0].camera;
+    expect(camera.follow).toBe("yaw");
+    settings.setHostDefault("osfs.camera.chaseFrame", camera.follow, manifest.name);
+    expect(parameters.get("osfs.camera.chaseFrame")).toBe("yaw");
     settings.setHostDefault("osfs.camera.chaseDistance", camera.chaseDistanceMeters, manifest.name);
     settings.setHostDefault("osfs.camera.chaseHeight", camera.chaseHeightMeters, manifest.name);
     settings.setHostDefault("osfs.camera.chaseZoomLimits", camera.chaseZoomLimits, manifest.name);
@@ -191,6 +195,29 @@ describe("aircraft chase camera", () => {
       expect(aircraft.thirdPersonCamera.parent).toBe(aircraft.root);
       const pitch = Math.asin(aircraft.thirdPersonCamera.position.y / aircraft.thirdPersonCamera.position.length());
       expect(pitch).toBeCloseTo(Math.atan2(2.2, 14));
+    } finally { aircraft.dispose(); scene.dispose(); engine.dispose(); }
+  });
+
+  it.each([true, false])('keeps Yaw level and retains orbit and zoom while the aircraft banks (RH %s)', rightHanded => {
+    const engine = new NullEngine(), scene = new Scene(engine);
+    scene.useRightHandedSystem = rightHanded;
+    const origin = new TransformNode('origin', scene);
+    const aircraft = createPlaceholderAircraft(scene, origin);
+    const follow = createCameraFollow();
+    try {
+      aircraft.orbitChaseCamera(.8, .2);
+      aircraft.zoomChaseCamera(.5);
+      aircraft.setChaseFrame(follow.update('yaw', { headingRad: 0, northVelocityFps: 0, eastVelocityFps: 0, verticalSpeedFps: 0 }, 0));
+      const offset = aircraft.thirdPersonCamera.position.clone();
+      for (let i = 0; i < 120; i++) {
+        const headingRad = i * .02;
+        origin.rotationQuaternion = flightAttitudeToQuaternion(.8 * Math.sin(i), .5, headingRad);
+        aircraft.setChaseFrame(follow.update('yaw', { headingRad, northVelocityFps: -50, eastVelocityFps: 100, verticalSpeedFps: 200 }, 1 / 60));
+        const world = aircraft.thirdPersonCamera.getViewMatrix(true).clone().invert();
+        expect(Vector3.TransformNormal(Vector3.Right(), world).normalize().y).toBeCloseTo(0, 5);
+        expect(Vector3.TransformNormal(Vector3.Up(), world).normalize().y).toBeGreaterThan(0);
+        expect(Vector3.Distance(aircraft.thirdPersonCamera.position, offset)).toBeCloseTo(0, 10);
+      }
     } finally { aircraft.dispose(); scene.dispose(); engine.dispose(); }
   });
 

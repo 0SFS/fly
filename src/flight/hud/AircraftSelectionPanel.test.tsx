@@ -5,7 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AircraftSelectionPanel } from "@0sfs/aircraft/AircraftSelectionPanel";
 import { createBrowserInputSource } from "@felipegalind0/gamepad-tools/browser";
 import type { FlightControlPanelSnapshot } from "./FlightControlPanel";
-import { normalizeAircraftSelection, type AircraftSelection } from "@0sfs/aircraft/aircraftCatalog";
+import {
+  normalizeAircraftSelection, registerAircraftMod, unregisterAircraftMod,
+  type AircraftDefinition, type AircraftFamilyDefinition, type AircraftSelection,
+} from "@0sfs/aircraft/aircraftCatalog";
 
 const roots: Root[] = [];
 beforeEach(() => {
@@ -275,6 +278,29 @@ describe("aircraft selection panel", () => {
     expect(card.textContent).toContain("Image unavailable");
     await act(async () => card.click());
     expect(t.host.querySelector("dialog h2")?.textContent).toBe("Switch to Cessna 172 Skyhawk?");
+  });
+
+  it("shows a mod family's thumbnail at the path the mod resolved", async () => {
+    const credit = { artist: "DJI", note: "test" };
+    const family = {
+      id: "dji-mini2", label: "DJI Mini 2", summary: "test",
+      thumbnail: { path: "/aircraft/thumbnails/dji-mini2.png", credit }, defaultAircraftId: "dji-mini2",
+      variants: [{ id: "dji-mini2", aircraftId: "dji-mini2", label: "DJI Mini 2" }],
+    } as unknown as AircraftFamilyDefinition;
+    const definition = {
+      id: "dji-mini2", familyId: "dji-mini2", label: "DJI Mini 2", summary: "test",
+      modelYawRad: 0, modelOffset: { x: 0, y: 0, z: 0 }, propellerBlades: 0,
+      lods: [{ id: "lod0", label: "Procedural", triangles: 12, path: "", autoFromMeters: 0, credit }],
+    } as unknown as AircraftDefinition;
+    registerAircraftMod(family, [definition]);
+    try {
+      const t = await mount();
+      await openGallery(t.host);
+      const card = t.host.querySelector('[aria-label="Switch to DJI Mini 2"]')!;
+      expect(card.querySelector("img")?.getAttribute("src")).toBe("/aircraft/thumbnails/dji-mini2.png");
+    } finally {
+      unregisterAircraftMod("dji-mini2", ["dji-mini2"]);
+    }
   });
 
   it("applies model detail directly, with HD offered and credited in the level list", async () => {

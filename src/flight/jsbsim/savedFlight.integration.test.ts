@@ -7,6 +7,7 @@ import { bootstrapC172p } from "./bootstrapC172";
 import { resolveAircraftDataFiles } from "./hydrateJsbsimData";
 import { readFlightState } from "@0sfs/ground-contact/ecefBridge";
 import { validFlightState } from "@0sfs/ground-contact/safeFlightState";
+import { getFdmProfile } from "./fdmProfiles";
 import { applySavedControls, captureSavedFlight, parseSavedFlight, restoreSavedFlight } from "./savedFlight";
 import { LEGACY_PHYSICS_HZ_120 } from "../physics/physicsRate";
 
@@ -32,7 +33,7 @@ async function createC172(options: Parameters<typeof bootstrapC172p>[1] = {}): P
 }
 
 describe("saved flight in JSBSim", () => {
-  it("resumes a turning C172 in a new simulator, at its height above the ground prepared there", async () => {
+  it("resumes a turning C172 at its absolute pose when the prepared ground changes", async () => {
     const first = await createC172();
     first.setPropertyValue("position/terrain-elevation-asl-ft", 250 / FT);
     first.setPropertyValue("fcs/throttle-cmd-norm", 0.8);
@@ -56,11 +57,11 @@ describe("saved flight in JSBSim", () => {
     const ground = 290;
     const after = restoreSavedFlight(second, saved, "cessna-172", {
       groundHeightMeters: ground, altitudeMeters: ground + saved.aboveGroundMeters!,
-    });
+    }, getFdmProfile("cessna-172").stance);
     expect(validFlightState(after)).toBe(true);
     expect(after.latDeg).toBeCloseTo(before.latDeg, 7);
     expect(after.lonDeg).toBeCloseTo(before.lonDeg, 7);
-    expect(after.altMeters - ground).toBeCloseTo(before.altMeters - 250, 1);
+    expect(after.altMeters).toBeCloseTo(before.altMeters, 1);
     expect(after.rollRad).toBeCloseTo(before.rollRad, 3);
     expect(after.pitchRad).toBeCloseTo(before.pitchRad, 3);
     expect(after.headingRad).toBeCloseTo(before.headingRad, 3);

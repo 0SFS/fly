@@ -8,6 +8,7 @@ import { createTerrainContact as createContact } from "@0sfs/ground-contact/terr
 // The package does not export its WASM core yet; this is the installed copy's loader.
 import { instantiateGroundContact } from "../../../node_modules/@0sfs/ground-contact/wasm/index.js";
 import { createFixedStepPhysicsLoop } from "./fixedStepLoop";
+import { acceptTerrainRelocations } from "../testing/acceptTerrainRelocations";
 import { getFdmProfile } from "../jsbsim/fdmProfiles";
 import { LEGACY_FIXED_DT_120, LEGACY_PHYSICS_HZ_120 } from "./physicsRate";
 
@@ -31,7 +32,8 @@ function useKernel(kernel: (typeof KERNELS)[number]) {
 function createTerrainContact(...[sdk, surface, stance]: Parameters<typeof createContact>) {
   const contact = createContact(sdk, surface, stance, { core: active.core });
   expect(contact.status().kernel).toBe(active.core ? "single" : "typescript");
-  return contact;
+  // Terrain corrections are answered Yes; these scenarios measure the move itself.
+  return acceptTerrainRelocations(contact);
 }
 
 /** Surface height at metres north and east of the start. */
@@ -350,7 +352,7 @@ describe("WASM contact support with real JSBSim", () => {
     const runs = await Promise.all([undefined, await wasm()].map(async core => {
       const sdk = await setup(15);
       const { world, surface } = surfaceOf(height);
-      const contact = createContact(sdk, surface, STANCE, { core });
+      const contact = acceptTerrainRelocations(createContact(sdk, surface, STANCE, { core }));
       const loop = createFixedStepPhysicsLoop(sdk, undefined, { physicsHz: LEGACY_PHYSICS_HZ_120 });
       return { sdk, world, contact, loop, core };
     }));

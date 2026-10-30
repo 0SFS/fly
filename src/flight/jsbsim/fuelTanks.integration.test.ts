@@ -161,7 +161,7 @@ describe("fuel tanks in JSBSim", () => {
     const sdk = await boot("f-35b");
     applySavedControls(sdk, saved, "f-35b");
     expect(readExternalFuelTanks(sdk, "f-35b").map(tank => tank.attached)).toEqual([false, true]);
-    restoreSavedFlight(sdk, saved, "f-35b", { groundHeightMeters: 0, altitudeMeters: saved.altMeters });
+    restoreSavedFlight(sdk, saved, "f-35b", { groundHeightMeters: 0, altitudeMeters: saved.altMeters }, getFdmProfile("f-35b").stance);
     expect(captureSimulation(sdk).controls).toEqual(saved.simulation.controls);
     expect(readFuelTanks(sdk).map(tank => tank.contentsLbs)).toEqual([1200, 1800, 0, 750]);
   });
@@ -174,7 +174,7 @@ describe("fuel tanks in JSBSim", () => {
     }
     saved.simulation.controls["propulsion/tank[0]/contents-lbs"] = 6650;
     saved.simulation.controls["propulsion/tank[2]/contents-lbs"] = 500;
-    restoreSavedFlight(sdk, saved, "f-35b", { groundHeightMeters: 0, altitudeMeters: saved.altMeters });
+    restoreSavedFlight(sdk, saved, "f-35b", { groundHeightMeters: 0, altitudeMeters: saved.altMeters }, getFdmProfile("f-35b").stance);
     expect(readExternalFuelTanks(sdk, "f-35b").map(tank => tank.attached)).toEqual([true, true]);
     expect(readFuelTanks(sdk).map(tank => tank.contentsLbs)).toEqual([6550, 2500, 500, 0]);
   });

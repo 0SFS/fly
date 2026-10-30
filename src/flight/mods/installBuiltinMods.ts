@@ -3,11 +3,10 @@ import {
   type AircraftDefinition,
   type AircraftFamilyDefinition,
 } from "@0sfs/aircraft/aircraftCatalog";
-import type { AircraftId } from "@0sfs/aircraft/aircraftIds";
 import { registerEngine } from "@0sfs/engines/engineRegistry";
 import { registerExternalTanks } from "@0sfs/fuel/externalTankDefinitions";
-import { registerAircraftAudioInstallation } from "@0sfs/sound/aircraftAudioProfiles";
-import { registerEngineAcousticDefinition, telemetryById, type EngineAcousticDefinition } from "@0sfs/sound/engineAcousticDefinitions";
+import { installAudioMod } from "@0sfs/sound/installAudioMod";
+import type { ModEngineContribution } from "@0sfs/mods/schema";
 import { registerPayloadInstallation } from "@0sfs/stores/stationTable";
 import { applyStoreClearance, registerPayloadStore, registerRefusedStore, registerStorePresets } from "@0sfs/stores/storeCatalog";
 import type { StoreCard } from "@0sfs/stores/storeCatalog";
@@ -25,22 +24,7 @@ export const BUILTIN_FAMILY_THUMBNAILS = [
   "aircraft/thumbnails/f-35b.png",
 ] as const;
 
-interface EngineMod {
-  engine: {
-    id: string; label: string; summary: string; type: "piston" | "turbine";
-    jsbsimEngineFiles: readonly string[];
-    rotorBlades: EngineAcousticDefinition["parameters"] extends never ? never : {
-      outer: number; inner: number | null; outerEstimated: boolean; innerEstimated: boolean;
-    };
-    startSpeed: { property: string; runningAt: number };
-    maxEngineRpm?: number;
-    gauges: { primary: string; secondary: string | null; label: string };
-    acousticProfile?: {
-      id: string; engineClass: string; manufacturerFamily: string; rendererId: string;
-      telemetryId: string; label: string; approximation: string; parameters: EngineAcousticDefinition["parameters"];
-    };
-  };
-}
+interface EngineMod { id: string; engine: ModEngineContribution }
 
 interface AircraftMod {
   aircraft: {
@@ -74,6 +58,7 @@ interface TankMod { payload?: { tank?: { key: string; capacityLbs: number; dryWe
 void F135_ENGINE_GAS_SUPPORT;
 
 const manifests = BUNDLED_MODS.map(([, manifest]) => manifest);
+for (const manifest of manifests) installAudioMod(manifest, { bundled: true });
 const aircraftMods = BUILTIN_AIRCRAFT_MODS as unknown as AircraftMod[];
 const families = aircraftMods.map(mod => mod.aircraft.family);
 for (const [index, family] of families.entries()) {
@@ -86,12 +71,8 @@ registerAircraftFleet(families, aircraftMods.flatMap(mod => mod.aircraft.definit
 
 for (const mod of manifests.filter(manifest => manifest.kind === "engine") as unknown as EngineMod[]) {
   const engine = mod.engine;
-  registerEngine(engine);
-  const acoustic = engine.acousticProfile;
-  const telemetry = acoustic ? telemetryById(acoustic.telemetryId) : undefined;
-  if (acoustic && telemetry) {
-    registerEngineAcousticDefinition({ ...acoustic, telemetry, parameters: acoustic.parameters });
-  }
+  registerEngine(engine, mod.id);
+
 }
 
 const payloads = manifests.filter(manifest => manifest.kind === "payload");
@@ -103,10 +84,6 @@ for (const mod of stores) {
 }
 
 for (const mod of aircraftMods) {
-  const audio = mod.aircraft.audio?.engineDefinitionId;
-  if (audio) {
-    for (const id of Object.keys(mod.aircraft.fdmProfiles)) registerAircraftAudioInstallation(id as AircraftId, audio);
-  }
   const installation = mod.aircraft.payloadInstallation;
   if (!installation) continue;
   for (const [key, clearance] of Object.entries(installation.stationClearances)) {

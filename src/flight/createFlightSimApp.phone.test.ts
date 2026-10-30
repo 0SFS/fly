@@ -1,11 +1,41 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Vector3, type Quaternion } from "@babylonjs/core";
 vi.mock("./hud/flightCompass", () => ({ createFlightCompass: () => ({ update: vi.fn(), destroy: vi.fn() }) }));
 import type { PhoneControlSessionOptions } from "@0sfs/rc/createPhoneControlSession";
 import type { ControlSurfaceState } from "@0sfs/controls/flightInputManager";
 import type { FlightControlPanelOptions } from "./hud/FlightControlPanel";
 
 const mocks = vi.hoisted(() => {
+  const regionProgress: import("foss-earth/runtime").TerrainRegionProgress = {
+    state: "ready", minimumReady: true, finalReady: true, readyTiles: 1, totalTiles: 1, pendingTiles: 0,
+    estimatedRemainingMs: null, reason: null, groundHeightMeters: 250, sourceGeneration: 1,
+  };
+  const regionLeases: Array<{
+    request: import("foss-earth/runtime").TerrainRegionOptions;
+    progress: import("foss-earth/runtime").TerrainRegionProgress;
+    emit(update: Partial<import("foss-earth/runtime").TerrainRegionProgress>): void;
+    update: ReturnType<typeof vi.fn>;
+    release: ReturnType<typeof vi.fn>;
+    read(): import("foss-earth/runtime").TerrainRegionProgress;
+  }> = [];
+  const createRegionLease = (request: import("foss-earth/runtime").TerrainRegionOptions) => {
+    let released = false;
+    const lease = {
+      request, progress: { ...regionProgress },
+      update: vi.fn(() => queueMicrotask(() => { if (!released) request.onProgress?.(lease.progress); })),
+      release: vi.fn(() => { released = true; }),
+      setVisible: vi.fn(),
+      read() { return lease.progress; },
+      emit(update: Partial<import("foss-earth/runtime").TerrainRegionProgress>) {
+        if (released) return;
+        Object.assign(lease.progress, update);
+        request.onProgress?.(lease.progress);
+      },
+    };
+    regionLeases.push(lease);
+    return lease;
+  };
   const state = { latDeg: 1, lonDeg: 2, altMeters: 1000, headingRad: 0, airspeedKts: 110 };
   const snapshot = { owner: "local" as "local" | "phone", phase: "paired", quiet: false };
   const phoneControls = { elevator: -0.4, aileron: 0.6, rudder: 0.5, throttle: 0.83, pitchTrim: -0.2, rollTrim: 0.15, flaps: 1 / 3, brake: 1 };
@@ -22,7 +52,7 @@ const mocks = vi.hoisted(() => {
     getDroneCommand: vi.fn(() => null),
   };
   return {
-    state, snapshot, phoneControls, phone, engineVisualValues,
+    state, snapshot, phoneControls, phone, engineVisualValues, regionProgress, regionLeases, createRegionLease,
     createPhoneSession: vi.fn(() => phone),
     pairingPanel: { destroy: vi.fn() }, createPairingPanel: vi.fn(),
     resetLocation: vi.fn(() => state),
@@ -44,6 +74,7 @@ const mocks = vi.hoisted(() => {
       renderer: { mode: "webgl2", engine: {} }, status: { mode: "fallback" }, scene: { onAfterRenderObservable: { add: () => null, remove: () => true } }, getViewState: () => null,
       onDeviceLost: vi.fn(() => () => {}), onDeviceRestored: vi.fn(() => () => {}),
       engine: { getFps: () => 60 }, geospatialCamera: null, prepareTerrain: vi.fn(async (request: { altitudeMeters?: number }) => ({ groundHeightMeters: 250, altitudeMeters: request.altitudeMeters ?? 1774 })),
+      prepareTerrainRegion: vi.fn(createRegionLease),
       surface: { sample: vi.fn(() => null) },
       getWorldRoot: () => ({}), sky: { getEnvironment: () => null, subscribe: () => () => {}, setGroundLights: vi.fn(), setGroundLightReceiver: vi.fn() }, registerFocusPoint: vi.fn(() => () => {}), setSimViewState: vi.fn(), setSimTick: vi.fn(), setSimRunning: vi.fn(),
       getGoogleTerrainDetailState: vi.fn(() => null),
@@ -59,16 +90,16 @@ const mocks = vi.hoisted(() => {
     },
     aircraft: {
       setViewMode: vi.fn(), getViewMode: () => "third", toggleViewMode: vi.fn(), lookFromCockpit: vi.fn(), dispose: vi.fn(),
-      orbitChaseCamera: vi.fn(), zoomChaseCamera: vi.fn(), modelRoot: {}, setModelLoaded: vi.fn(), getChaseDistanceMeters: () => 14,
+      orbitChaseCamera: vi.fn(), zoomChaseCamera: vi.fn(), setChaseFrame: vi.fn(), modelRoot: {}, setModelLoaded: vi.fn(), getChaseDistanceMeters: () => 14,
       thirdPersonCamera: { position: { y: 2.2, length: () => Math.hypot(2.2, 14) } },
     },
     aircraftModel: { getState: () => ({ status: "ready" }), getRig: () => null, setAircraft: vi.fn(), setLod: vi.fn(), setRenderStowedGear: vi.fn(), updateGearVisibility: vi.fn(), refreshAutoLod: vi.fn(), dispose: vi.fn() },
-    terrainContact: { update: vi.fn(() => true), reset: vi.fn() },
-    visibleMeshCollision: { update: vi.fn(() => false), reset: vi.fn(), dispose: vi.fn() },
+    terrainContact: { update: vi.fn(() => true), reset: vi.fn(), getRelocationProposal: vi.fn(() => null), declineRelocation: vi.fn(), acceptRelocation: vi.fn(), ignoreTerrainOverlap: vi.fn(), isTerrainIgnored: vi.fn(() => false), dispose: vi.fn() },
+    visibleMeshCollision: { update: vi.fn(() => false), reset: vi.fn(), dispose: vi.fn(), setTerrainOverlapIgnored: vi.fn() },
     physics: {
       reset: vi.fn(), setPaused: vi.fn(), update: vi.fn(), getLatestState: () => state, getFault: () => null,
     },
-    createHud: vi.fn(() => ({ update: vi.fn(), refreshFlaps: vi.fn(), isPilotHolding: vi.fn(() => false), setLayout: vi.fn(), setReadingTints: vi.fn(), setHidden: vi.fn(), destroy: vi.fn() })),
+    createHud: vi.fn(() => ({ update: vi.fn(), refreshFlaps: vi.fn(), isPilotHolding: vi.fn(() => false), setLayout: vi.fn(), setAttitudeSide: vi.fn(), setReadingTints: vi.fn(), setHidden: vi.fn(), destroy: vi.fn() })),
     createPanel: vi.fn(() => ({ update: vi.fn(), openOrSelectTab: vi.fn(), toggleTab: vi.fn(), destroy: vi.fn() })),
     createHudBar: vi.fn(() => ({ update: vi.fn(), setLayout: vi.fn(), destroy: vi.fn() })),
   };
@@ -180,6 +211,34 @@ function grant() {
 }
 
 describe("0SFS phone integration", () => {
+  it("applies the plane side preference live independently of the drone preference", async () => {
+    await mount();
+    const hud = mocks.createHud.mock.results.at(-1)!.value;
+    expect(hud.setAttitudeSide).toHaveBeenLastCalledWith("left");
+    getAppSettings().set("osfs.hud.planeAttitudeSide", "right");
+    expect(hud.setAttitudeSide).toHaveBeenLastCalledWith("right");
+    const calls = hud.setAttitudeSide.mock.calls.length;
+    getAppSettings().set("osfs.hud.droneAttitudeSide", "left");
+    expect(hud.setAttitudeSide).toHaveBeenCalledTimes(calls);
+  });
+
+  it("uses declared capabilities for both HUD and phone controls", async () => {
+    const definition = getAircraftDefinition("cessna-172");
+    const previous = definition.controls;
+    definition.controls = { ...previous, flaps: false, pitchTrim: false, rollTrim: false, landingGear: false };
+    try {
+      await mount();
+      const capabilities = { flaps: false, pitchTrim: false, rollTrim: false, landingGear: false };
+      expect(mocks.createHud.mock.calls.at(-1)![1]).toMatchObject({ drone: false, capabilities });
+      const status = options.getStatus();
+      expect(status.controlCapabilities).toEqual(capabilities);
+      for (const key of ["gearDown", "autoFlaps", "autoTrim"]) expect(status).not.toHaveProperty(key);
+      expect(options.setGearDown).toBeUndefined();
+      expect(options.setAutoFlaps).toBeUndefined();
+      expect(options.setAutoTrim).toBeUndefined();
+    } finally { definition.controls = previous; }
+  });
+
   it("distinguishes automatic trim and flap travel from deliberate desktop input during handoff", async () => {
     const previousRead = mocks.sdk.getPropertyValue.getMockImplementation()!;
     let flaps = 0;
@@ -387,6 +446,33 @@ describe("0SFS phone integration", () => {
     expect(mocks.physics.update).toHaveBeenLastCalledWith(0, expect.any(Function));
   });
 
+  it("keeps a paused Yaw spring drawing and applies spring time changes live", async () => {
+    await mount();
+    const originalHeading = mocks.state.headingRad;
+    try {
+      options.setPaused(true);
+      const settings = getAppSettings();
+      settings.set("osfs.camera.chaseFrame", "yaw");
+      settings.set("osfs.camera.yawSpringTime", .5);
+      tick(0);
+      mocks.state.headingRad = originalHeading + Math.PI / 2;
+      mocks.runtime.requestRender.mockClear();
+      tick(1 / 60);
+      const actualHeading = () => {
+        const rotation = mocks.aircraft.setChaseFrame.mock.calls.at(-1)![0] as Quaternion;
+        const forward = new Vector3(0, 0, 1).applyRotationQuaternion(rotation);
+        return Math.atan2(forward.x, -forward.z);
+      };
+      const delta = Math.atan2(Math.sin(actualHeading() - originalHeading), Math.cos(actualHeading() - originalHeading));
+      expect(delta).toBeGreaterThan(0);
+      expect(delta).toBeLessThan(.01);
+      expect(mocks.runtime.requestRender).toHaveBeenCalled();
+      settings.set("osfs.camera.yawSpringTime", 0);
+      tick(1 / 60);
+      expect(actualHeading()).toBeCloseTo(mocks.state.headingRad, 10);
+    } finally { mocks.state.headingRad = originalHeading; }
+  });
+
   it("draws the phone's camera swipe once with Glide off, at the mouse's rate, and pinches the chase distance", async () => {
     // Stored, so the tests after this one start from the default again.
     getAppSettings().set("camera.inertiaDecay", 0);
@@ -565,6 +651,7 @@ describe("0SFS phone integration", () => {
     const callbacks = mocks.createPanel.mock.calls[0][2] as { onLocationApply(location: { latDeg: number; lonDeg: number }): void };
     mocks.resetLocation.mockClear();
     callbacks.onLocationApply({ latDeg: 3, lonDeg: 4 });
+    [...document.querySelectorAll<HTMLButtonElement>('.flight-placement-dialog button')].find(button => button.textContent === "Yes")!.click();
     await vi.waitFor(() => expect(mocks.resetLocation).toHaveBeenCalledOnce());
     expect(mocks.phone.reset).toHaveBeenCalledOnce();
     expect(mocks.phone.reset.mock.invocationCallOrder[0]).toBeLessThan(mocks.resetLocation.mock.invocationCallOrder[0]);

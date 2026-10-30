@@ -6,6 +6,7 @@ import { NullEngine, Quaternion, Scene, TransformNode, Vector3 } from "@babylonj
 import { describe, expect, it } from "vitest";
 import { AIR_2S, AIR_2S_MASS, MINI_2, MINI_2_MASS } from "../../../../multirotor/tests/airframes";
 import { mountDroneProceduralMesh } from "./buildDroneProceduralMesh";
+import { resolveQuadPropeller } from "./quadRegistry";
 import { droneMotorPosition } from "./droneMotorTelemetry";
 
 const root = resolve(process.cwd(), "..") + "/";
@@ -33,7 +34,7 @@ function location(parent: ParentNode, selector = "location"): number[] {
 
 describe.each(cases)("$directory quad airframe data", ({ directory, spec, mass, cdA }) => {
   const manifest = JSON.parse(readFileSync(root + directory + "/public/0sfs-mod.json", "utf8"));
-  const quad = manifest.quad;
+  const quad = { ...manifest.quad, propeller: resolveQuadPropeller(manifest.quad) };
   const definition = manifest.aircraft.definitions[0];
   const profile = manifest.aircraft.fdmProfiles[definition.id];
   const text = readFileSync(root + directory + "/public/jsbsim-data/aircraft/" + profile.model + "/" + profile.model + ".xml", "utf8");
@@ -78,6 +79,15 @@ describe.each(cases)("$directory quad airframe data", ({ directory, spec, mass, 
     }
   });
 
+  it("loads physical propeller data from a separate electric engine mod", () => {
+    const propulsion = JSON.parse(readFileSync(root + directory + "-propulsion/public/0sfs-mod.json", "utf8"));
+    expect(manifest.dependencies).toContain("0SFS/" + directory + "-propulsion");
+    expect(manifest.quad.propeller).toBeUndefined();
+    expect(manifest.quad.propulsionId).toBe(propulsion.engine.id);
+    expect(quad.propeller).toEqual(propulsion.engine.electric.propeller);
+    expect(propulsion.dependencies).toContain("0SFS/electric-sound");
+    expect(manifest.aircraft.audio).toEqual({ engineDefinitionId: propulsion.engine.acousticProfile.id, sourceKind: "rotor" });
+  });
   it("keeps propellers, rotor layout, CG and controller equal to the multirotor reference specs", () => {
     for (const field of ["propeller", "rotors", "cgM", "control"] as const) expect(quad[field]).toEqual(spec[field]);
     for (const entry of manifest.aircraft.definitions) {

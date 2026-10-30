@@ -1,3 +1,4 @@
+import { getRegisteredEngine } from "@0sfs/engines/engineRegistry";
 import type { DroneCameraModData, DjiQuadModData, QuadcopterModData, QuadVehicleModData } from "@0sfs/mods/schema";
 import type { buildDroneProfile, DroneProfile } from "./droneTypes";
 
@@ -10,6 +11,17 @@ const cameras = new Map<string, DroneCameraModData>();
 const vehicles = new Map<string, { label: string; vehicle: QuadVehicleModData }>();
 const profiles = new Map<string, DroneProfile>();
 
+/** Resolves the authoritative propulsion data; old inline airframe mods still work. */
+export function resolveQuadPropeller(vehicle: QuadVehicleModData): NonNullable<QuadVehicleModData["propeller"]> {
+  if (vehicle.propulsionId) {
+    const engine = getRegisteredEngine(vehicle.propulsionId);
+    if (!engine || engine.type !== "electric") throw new Error(`Electric propulsion ${vehicle.propulsionId} is not installed.`);
+    return engine.electric.propeller;
+  }
+  if (vehicle.propeller) return vehicle.propeller;
+  throw new Error("A quadcopter needs an electric propulsionId or legacy propeller data.");
+}
+
 /** The lazy feature supplies the runtime builder. Adding a mod stores only data. */
 export function setQuadProfileBuilder(builder: typeof buildDroneProfile): void { build = builder; profiles.clear(); }
 export function installDroneCamera(id: string, profile: DroneCameraModData): void { cameras.set(id, profile); profiles.clear(); }
@@ -19,13 +31,14 @@ export function installDjiCommon(data: DjiQuadModData): void { dji = data; profi
 export function installQuadVehicle(id: string, label: string, vehicle: QuadVehicleModData): void {
   if (!common || !dji) throw new Error(`${id} needs the Quadcopter and DJI-Quadcopter mods installed first.`);
   if (!cameras.has(vehicle.cameraId)) throw new Error(`${id} needs camera mod ${vehicle.cameraId} installed first.`);
+  resolveQuadPropeller(vehicle);
   vehicles.set(id, { label, vehicle });
   profiles.delete(id);
 }
 export function uninstallQuadVehicle(id: string): void { vehicles.delete(id); profiles.delete(id); }
-export function uninstallQuadLayer(modId: string): void {
+export function uninstallQuadLayer(modId: string, propulsionId?: string): void {
   cameras.delete(modId);
-  for (const [id, { vehicle }] of vehicles) if (vehicle.cameraId === modId) vehicles.delete(id);
+  for (const [id, { vehicle }] of vehicles) if (vehicle.cameraId === modId || (propulsionId !== undefined && vehicle.propulsionId === propulsionId)) vehicles.delete(id);
   if (modId === QUADCOPTER_MOD_ID) common = null;
   if (modId === DJI_QUADCOPTER_MOD_ID) dji = null;
   if (!common || !dji) vehicles.clear();
@@ -35,6 +48,7 @@ export function quadProfile(id: string): DroneProfile | null {
   const installed = vehicles.get(id);
   const camera = installed && cameras.get(installed.vehicle.cameraId);
   if (!installed || !camera || !build || !common || !dji) return null;
+  if (profiles.get(id)?.propeller !== resolveQuadPropeller(installed.vehicle)) profiles.delete(id);
   if (!profiles.has(id)) profiles.set(id, build(id, installed.label, common, dji, installed.vehicle, camera));
   return profiles.get(id)!;
 }

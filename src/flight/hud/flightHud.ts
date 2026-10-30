@@ -1,3 +1,5 @@
+import type { ControlCapabilities } from "@0sfs/aircraft/aircraftCatalog";
+import { mountCenteredStick, stickResponse, inverseStickResponse } from "@0sfs/controls/centeredStick";
 import { createClimbRateLever, type ClimbRateLeverOptions } from "@0sfs/controls/climbRateLever";
 import { headingDegFromRad, type FlightState } from "@0sfs/ground-contact/flightState";
 import type { FrameProfiler } from "foss-earth/perf";
@@ -21,6 +23,9 @@ import type { ReadingTints } from "./instrumentBands";
 export type FlightHudLayout = "compact" | "classic";
 
 export interface FlightHudOptions {
+  drone?: boolean;
+  capabilities?: ControlCapabilities;
+  onEngineDetails?(): void;
   /** Physical actuator positions; absent readings never stand in for a command. */
   getActualControls?(): ActualControlPositions;
   onGearChange(down: boolean): void;
@@ -152,6 +157,7 @@ export interface FlightHudHandle {
    * gear and autopilot into `toolbarSlot`. Without a slot they stay in the row.
    */
   setLayout(layout: FlightHudLayout, toolbarSlot?: HTMLElement | null): void;
+  setAttitudeSide(side: "left" | "right"): void;
   /** Tints the airspeed, angle of attack and load chips, 0 green to 1 red; null leaves one untinted. */
   setReadingTints(tints: ReadingTints): void;
   /**
@@ -161,15 +167,6 @@ export interface FlightHudHandle {
    */
   isPilotHolding(): boolean;
   destroy(): void;
-}
-
-function stickResponse(value: number): number {
-  return Math.abs(value) <= 0.035 ? 0 : Math.sign(value) * (Math.abs(value) - 0.035) / 0.965;
-}
-
-function inverseStickResponse(value: number): number {
-  if (value === 0) return 0;
-  return Math.sign(value) * (Math.abs(value) * 0.965 + 0.035);
 }
 
 function clampStickSquare(x: number, y: number): { x: number; y: number } {
@@ -269,6 +266,7 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
         <button class="flight-hud__ap" data-control="autopilot" type="button" aria-pressed="false">AP</button>
       </div>
       <div class="flight-hud__yaw-throttle" aria-label="Yaw and throttle">
+        <div class="flight-hud__armament" data-slot="armament" hidden></div>
         <div class="flight-hud__eval" data-slot="eval"></div>
         <div class="flight-hud__yaw">
           <label class="flight-hud__yaw-control">
@@ -279,7 +277,9 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
             <input data-control="rudder" type="range" min="-1" max="1" step="0.01" value="0" aria-label="Yaw rudder. Drag left or right; releases to center." />
           </label>
         </div>
+        ${options.drone ? '<div class="flight-hud__engine-stick" data-control="climb-yaw" role="button" tabindex="0" data-takes-keys="ArrowLeft ArrowRight ArrowUp ArrowDown" aria-label="Climb and yaw control. Drag up to climb, down to descend, left or right to yaw. Release to hold.">' : ""}
         <div class="flight-hud__engine" data-slot="engine"></div>
+        ${options.drone ? '<span class="flight-hud__engine-stick-marker" aria-hidden="true"></span><span class="flight-hud__engine-stick-label">CLIMB / YAW</span></div><button type="button" class="flight-hud__engine-details" data-control="engine-details" aria-label="Open quadcopter engine details">Engines</button>' : ""}
         <div class="flight-hud__throttle">
           <div class="flight-hud__slider-control flight-hud__slider-control--throttle"></div>
           ${options.vtolConversion ? `
@@ -295,6 +295,9 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
 
   // The pad takes the pointer and the keys; the renderer draws into a canvas inside it.
   const pad = root.querySelector<HTMLElement>(".flight-hud__attitude");
+  const enginePad = root.querySelector<HTMLElement>(".flight-hud__engine-stick");
+  const engineMarker = root.querySelector<HTMLElement>(".flight-hud__engine-stick-marker");
+  const engineDetails = root.querySelector<HTMLButtonElement>('[data-control="engine-details"]');
   const iasEl = root.querySelector<HTMLElement>('[data-metric="ias"]');
   const hdgEl = root.querySelector<HTMLElement>('[data-metric="hdg"]');
   const vsEl = root.querySelector<HTMLElement>('[data-metric="vs"]');
@@ -335,12 +338,12 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
     throttleControl.style.setProperty("--afterburner-accent", options.afterburner.accentColor);
   }
   // The phone mounts this same lever; see throttleLever.ts.
-  const climb = options.climbRate ? createClimbRateLever(throttleControl, options.climbRate) : null;
+  const climb = !options.drone && options.climbRate ? createClimbRateLever(throttleControl, options.climbRate) : null;
   if (climb) {
     throttleControl.classList.add("flight-hud__slider-control--climb-rate");
     root.querySelector(".flight-hud__yaw-throttle")?.setAttribute("aria-label", "Yaw and climb rate");
   }
-  const throttle = climb ? null : createThrottleLever(throttleControl, {
+  const throttle = climb || options.drone ? null : createThrottleLever(throttleControl, {
     onThrottleChange: options.onThrottleChange,
     onPowerChange: options.onPowerChange,
     onStartHold: options.engine?.onStartHold,
@@ -514,107 +517,32 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
   rudderInput.addEventListener("lostpointercapture", onRudderPointerUp);
   rudderInput.addEventListener("blur", onRudderBlur);
 
-  let stickX = 0;
-  let stickY = 0;
-  let stickActive = false;
-  let capturedPointer: number | null = null;
-  const stickKeys = new Set<string>();
-
-  const applyStick = (x: number, y: number): void => {
-    stickX = x;
-    stickY = y;
-    options.onStickChange(stickResponse(x), -stickResponse(y));
+  let hidden = false;
+  const stick = mountCenteredStick(pad, {
+    halfShare: ATTITUDE_HALF_SHARE,
+    disabled: () => hidden,
+    onChange: (x, y) => options.onStickChange(stickResponse(x), -stickResponse(y)),
+  });
+  const paintEngineStick = (x: number, y: number, held: boolean): void => {
+    if (!engineMarker || !enginePad) return;
+    const half = ATTITUDE_HALF_SHARE * 100;
+    const left = `${50 + x * half}%`;
+    const top = `${50 + y * half}%`;
+    if (engineMarker.style.left !== left) engineMarker.style.left = left;
+    if (engineMarker.style.top !== top) engineMarker.style.top = top;
+    enginePad.toggleAttribute("data-commanded", held || Math.abs(x) + Math.abs(y) > .001);
   };
-
-  const releaseStick = (): void => {
-    if (capturedPointer !== null && pad.hasPointerCapture(capturedPointer)) {
-      pad.releasePointerCapture(capturedPointer);
-    }
-    const held = capturedPointer !== null || stickKeys.size > 0 || stickX !== 0 || stickY !== 0;
-    capturedPointer = null;
-    stickKeys.clear();
-    stickActive = false;
-    pad.removeAttribute("data-active");
-    // Letting go of a stick nobody holds is not pilot input. The window losing
-    // focus or resizing lands here, and any stick input takes the controls
-    // from a phone: clicking another application handed the aircraft back to
-    // this computer mid-flight.
-    if (held) applyStick(0, 0);
-  };
-
-  const moveStick = (clientX: number, clientY: number): void => {
-    const rect = pad.getBoundingClientRect();
-    const half = Math.max(1, Math.min(rect.width, rect.height) * ATTITUDE_HALF_SHARE);
-    const { x, y } = clampStickSquare(
-      (clientX - rect.left - rect.width / 2) / half,
-      (clientY - rect.top - rect.height / 2) / half,
-    );
-    applyStick(x, y);
-  };
-
-  const onPointerDown = (event: PointerEvent): void => {
-    if (capturedPointer !== null || event.button !== 0) return;
-    event.preventDefault();
-    capturedPointer = event.pointerId;
-    pad.setPointerCapture(event.pointerId);
-    pad.setAttribute("data-active", "");
-    stickActive = true;
-    moveStick(event.clientX, event.clientY);
-  };
-
-  const onPointerMove = (event: PointerEvent): void => {
-    if (capturedPointer !== event.pointerId) return;
-    event.preventDefault();
-    moveStick(event.clientX, event.clientY);
-  };
-
-  const onPointerEnd = (event: PointerEvent): void => {
-    if (capturedPointer !== event.pointerId) return;
-    releaseStick();
-  };
-
-  const applyKeyboardStick = (): void => {
-    const { x, y } = clampStickSquare(
-      Number(stickKeys.has("ArrowRight")) - Number(stickKeys.has("ArrowLeft")),
-      Number(stickKeys.has("ArrowDown")) - Number(stickKeys.has("ArrowUp")),
-    );
-    stickActive = x !== 0 || y !== 0;
-    applyStick(x, y);
-  };
-
-  const onKeyDown = (event: KeyboardEvent): void => {
-    if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key) || capturedPointer !== null) return;
-    event.preventDefault();
-    stickKeys.add(event.key);
-    applyKeyboardStick();
-  };
-
-  const onKeyUp = (event: KeyboardEvent): void => {
-    if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key) || capturedPointer !== null) return;
-    event.preventDefault();
-    stickKeys.delete(event.key);
-    if (stickKeys.size === 0) releaseStick();
-    else applyKeyboardStick();
-  };
-
-  const onBlur = (): void => releaseStick();
-  const onVisibilityChange = (): void => {
-    if (document.hidden) releaseStick();
-  };
-
-  pad.addEventListener("pointerdown", onPointerDown);
-  pad.addEventListener("pointermove", onPointerMove);
-  pad.addEventListener("pointerup", onPointerEnd);
-  pad.addEventListener("pointercancel", onPointerEnd);
-  pad.addEventListener("lostpointercapture", onPointerEnd);
-  pad.addEventListener("keydown", onKeyDown);
-  pad.addEventListener("keyup", onKeyUp);
-  pad.addEventListener("blur", onBlur);
-  const onContextMenu = (event: Event): void => event.preventDefault();
-  pad.addEventListener("contextmenu", onContextMenu);
-  window.addEventListener("blur", onBlur);
-  window.addEventListener("resize", onBlur);
-  document.addEventListener("visibilitychange", onVisibilityChange);
+  const engineStick = enginePad ? mountCenteredStick(enginePad, {
+    halfShare: ATTITUDE_HALF_SHARE,
+    disabled: () => hidden,
+    onPosition: paintEngineStick,
+    onChange: (x, y) => {
+      options.onRudderChange(stickResponse(x));
+      options.climbRate?.onChange(-stickResponse(y));
+    },
+  }) : null;
+  const onEngineDetails = (): void => options.onEngineDetails?.();
+  engineDetails?.addEventListener("click", onEngineDetails);
 
   // Pointers down on a flight control, wherever they are lifted.
   const heldPointers = new Set<number>();
@@ -622,10 +550,16 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
   const onHoldStart = (event: PointerEvent): void => { heldPointers.add(event.pointerId); };
   const onHoldEnd = (event: PointerEvent): void => { heldPointers.delete(event.pointerId); };
   const clearHeld = (): void => heldPointers.clear();
-  for (const group of controlGroups) group.addEventListener("pointerdown", onHoldStart, { capture: true });
+  const clearHiddenHeld = (): void => { if (document.hidden) clearHeld(); };
+  for (const group of controlGroups) {
+    group.addEventListener("pointerdown", onHoldStart, { capture: true });
+    group.addEventListener("lostpointercapture", onHoldEnd, { capture: true });
+  }
   window.addEventListener("pointerup", onHoldEnd, { capture: true });
   window.addEventListener("pointercancel", onHoldEnd, { capture: true });
   window.addEventListener("blur", clearHeld);
+  window.addEventListener("resize", clearHeld);
+  document.addEventListener("visibilitychange", clearHiddenHeld);
 
   const setGearDown = (next: boolean): void => {
     if (next === gearDown) return;
@@ -655,8 +589,31 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
   };
 
   // The row's own order, which Classic puts back.
-  const rowItems = [iasTape, hdgTape, vsTape, aoaSlot, gSlot, gearButton, apButton];
-  const toolbarItems = [gSlot, gearButton, apButton];
+  const capabilities = options.capabilities ?? {
+    flaps: !options.drone, pitchTrim: !options.drone, rollTrim: !options.drone, landingGear: !options.drone,
+  };
+  if (!capabilities.pitchTrim) {
+    pitchTrimInput.closest(".flight-hud__lever--pitch")?.remove();
+    pitchAutoTrimButton.remove();
+  }
+  if (!capabilities.rollTrim) {
+    rollTrimInput.closest(".flight-hud__slider-control--roll-trim")?.remove();
+    rollAutoTrimButton.remove();
+  }
+  if (!capabilities.pitchTrim && !capabilities.rollTrim) root.querySelector(".flight-hud__auto-trims")?.remove();
+  if (!capabilities.flaps) flapsInput.closest(".flight-hud__lever--flaps")?.remove();
+  if (!capabilities.landingGear) gearButton.remove();
+  if (options.drone) {
+    hud.dataset.drone = "true";
+    root.querySelector(".flight-hud__yaw")?.remove();
+    root.querySelector(".flight-hud__throttle")?.remove();
+    pad.setAttribute("aria-label", "Attitude indicator and pitch roll control. Drag up to fly forward, down to fly backward, left or right to roll.");
+    root.querySelector(".flight-hud__yaw-throttle")?.setAttribute("aria-label", "Climb and yaw");
+  }
+  hud.dataset.trims = String(capabilities.pitchTrim || capabilities.rollTrim);
+  const gearItems = capabilities.landingGear ? [gearButton] : [];
+  const rowItems = [iasTape, hdgTape, vsTape, aoaSlot, gSlot, ...gearItems, apButton];
+  const toolbarItems = [gSlot, ...gearItems, apButton];
   hud.dataset.layout = "classic";
   const setLayout = (layout: FlightHudLayout, toolbarSlot: HTMLElement | null = null): void => {
     if (layout === "compact") {
@@ -669,12 +626,23 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
     hud.dataset.layout = layout;
   };
 
-  let hidden = false;
+  const setAttitudeSide = (side: "left" | "right"): void => {
+    if (hud.dataset.attitudeSide === side) return;
+    stick.release();
+    engineStick?.release();
+    releaseRudder();
+    heldPointers.clear();
+    hud.dataset.attitudeSide = side;
+  };
+  setAttitudeSide(options.drone ? "right" : "left");
+
   const setHidden = (next: boolean): void => {
     if (next === hidden) return;
     hidden = next;
     if (hidden) {
-      releaseStick();
+      stick.release();
+      engineStick?.release();
+      releaseRudder();
       heldPointers.clear();
     }
     for (const element of [root, ...toolbarItems]) {
@@ -724,6 +692,7 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
     setAttitudeRenderer: preference => attitude.setPreference(preference),
     setHidden,
     setLayout,
+    setAttitudeSide,
     setReadingTints,
     update(
       state: FlightState,
@@ -739,12 +708,12 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
       setAutoTrim(nextAutoTrim);
       setMasterAp(nextMasterAp);
       refreshVtolConversion();
-      const localStick = capturedPointer !== null || stickKeys.size > 0;
+      const position = stick.getPosition();
+      const localStick = position.held;
       const { x: displayX, y: displayY } = localStick
-        ? clampStickSquare(stickX, stickY)
+        ? clampStickSquare(position.x, position.y)
         : controlsToStickDisplay(controls.aileron, controls.elevator);
-      const displayActive = localStick || stickActive
-        || Math.hypot(controls.aileron, controls.elevator) > 0.001;
+      const displayActive = localStick || Math.hypot(controls.aileron, controls.elevator) > 0.001;
       attitude.draw(state, { x: displayX, y: displayY, active: displayActive }, attitudeView);
 
       setText(iasEl, Math.round(state.airspeedKts).toString().padStart(3, "0"));
@@ -766,6 +735,9 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
       if (!rudderDragging) setValue(rudderInput, String(controls.rudder));
       rudderPosition.update(Number(rudderInput.value), actual?.rudder);
       climb?.update();
+      if (engineStick && !engineStick.isHolding()) paintEngineStick(
+        inverseStickResponse(controls.rudder), -inverseStickResponse(options.climbRate?.getCommand() ?? 0), false,
+      );
       throttle?.update({
         throttle: controls.throttle ?? state.throttleNorm,
         actualThrottle: actual?.throttle,
@@ -782,7 +754,10 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
     },
     destroy(): void {
       attitude.destroy();
-      releaseStick();
+      stick.destroy();
+      engineStick?.destroy();
+      heldPointers.clear();
+      engineDetails?.removeEventListener("click", onEngineDetails);
       releaseRudder();
       gearButton.removeEventListener("click", onGearClick);
       pitchAutoTrimButton.removeEventListener("click", onPitchAutoTrimClick);
@@ -808,26 +783,19 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
       rudderInput.removeEventListener("pointercancel", onRudderPointerUp);
       rudderInput.removeEventListener("lostpointercapture", onRudderPointerUp);
       rudderInput.removeEventListener("blur", onRudderBlur);
-      pad.removeEventListener("pointerdown", onPointerDown);
-      pad.removeEventListener("pointermove", onPointerMove);
-      pad.removeEventListener("pointerup", onPointerEnd);
-      pad.removeEventListener("pointercancel", onPointerEnd);
-      pad.removeEventListener("lostpointercapture", onPointerEnd);
-      pad.removeEventListener("keydown", onKeyDown);
-      pad.removeEventListener("keyup", onKeyUp);
-      pad.removeEventListener("blur", onBlur);
-      pad.removeEventListener("contextmenu", onContextMenu);
-      window.removeEventListener("blur", onBlur);
-      window.removeEventListener("resize", onBlur);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-      for (const group of controlGroups) group.removeEventListener("pointerdown", onHoldStart, { capture: true });
+      for (const group of controlGroups) {
+        group.removeEventListener("pointerdown", onHoldStart, { capture: true });
+        group.removeEventListener("lostpointercapture", onHoldEnd, { capture: true });
+      }
       window.removeEventListener("pointerup", onHoldEnd, { capture: true });
       window.removeEventListener("pointercancel", onHoldEnd, { capture: true });
       window.removeEventListener("blur", clearHeld);
+      window.removeEventListener("resize", clearHeld);
+      document.removeEventListener("visibilitychange", clearHiddenHeld);
       // In Compact these sit in the toolbar, outside the root.
       for (const element of toolbarItems) element.remove();
       root.innerHTML = "";
     },
-    isPilotHolding: () => heldPointers.size > 0,
+    isPilotHolding: () => heldPointers.size > 0 || stick.isHolding() || engineStick?.isHolding() === true,
   };
 }

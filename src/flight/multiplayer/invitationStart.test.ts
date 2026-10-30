@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { invitationLocation, readInvitationStart, withInvitationStart } from "./invitationStart";
+import { registerAircraftId, unregisterAircraftId } from "@0sfs/aircraft/aircraftIds";
 import { createSettingsRegistry } from "foss-earth/settings";
 import { OSFS_PARAMETERS } from "../settings/flightParameters";
 
@@ -19,7 +20,7 @@ describe("invitation start", () => {
     expect(readInvitationStart(url)).toEqual(start);
     const fragment = new URLSearchParams(new URL(url).hash.slice(1));
     expect(fragment.get("peer")).toBe("host"); expect(fragment.get("join")).toBe("a".repeat(43));
-    expect(new URL(url).searchParams.get("set.osfs.aircraft.id")).toBe("f-35b");
+    expect(new URL(url).searchParams.get("aircraft")).toBe("f-35b");
     expect(withInvitationStart(url, {})).toBe(base);
   });
   it("supports independent optional fields and strips unrelated location data", () => {
@@ -35,5 +36,15 @@ describe("invitation start", () => {
     }
     expect(readInvitationStart(`${base}&spawn=invalid-json`)).toEqual({});
     expect(readInvitationStart(base.replace("/fly/", "/fly/?set.osfs.aircraft.id=unknown"))).toEqual({});
+  });
+  it("reads an older invitation's full setting name and a renamed aircraft's old id", () => {
+    expect(readInvitationStart(base.replace("/fly/", "/fly/?set.osfs.aircraft.id=f-35b"))).toEqual({ aircraftId: "f-35b" });
+    // A drone's id is known once its mod is installed.
+    registerAircraftId("dji-air2s");
+    try {
+      expect(readInvitationStart(base.replace("/fly/", "/fly/?aircraft=dji-air-2s"))).toEqual({ aircraftId: "dji-air2s" });
+    } finally { unregisterAircraftId("dji-air2s"); }
+    const older = new URL(base); older.searchParams.set("set.osfs.aircraft.id", "f-35b");
+    expect(new URL(withInvitationStart(older.href, { aircraftId: "cessna-172" })).searchParams.has("set.osfs.aircraft.id")).toBe(false);
   });
 });

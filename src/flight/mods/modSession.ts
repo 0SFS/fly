@@ -1,5 +1,7 @@
+import { getRegisteredEngine, unregisterEngine } from "@0sfs/engines/engineRegistry";
+import { uninstallAudioMod } from "@0sfs/sound/installAudioMod";
 import { modAboutParts, type ModAboutPart } from "@0sfs/mods";
-import { browseGithubMods, type GithubModRepository, type ModBrowseKind } from "@0sfs/mods/githubDiscovery";
+import { searchGithubMods, type GithubModRepository, type ModBrowseKind } from "@0sfs/mods/githubDiscovery";
 import { readViewerIdentity, writeDeveloperUsername } from "@0sfs/mods/identity";
 import { ModRegistry, type LoadedModRecord, type ModLoaderOptions } from "@0sfs/mods/loader";
 import { normalizeModSource, type NormalizeModSourceOptions } from "@0sfs/mods/normalizeModSource";
@@ -52,9 +54,13 @@ export interface ModsSessionSnapshot {
   notice: string | null;
   pendingWarning: ModSecurityAssessment | null;
   pendingSource: string | null;
+  source: string;
+  place: "github" | "local";
   browseKind: ModBrowseKind;
   browseResults: readonly GithubModRepository[];
   browseError: string | null;
+  browseStatus: "idle" | "loading" | "waiting" | "ready" | "error";
+  browseRetryAt: number | null;
   shareUrl: string;
 }
 
@@ -68,9 +74,14 @@ let records: LoadedModRecord[] = [];
 let pendingSource: string | null = null;
 let pendingWarning: ModSecurityAssessment | null = null;
 let notice: string | null = null;
+let source = "";
+let place: "github" | "local" = "github";
 let browseKind: ModBrowseKind = "all";
 let browseResults: readonly GithubModRepository[] = [];
 let browseError: string | null = null;
+let browseStatus: ModsSessionSnapshot["browseStatus"] = "idle";
+let browseRetryAt: number | null = null;
+let browseController: AbortController | null = null;
 let snapshot: ModsSessionSnapshot = emptySnapshot();
 
 function storage(): Storage | null {
@@ -112,9 +123,13 @@ function emptySnapshot(): ModsSessionSnapshot {
     notice: null,
     pendingWarning: null,
     pendingSource: null,
+    source: "",
+    place: "github",
     browseKind: "all",
     browseResults: [],
     browseError: null,
+    browseStatus: "idle",
+    browseRetryAt: null,
     shareUrl: "",
   };
 }
@@ -127,9 +142,13 @@ function publish(): void {
     notice,
     pendingWarning,
     pendingSource,
+    source,
+    place,
     browseKind,
     browseResults,
     browseError,
+    browseStatus,
+    browseRetryAt,
     shareUrl: shareUrl(),
   };
   for (const listener of listeners) listener();
@@ -214,15 +233,20 @@ export function ensureModsSession(): Promise<readonly LoadedModRecord[]> {
 
 function dropRecord(record: LoadedModRecord): void {
   const manifest = record.manifest;
+  const quadsBefore = quadAircraftIds();
+  const removedAircraftIds = new Set<string>();
   uninstallCameraPreview(manifest.id);
+  uninstallAudioMod(manifest, record.source.bundled ? manifest.id : record.source.canonicalKey);
   if (manifest.kind === "aircraft" && manifest.aircraft) {
     const familyId = String((manifest.aircraft.family as { id?: string }).id ?? "");
     const ids = manifest.aircraft.definitions.map(definition => String((definition as { id?: string }).id ?? "")).filter(Boolean);
-    for (const id of ids) uninstallQuadVehicle(id);
+    for (const id of ids) { removedAircraftIds.add(id); uninstallQuadVehicle(id); }
     unregisterAircraftMod(familyId, ids);
     for (const id of Object.keys(manifest.aircraft.fdmProfiles)) unregisterFdmProfile(id);
   }
-  uninstallQuadLayer(manifest.id);
+  if (manifest.engine) unregisterEngine(manifest.engine.id, record.source.bundled ? manifest.id : record.source.canonicalKey);
+  const lostPropulsionId = manifest.engine && !getRegisteredEngine(manifest.engine.id) ? manifest.engine.id : undefined;
+  uninstallQuadLayer(manifest.id, lostPropulsionId);
   records = records.filter(item => item.source.canonicalKey !== record.source.canonicalKey);
   if (options) {
     added = added.filter(item => {
@@ -233,7 +257,9 @@ function dropRecord(record: LoadedModRecord): void {
     confirmed.delete(record.source.canonicalKey);
     writeList(CONFIRMED_KEY, [...confirmed]);
   }
-  onModRemoved(manifest.id);
+  const quadsAfter = new Set(quadAircraftIds());
+  for (const id of quadsBefore) if (!quadsAfter.has(id)) removedAircraftIds.add(id);
+  onModRemoved(manifest.id, [...removedAircraftIds]);
 }
 
 export async function removeMod(source: string): Promise<void> {
@@ -291,18 +317,69 @@ export function setDeveloperUsername(username: string): void {
 }
 
 export function setBrowseKind(kind: ModBrowseKind): void {
+  if (kind === browseKind) return;
+  resetBrowse();
   browseKind = kind;
   publish();
 }
 
-export async function browseMods(): Promise<void> {
+export function setModSource(value: string): void {
+  if (value === source) return;
+  resetBrowse();
+  source = value;
+  publish();
+}
+
+export function setModPlace(value: "github" | "local"): void {
+  if (value === place) return;
+  resetBrowse();
+  place = value;
+  publish();
+}
+
+export function cancelModSearch(): void {
+  browseController?.abort();
+  browseController = null;
+}
+
+function resetBrowse(): void {
+  cancelModSearch();
+  browseResults = [];
   browseError = null;
+  browseStatus = "idle";
+  browseRetryAt = null;
+}
+
+export async function browseMods(): Promise<void> {
+  if (place === "local" || (source.trim().length > 0 && source.trim().length < 2)) return;
+  cancelModSearch();
+  const controller = new AbortController();
+  browseController = controller;
+  browseError = null;
+  browseStatus = "loading";
+  browseRetryAt = null;
+  publish();
   try {
-    const session = typeof sessionStorage === "undefined" ? null : sessionStorage;
-    browseResults = await browseGithubMods(browseKind, globalThis.fetch.bind(globalThis), session);
+    let session: Storage | null = null;
+    try { session = globalThis.sessionStorage ?? null; } catch { /* Search works without storage. */ }
+    const results = await searchGithubMods(source, browseKind, {
+      fetchImpl: globalThis.fetch.bind(globalThis), storage: session, signal: controller.signal,
+      onWait: until => {
+        if (controller.signal.aborted) return;
+        browseStatus = until === null ? "loading" : "waiting";
+        browseRetryAt = until;
+        publish();
+      },
+    });
+    if (controller.signal.aborted) return;
+    browseResults = results;
+    browseStatus = "ready";
   } catch (error) {
+    if (controller.signal.aborted) return;
     browseError = error instanceof Error ? error.message : String(error);
     browseResults = [];
+    browseStatus = "error";
   }
+  browseRetryAt = null;
   publish();
 }

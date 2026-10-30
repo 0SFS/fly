@@ -1,3 +1,4 @@
+import { resolveQuadPropeller } from "./quadRegistry";
 import type { DroneCameraModData, DjiQuadModData, QuadcopterModData, QuadVehicleModData } from "@0sfs/mods/schema";
 
 export const DEADZONE = 0.03;
@@ -7,6 +8,7 @@ import { fovFromDiagonal, type CameraProfile } from "@0sfs/drone-camera/profile"
 export { fovFromDiagonal } from "@0sfs/drone-camera/profile";
 
 export interface DroneProfile extends CameraProfile, QuadVehicleModData {
+  propeller: NonNullable<QuadVehicleModData["propeller"]>;
   id: string;
   label: string;
   kPos: number;
@@ -15,7 +17,6 @@ export interface DroneProfile extends CameraProfile, QuadVehicleModData {
   gimbalSlewDeg: number;
   positionHoldMps: number;
   gimbalRollDeg: number;
-  familyId: string;
   properties: QuadcopterModData["properties"];
 }
 
@@ -33,6 +34,7 @@ export function buildDroneProfile(
     id,
     label,
     ...vehicle,
+    propeller: resolveQuadPropeller(vehicle),
     ...camera,
     ...fov,
     kPos: common.gains.kPos,
@@ -41,7 +43,6 @@ export function buildDroneProfile(
     gimbalSlewDeg: common.gimbalSlewDeg,
     positionHoldMps: common.positionHoldMps,
     gimbalRollDeg: dji.gimbalRollDeg,
-    familyId: dji.familyId,
     properties: common.properties,
   };
 }

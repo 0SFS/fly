@@ -197,6 +197,22 @@
   grid-area: engine;
 }
 
+.flight-hud__armament {
+  grid-area: armament;
+  min-width: 0;
+  max-width: calc(100vw - 24px);
+}
+
+.flight-hud__armament[hidden] { display: none; }
+
+.flight-hud__yaw-throttle[data-armament="true"] {
+  grid-template-columns: max-content max-content max-content;
+  grid-template-areas:
+    "armament eval ."
+    "armament yaw throttle"
+    "armament engine throttle";
+}
+
 .flight-hud__throttle {
   grid-area: throttle;
   display: flex;
@@ -1057,6 +1073,15 @@ html[data-world-edges="flush"] .flight-toolbar-instruments :where(.flight-hud__t
 }
 
 @media (max-width: 720px) {
+  .flight-hud__yaw-throttle[data-armament="true"] {
+    grid-template-columns: max-content max-content;
+    grid-template-areas:
+      "armament armament"
+      "eval ."
+      "yaw throttle"
+      "engine throttle";
+  }
+
   .flight-hud {
     --flight-attitude-size: 130px;
     --flight-auto-trim-size: 25px;
@@ -1445,3 +1470,151 @@ html[data-world-edges="flush"] .flight-toolbar-instruments :where(.flight-hud__t
 .flight-climb-rate input { touch-action: none; }
 
 .flight-hud__throttle .flight-hud__slider-control--climb-rate { width: auto; min-width: 60px; }
+
+/* Side preferences move complete instruments, including the classic tape row. */
+.flight-hud {
+  --flight-hud-right: calc(env(safe-area-inset-right, 0px) + 24px);
+}
+.flight-hud[data-layout="compact"] {
+  --flight-hud-right: var(--foss-hud-right, env(safe-area-inset-right, 0px));
+}
+.flight-hud[data-attitude-side="right"] .flight-hud__attitude-cluster,
+.flight-hud[data-attitude-side="right"] .flight-hud__tapes {
+  left: auto;
+  right: var(--flight-hud-right);
+}
+.flight-hud[data-attitude-side="right"] .flight-hud__tapes { justify-content: flex-end; }
+.flight-hud[data-attitude-side="right"] .flight-hud__yaw-throttle {
+  right: auto;
+  left: var(--flight-hud-left);
+  justify-items: start;
+}
+.flight-hud[data-trims="false"] {
+  --flight-attitude-cluster-height: var(--flight-attitude-size);
+}
+.flight-hud[data-trims="false"] .flight-hud__attitude-cluster {
+  grid-template-rows: 0 var(--flight-attitude-size);
+  row-gap: 0;
+}
+.flight-hud[data-drone="true"] .flight-hud__yaw-throttle {
+  grid-template-columns: var(--flight-attitude-size);
+  grid-template-areas: "eval" "details" "engine-stick";
+  justify-items: stretch;
+  row-gap: 4px;
+}
+.flight-hud[data-drone="true"] .flight-hud__attitude {
+  box-sizing: border-box;
+}
+.flight-hud__engine-stick {
+  grid-area: engine-stick;
+  position: relative;
+  width: var(--flight-attitude-size);
+  height: var(--flight-attitude-size);
+  border: 1px solid var(--ctl-line-bright, rgba(255, 255, 255, .2));
+  border-radius: 12px;
+  background: var(--ctl-surface, rgba(10, 15, 22, .75));
+  box-sizing: border-box;
+  touch-action: none;
+  user-select: none;
+  cursor: crosshair;
+  overflow: hidden;
+}
+.flight-hud__engine-stick:focus-visible,
+.flight-hud__engine-stick[data-active] {
+  outline: 2px solid var(--ctl-accent);
+  outline-offset: -2px;
+}
+.flight-hud__engine-stick > .flight-hud__engine {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.flight-hud[data-drone="true"] .flight-quad-engine__grid {
+  --quad-motor-size: calc(var(--flight-attitude-size) * .28);
+  gap: 5px 16px;
+}
+.flight-hud[data-drone="true"] .flight-quad-engine__summary {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+.flight-hud__engine-stick-marker {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--ctl-accent);
+  border-radius: 50%;
+  background: rgba(232, 182, 71, .22);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .8);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.flight-hud__engine-stick[data-active] .flight-hud__engine-stick-marker {
+  background: var(--ctl-accent);
+}
+.flight-hud__engine-stick-label {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.flight-hud__engine-details {
+  grid-area: details;
+  justify-self: end;
+  padding: 2px 7px;
+  border: 1px solid var(--ctl-line-bright);
+  border-radius: 6px;
+  color: inherit;
+  background: var(--ctl-surface);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+@media (max-width: 720px) {
+  .flight-hud:not([data-layout="compact"]) {
+    --flight-hud-right: calc(env(safe-area-inset-right, 0px) + 10px);
+  }
+}
+/* Nonmodal loading and terrain notices leave the world and dock controls live. */
+.flight-loading-status,
+.flight-terrain-overlap {
+  position: fixed;
+  z-index: 1100;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  box-sizing: border-box;
+  width: min(28rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  overflow: auto;
+  padding: 1rem;
+  border: 1px solid rgba(170, 195, 220, 0.45);
+  border-radius: 1rem;
+  color: #edf4fc;
+  background: rgba(16, 24, 36, 0.96);
+  box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.3);
+  pointer-events: auto;
+}
+.flight-loading-status[hidden],
+.flight-terrain-overlap[hidden],
+.flight-loading-status [hidden],
+.flight-terrain-overlap [hidden] { display: none; }
+.flight-loading-status__title { margin: 0 0 0.6rem; font-size: 1.1rem; }
+.flight-loading-status__detail,
+.flight-loading-status__override-detail { margin: 0.6rem 0; line-height: 1.4; white-space: pre-line; }
+.flight-loading-status__override-detail { color: #c1cedd; font-size: 0.9rem; }
+.flight-loading-status__progress { width: 100%; }
+.flight-loading-status__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.flight-terrain-overlap { top: auto; bottom: 4rem; transform: translateX(-50%); }
+/* After Resume flight here: a status line and any recovery move, not a second question. */
+.flight-terrain-overlap--compact { width: auto; max-width: min(28rem, calc(100vw - 2rem)); padding: 0.5rem 0.75rem; }
+.flight-terrain-overlap--compact .flight-loading-status__detail { margin: 0 0 0.4rem; font-size: 0.9rem; }
+

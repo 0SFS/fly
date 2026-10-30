@@ -5,8 +5,8 @@
 import { DJI_QUADCOPTER_MOD_ID, QUADCOPTER_MOD_ID, quadAircraftIds } from "./quadRegistry";
 
 export const DRONE_MOD_ID = DJI_QUADCOPTER_MOD_ID;
-export const QUAD_LAYER_IDS = [QUADCOPTER_MOD_ID, DJI_QUADCOPTER_MOD_ID, "0sfs/dji-mini2", "0sfs/dji-air-2s"] as const;
-export const DRONE_AIRCRAFT_IDS = ["dji-mini-2", "dji-air-2s"] as const;
+export const QUAD_LAYER_IDS = [QUADCOPTER_MOD_ID, DJI_QUADCOPTER_MOD_ID, "0sfs/dji-mini2", "0sfs/dji-air2s"] as const;
+export const DRONE_AIRCRAFT_IDS = ["dji-mini2", "dji-air2s"] as const;
 export type DroneAircraftId = (typeof DRONE_AIRCRAFT_IDS)[number];
 
 export type DroneMotorPosition = "front-left" | "front-right" | "rear-left" | "rear-right";
@@ -27,6 +27,29 @@ export interface DroneMotorTelemetry {
   source: "simulated";
 }
 
+/** Acoustic inputs from the accepted rotor plant step, in the physical rotor order. */
+export interface DroneAcousticRotor {
+  rpm: number;
+  thrustN: number;
+  shaftTorqueNm: number;
+  inducedVelocityMps: number;
+  vrs: number;
+  valid: boolean;
+}
+export interface DroneAcousticSample {
+  valid: boolean;
+  armed: boolean;
+  simTimeS: number;
+  airDensityKgM3: number;
+  /** Body axes: forward, right, down; relative to the air, in m/s. */
+  airVelocityBodyMps: readonly [number, number, number];
+  rotors: readonly DroneAcousticRotor[];
+}
+export interface DroneAcousticTelemetry extends DroneAcousticSample {
+  aircraftId: string;
+  propulsionId?: string;
+}
+
 export function isDroneAircraftId(id: string): id is DroneAircraftId {
   return (DRONE_AIRCRAFT_IDS as readonly string[]).includes(id) || quadAircraftIds().includes(id);
 }
@@ -41,6 +64,8 @@ export interface DroneFeatureHooks {
   cameraTab?(): HTMLElement;
   /** A propulsion-specific instrument supplied only by the applied lazy feature. */
   createEngineMonitor?(root: HTMLElement, options: import("@0sfs/engines/engineMonitor").EngineMonitorOptions): import("@0sfs/engines/engineMonitor").EngineMonitorHandle;
+  /** Immediately releases a removed active aircraft and clears its native wrench. */
+  releaseAircraft?(aircraftId: string): void;
   beforeStep(step: DroneStepContext): void;
   afterView(view: DroneViewContext): void;
   dispose(): void;
@@ -105,12 +130,14 @@ let gimbalTarget = 0;
 let captureHeld = false;
 let telemetry: Record<string, unknown> | null = null;
 let motorTelemetry: DroneMotorTelemetry | null = null;
+let acousticTelemetry: DroneAcousticTelemetry | null = null;
 let refusal: string | null = null;
-let removalSwitch: ((modId: string) => void) | null = null;
+let removalSwitch: ((modId: string, removedAircraftIds: readonly string[]) => void) | null = null;
 
 export function noteActiveAircraft(id: string): void {
   activeId = id;
   if (motorTelemetry?.aircraftId !== id) motorTelemetry = null;
+  if (acousticTelemetry?.aircraftId !== id) acousticTelemetry = null;
 }
 
 export function activeAircraftId(): string | null {
@@ -165,7 +192,15 @@ export function droneMotorTelemetry(): DroneMotorTelemetry | null {
   return motorTelemetry;
 }
 
-export function setDroneRemovalSwitch(handler: ((modId: string) => void) | null): void {
+export function setDroneAcousticTelemetry(next: DroneAcousticTelemetry | null): void {
+  acousticTelemetry = next;
+}
+/** Cheap read: loading the electric sound never imports the drone feature or plant. */
+export function droneAcousticTelemetry(): DroneAcousticTelemetry | null {
+  return acousticTelemetry;
+}
+
+export function setDroneRemovalSwitch(handler: ((modId: string, removedAircraftIds: readonly string[]) => void) | null): void {
   removalSwitch = handler;
 }
 
@@ -193,10 +228,16 @@ export function loadDroneFeature(): Promise<void> {
   return loading;
 }
 
-export function onModRemoved(modId: string): void {
+export function onModRemoved(modId: string, removedAircraftIds: readonly string[] = []): void {
+  if (activeId && removedAircraftIds.includes(activeId)) {
+    // Release before the asynchronous aircraft switch can take another physics step.
+    hooks?.releaseAircraft?.(activeId);
+    telemetry = null;
+    motorTelemetry = null;
+    acousticTelemetry = null;
+  }
   const layer = (QUAD_LAYER_IDS as readonly string[]).includes(modId);
-  if (!layer) return;
-  if (quadAircraftIds().length === 0) {
+  if ((layer || removedAircraftIds.length > 0) && quadAircraftIds().length === 0) {
     disposed = true;
     hooks?.dispose();
     mesh?.dispose();
@@ -205,14 +246,15 @@ export function onModRemoved(modId: string): void {
     loading = null;
     telemetry = null;
     motorTelemetry = null;
+    acousticTelemetry = null;
     refusal = null;
     captureHeld = false;
   }
-  removalSwitch?.(modId);
+  if (removedAircraftIds.length > 0) removalSwitch?.(modId, removedAircraftIds);
 }
 
 export function onModAdded(modId: string): void {
-  if ((QUAD_LAYER_IDS as readonly string[]).includes(modId)) disposed = false;
+  if ((QUAD_LAYER_IDS as readonly string[]).includes(modId) || quadAircraftIds().length > 0) disposed = false;
 }
 
 export function currentDroneCommand(

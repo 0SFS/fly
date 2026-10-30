@@ -19,6 +19,21 @@ applies to registry storage reloads. The regression in
 Earth settings before flight registration, reloads storage, then verifies the
 complete choice survives. It failed as C172/Auto before the fix.
 
+## An aircraft a mod adds, asked for at startup
+
+A link such as `?aircraft=dji-mini2`, short for `?set.osfs.aircraft.id=dji-mini2`,
+names an aircraft that joins the catalogue only once its mod loads. Invitations
+and shared flights write the short form. Ids that were renamed, such as
+`dji-mini-2` and `dji-air-2s`, still open the aircraft from saved settings, saved
+flights and older links (`src/flight/aircraft/aircraftAddress.ts`). The registry holds a URL's dynamic choice
+until its option exists, as it holds a saved one. The flight installs the default
+modpack behind the loading screen before reading the choice, so a fresh browser
+flies the drone. When nothing installed supplies the asked-for aircraft, loading
+stops with **Fly the Cessna 172 instead** (or the aircraft otherwise in use)
+beside the reload button. The flight never switches unasked, and the choice
+replaces the request, so a mod that arrives later does not switch the aircraft.
+`unavailableAircraftRequest` (`src/flight/unavailableAircraft.ts`) names it.
+
 ## Complete aircraft activation
 
 - `createFlightSimApp` coordinates flight sessions around one Babylon runtime,

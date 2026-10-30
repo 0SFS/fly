@@ -10,8 +10,9 @@ import { getFdmProfile } from "../jsbsim/fdmProfiles";
 import { resolveAircraftDataFiles } from "../jsbsim/hydrateJsbsimData";
 import { AVAILABILITY } from "@0sfs/sound/audioSnapshot";
 import { getAircraftAudioInstallation, resolveAircraftAudioInstallation, type ResolvedEngineSoundSource } from "@0sfs/sound/aircraftAudioProfiles";
-import { FJ33_DEFINITION } from "@0sfs/sound/engineAcousticDefinitions";
-import { createDspHarness, rms, TIER } from "@0sfs/sound/dspHarness";
+import { FJ33_DEFINITION } from "../../../../sound/tests/fixtures/engineProfiles";
+import { rms, TIER } from "@0sfs/sound/dspHarness";
+import { createReferenceHarness as createDspHarness } from "../../../../sound/tests/fixtures/engineProfiles";
 import { createJsbsimAudioAdapter, decideCombustion, toSnapshot } from "@0sfs/sound/jsbsimAudioAdapter";
 import { LEGACY_PHYSICS_HZ_120 } from "../physics/physicsRate";
 

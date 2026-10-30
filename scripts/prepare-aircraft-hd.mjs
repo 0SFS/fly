@@ -1,6 +1,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { Matrix, Quaternion, Vector3 } from '@babylonjs/core/Maths/math.vector.js';
+import { symmetricTriangles } from './rotorSymmetry.mjs';
 
 // Keep the downloaded source intact. Reframe its scene in metres without
 // changing vertex attributes, textures or materials.
@@ -19,7 +20,7 @@ for (let offset = 12; offset < source.length;) {
 }
 const gltf = JSON.parse(chunks.find(chunk => chunk.type === 0x4e4f534a).bytes.toString('utf8'));
 const bounds = { min: new Vector3(Infinity, Infinity, Infinity), max: new Vector3(-Infinity, -Infinity, -Infinity) };
-let triangles = 0;
+let triangles = 0, turnedTriangles = 0, movedTriangles = 0;
 const worlds = new Map();
 function visit(index, parent) {
   const node = gltf.nodes[index];
@@ -47,26 +48,102 @@ const frame = gltf.nodes.length;
 gltf.nodes.push({ name: '0sfs-hd-frame', children: scene.nodes,
   scale: [scale, scale, scale], translation: center.scale(-scale).asArray() });
 scene.nodes = [frame];
-// Author-supplied pivot mapping. Preserve each blade's full authored world transform.
+// Author-supplied pivot mapping. Preserve each blade's full authored world
+// transform. A rotor's optional `axis` is its motor's spin axis, which the
+// pivot's +Y follows; its optional `motor` lists the parts that turn with it.
 if (rotorFile) {
   const rotors = JSON.parse(await readFile(rotorFile, 'utf8'));
   for (const [index, rotor] of rotors.entries()) {
-    const pivot = gltf.nodes.length;
+    const rotation = new Quaternion();
+    Quaternion.FromUnitVectorsToRef(Vector3.Up(), Vector3.FromArray(rotor.axis ?? [0, 1, 0]).normalize(), rotation);
+    const toPivot = Matrix.Compose(Vector3.One(), rotation, Vector3.FromArray(rotor.center)).invert();
     const children = [];
-    for (const name of rotor.blades) {
-      const blade = gltf.nodes.findIndex(node => node.mesh !== undefined && node.name === name);
-      if (blade < 0) throw new Error(`Missing rotor blade ${name}`);
-      for (const node of gltf.nodes) if (node.children) node.children = node.children.filter(child => child !== blade);
-      const world = worlds.get(blade);
-      const relative = world.multiply(Matrix.Translation(-rotor.center[0], -rotor.center[1], -rotor.center[2]));
-      const node = gltf.nodes[blade];
+    const attach = nodeIndex => {
+      for (const node of gltf.nodes) if (node.children) node.children = node.children.filter(child => child !== nodeIndex);
+      const node = gltf.nodes[nodeIndex];
       delete node.translation; delete node.rotation; delete node.scale;
-      node.matrix = relative.asArray();
-      children.push(blade);
-    }
-    gltf.nodes.push({ name: `drone-rotor-${index}`, translation: rotor.center, children });
+      node.matrix = gltfMatrix(worlds.get(nodeIndex).multiply(toPivot));
+      children.push(nodeIndex);
+    };
+    for (const name of rotor.blades) attach(meshNode(name, 'rotor blade'));
+    for (const turning of splitMotor(rotor.motor ?? [], toPivot)) attach(turning);
+    const pivot = gltf.nodes.length;
+    gltf.nodes.push({ name: `drone-rotor-${index}`, translation: rotor.center, rotation: rotation.asArray(), children });
     gltf.nodes[frame].children.push(pivot);
   }
+}
+/** glTF wants a JSON array; a Matrix's own Float32Array would serialize as an object. */
+function gltfMatrix(matrix) {
+  return Array.from(matrix.asArray());
+}
+function meshNode(name, role) {
+  const index = gltf.nodes.findIndex(node => node.mesh !== undefined && node.name === name);
+  if (index < 0) throw new Error(`Missing ${role} ${name}`);
+  return index;
+}
+/**
+ * Splits the motor parts that turn with a rotor, each a node name or
+ * { node, components } as in gimbal.json. Triangles that look different as
+ * they turn move to a new `<node>-turning` node, returned for the pivot; at
+ * propeller speed the rotor shows them only within its semi-transparent
+ * sweep. Surfaces of revolution look the same turning or still, so they stay
+ * on the original node, solid.
+ */
+function splitMotor(entries, toPivot) {
+  const parts = [], named = new Set();
+  for (const entry of entries.map(entry => typeof entry === 'string' ? { node: entry } : entry)) {
+    if (named.has(entry.node)) throw new Error(`Motor part ${entry.node} is listed twice`);
+    named.add(entry.node);
+    const nodeIndex = meshNode(entry.node, 'motor part'), mesh = gltf.meshes[gltf.nodes[nodeIndex].mesh];
+    if (entry.components && mesh.primitives.length !== 1) throw new Error(`Component mapping requires a single primitive in ${entry.node}`);
+    for (const primitive of mesh.primitives) {
+      if ((primitive.mode ?? 4) !== 4) throw new Error(`Motor part ${entry.node} must contain triangles`);
+      const positions = readAccessor(primitive.attributes.POSITION);
+      let turning = primitive.indices === undefined ? positions.map((_, i) => i) : readAccessor(primitive.indices).flat(), fixed = [];
+      if (entry.components) {
+        const pieces = meshComponents(nodeIndex, primitive, 1e-7);
+        if (entry.components.some(component => !pieces[component])) throw new Error(`Invalid motor component in ${entry.node}`);
+        turning = entry.components.flatMap(component => pieces[component]);
+        fixed = pieces.flatMap((piece, component) => entry.components.includes(component) ? [] : piece);
+      }
+      const toRotor = worlds.get(nodeIndex).multiply(toPivot);
+      const points = positions.map(point => Vector3.TransformCoordinates(Vector3.FromArray(point), toRotor).asArray());
+      parts.push({ nodeIndex, mesh, primitive, points, turning, still: fixed, moving: [] });
+    }
+  }
+  if (!parts.length) return [];
+  // Classified together, so parts that close one turn between them read as round.
+  const points = [], indices = [];
+  let radius = 0;
+  for (const part of parts) {
+    part.first = indices.length / 3;
+    for (const index of part.turning) {
+      indices.push(points.length + index);
+      radius = Math.max(radius, Math.hypot(part.points[index][0], part.points[index][2]));
+    }
+    for (const point of part.points) points.push(point);
+  }
+  const symmetric = symmetricTriangles(points, indices, { cell: radius / 20 });
+  for (const part of parts) for (let i = 0; i < part.turning.length; i += 3) {
+    (symmetric[part.first + i / 3] ? part.still : part.moving).push(part.turning[i], part.turning[i + 1], part.turning[i + 2]);
+  }
+  const created = [];
+  for (const nodeIndex of new Set(parts.map(part => part.nodeIndex))) {
+    const own = parts.filter(part => part.nodeIndex === nodeIndex), node = gltf.nodes[nodeIndex], mesh = own[0].mesh;
+    const subset = (key, suffix) => ({ ...mesh, name: `${node.name}-${suffix}`,
+      primitives: own.filter(part => part[key].length).map(part => ({ ...part.primitive, indices: writeIndices(part[key]) })) });
+    if (!own.some(part => part.moving.length)) continue;
+    gltf.meshes.push(subset('moving', 'turning'));
+    gltf.nodes.push({ name: `${node.name}-turning`, mesh: gltf.meshes.length - 1 });
+    worlds.set(gltf.nodes.length - 1, worlds.get(nodeIndex));
+    created.push(gltf.nodes.length - 1);
+    // Other instances of the original mesh must remain intact.
+    if (own.some(part => part.still.length)) { gltf.meshes.push(subset('still', 'still')); node.mesh = gltf.meshes.length - 1; }
+    else delete node.mesh;
+  }
+  turnedTriangles += indices.length / 3;
+  movedTriangles += parts.reduce((sum, part) => sum + part.moving.length / 3, 0);
+  return created;
 }
 // Split only disconnected authored shells, retaining the original attribute
 // accessors/materials. This lets a merged camera/support mesh articulate at
@@ -142,7 +219,7 @@ if (gimbalFile) {
     const center = stageCenters.get(stage), relative = worlds.get(index).multiply(Matrix.Translation(-center[0], -center[1], -center[2]));
     const node = gltf.nodes[index];
     delete node.translation; delete node.rotation; delete node.scale;
-    node.matrix = relative.asArray(); gltf.nodes[stageNodes.get(stage)].children.push(index);
+    node.matrix = gltfMatrix(relative); gltf.nodes[stageNodes.get(stage)].children.push(index);
   };
   for (const [name, entries] of selections) {
     const index = gltf.nodes.findIndex(node => node.mesh !== undefined && node.name === name);
@@ -179,7 +256,7 @@ if (gimbalFile) {
 // The credit is the model's whole attribution, as the aircraft manifest shows it.
 gltf.asset.copyright = credit.trim();
 gltf.asset.extras = { ...gltf.asset.extras,
-  changes: 'Scene recentered, converted to metres, with declared motor pivots and disconnected gimbal shells assigned to separate yaw, roll and camera pitch joints.', metresPerSourceUnit: scale };
+  changes: 'Scene recentered, converted to metres, with declared motor pivots turned onto their motor axes, the motor parts that turn and are not round moved onto them, and disconnected gimbal shells assigned to separate yaw, roll and camera pitch joints.', metresPerSourceUnit: scale };
 const json = Buffer.from(JSON.stringify(gltf));
 chunks.find(chunk => chunk.type === 0x4e4f534a).bytes = Buffer.concat([json, Buffer.alloc((4 - json.length % 4) % 4, 0x20)]);
 const header = Buffer.alloc(12);header.writeUInt32LE(0x46546c67, 0);header.writeUInt32LE(2, 4);
@@ -187,4 +264,4 @@ header.writeUInt32LE(12 + chunks.reduce((sum, chunk) => sum + 8 + chunk.bytes.le
 const result = [header];
 for (const chunk of chunks) { const h = Buffer.alloc(8);h.writeUInt32LE(chunk.bytes.length, 0);h.writeUInt32LE(chunk.type, 4);result.push(h, chunk.bytes); }
 await mkdir(path.dirname(output), { recursive: true });await writeFile(output, Buffer.concat(result));
-console.log(JSON.stringify({ output, triangles, sizeMeters: bounds.max.subtract(bounds.min).scale(scale).asArray(), centerSource: center.asArray() }));
+console.log(JSON.stringify({ output, triangles, motorTriangles: { turning: turnedTriangles, moved: movedTriangles }, sizeMeters: bounds.max.subtract(bounds.min).scale(scale).asArray(), centerSource: center.asArray() }));

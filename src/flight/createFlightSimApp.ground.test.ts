@@ -5,6 +5,21 @@ import { createWheelSpinState, type WheelSpinState } from "@0sfs/ground-contact/
 
 const mocks = vi.hoisted(() => {
   const state = { latDeg: 1, lonDeg: 2, altMeters: 1000, headingRad: 0 };
+  // Every region the flight asks for is ready at once, over ground at 250 m.
+  // Moving a region reports it again, as the runtime does.
+  const createRegionLease = (request: import("foss-earth/runtime").TerrainRegionOptions) => {
+    const progress: import("foss-earth/runtime").TerrainRegionProgress = {
+      state: "ready", minimumReady: true, finalReady: true, readyTiles: 1, totalTiles: 1, pendingTiles: 0,
+      estimatedRemainingMs: null, reason: null, groundHeightMeters: 250, sourceGeneration: 1,
+    };
+    let released = false;
+    return {
+      read: () => progress,
+      update: vi.fn<(region: import("foss-earth/runtime").TerrainRegion) => void>(() => queueMicrotask(() => { if (!released) request.onProgress?.(progress); })),
+      release: vi.fn(() => { released = true; }),
+      setVisible: vi.fn(),
+    };
+  };
   return {
     state,
     wheelStates: [] as WheelSpinState[],
@@ -13,6 +28,7 @@ const mocks = vi.hoisted(() => {
       onDeviceLost: vi.fn(() => () => {}), onDeviceRestored: vi.fn(() => () => {}),
       engine: { getFps: () => 60 }, geospatialCamera: null,
       prepareTerrain: vi.fn(async (request: { altitudeMeters?: number }) => ({ groundHeightMeters: 250, altitudeMeters: request.altitudeMeters ?? 1774 })),
+      prepareTerrainRegion: vi.fn(createRegionLease),
       surface: { sample: vi.fn(() => null) },
       getWorldRoot: () => ({}), sky: { getEnvironment: () => null, subscribe: () => () => {}, setGroundLights: vi.fn(), setGroundLightReceiver: vi.fn() }, registerFocusPoint: vi.fn(() => () => {}), setSimViewState: vi.fn(), setSimTick: vi.fn(),
       getGoogleTerrainDetailState: vi.fn(() => null),
@@ -38,8 +54,8 @@ const mocks = vi.hoisted(() => {
       getState: () => ({ aircraftId: "cessna-172", lodId: "auto", activeLodId: "lod3", status: "ready", triangles: 876, error: null }),
       getRig: () => null, setAircraft: vi.fn(), setLod: vi.fn(), setRenderStowedGear: vi.fn(), updateGearVisibility: vi.fn(), refreshAutoLod: vi.fn(), dispose: vi.fn(),
     },
-    terrainContact: { reset: vi.fn(), update: vi.fn(() => true) },
-    visibleMeshCollision: { reset: vi.fn(), update: vi.fn(() => false), dispose: vi.fn() },
+    terrainContact: { reset: vi.fn(), update: vi.fn(() => true), getRelocationProposal: vi.fn(() => null), declineRelocation: vi.fn(), acceptRelocation: vi.fn(), ignoreTerrainOverlap: vi.fn(), isTerrainIgnored: vi.fn(() => false) },
+    visibleMeshCollision: { reset: vi.fn(), update: vi.fn(() => false), dispose: vi.fn(), setTerrainOverlapIgnored: vi.fn() },
     physics: { reset: vi.fn(), setPaused: vi.fn(), update: vi.fn((_delta, applyInputs) => { applyInputs(); return state; }), getLatestState: () => state, getFault: () => null },
   };
 });

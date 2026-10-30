@@ -1,9 +1,11 @@
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { ACOUSTIC_PROFILE_FIELDS, acousticProfileValues, FJ33_ACOUSTICS, getAircraftAudioProfile } from "@0sfs/sound/aircraftAudioProfiles";
+import { ACOUSTIC_PROFILE_FIELDS, acousticProfileValues, getAircraftAudioProfile } from "@0sfs/sound/aircraftAudioProfiles";
+import { FJ33_ACOUSTICS, FJ33_DEFINITION } from "../../../../sound/tests/fixtures/engineProfiles";
 import { AVAILABILITY, type AudioSnapshotInit } from "@0sfs/sound/audioSnapshot";
-import { bandPower, createDspHarness, difference, peak, rms, TIER, type DspHarness } from "@0sfs/sound/dspHarness";
+import { bandPower, difference, peak, rms, TIER, type DspHarness } from "@0sfs/sound/dspHarness";
+import { createReferenceHarness as createDspHarness } from "../../../../sound/tests/fixtures/engineProfiles";
 import { renderReference } from "@0sfs/sound/validation/engineProfileReference";
 
 const full = Object.values(AVAILABILITY).reduce((bits, bit) => bits | bit, 0);
@@ -34,24 +36,24 @@ async function render(profile: typeof f135 | undefined, overrides: Partial<Audio
 
 describe("shared engine acoustic setup (actual shipped WASM)", () => {
   it("matches the native setup field order and retains exact FJ33 defaults", async () => {
-    const header = readFileSync("../sound/src/acoustic_profile.h", "utf8");
+    const header = readFileSync("../engine-sound/src/legacy_profile.h", "utf8");
     const block = header.split("// ACOUSTIC_PROFILE_FIELDS\n")[1].split("// END ACOUSTIC_PROFILE_FIELDS")[0];
     const fields = [...block.matchAll(/\bkProfile([A-Z]\w*)/g)].map(match => match[1]).filter(name => name !== "Size");
     expect(fields.map(name => name[0].toLowerCase() + name.slice(1))).toEqual(ACOUSTIC_PROFILE_FIELDS);
     const core = await createDspHarness();
-    const defaults = new Float64Array(core.exports.memory.buffer, core.exports.osfs_audio_profile_ptr(), core.exports.osfs_audio_profile_size());
-    expect([...defaults]).toEqual(acousticProfileValues());
-    expect(acousticProfileValues(getAircraftAudioProfile("cirrus-vision-jet"))).toEqual(acousticProfileValues());
+    const defaults = new Float64Array(core.voiceExports().memory.buffer, core.voiceExports().osfs_voice_profile_ptr(0), core.voiceExports().osfs_voice_profile_size());
+    expect([...defaults]).toEqual(acousticProfileValues(FJ33_DEFINITION));
+    expect(acousticProfileValues(getAircraftAudioProfile("cirrus-vision-jet"))).toEqual(acousticProfileValues(FJ33_DEFINITION));
     expect(FJ33_ACOUSTICS.fanMix).toBe(3.3 / (1 + 3.3));
   });
 
   it("refuses invalid setup atomically without changing the active voice", async () => {
     const correct = await render(f135);
     const rejected = await render(f135, {}, core => {
-      const values = new Float64Array(core.exports.memory.buffer, core.exports.osfs_audio_profile_ptr(), ACOUSTIC_PROFILE_FIELDS.length);
+      const values = new Float64Array(core.voiceExports().memory.buffer, core.voiceExports().osfs_voice_profile_ptr(0), ACOUSTIC_PROFILE_FIELDS.length);
       values.set(acousticProfileValues(f135));
       values[ACOUSTIC_PROFILE_FIELDS.indexOf("thrustReferenceLbf")] = 0;
-      expect(core.exports.osfs_audio_commit_profile()).toBe(0);
+      expect(core.voiceExports().osfs_voice_commit_profile(0)).toBe(0);
     });
     expect(rejected.output).toEqual(correct.output);
     expect(rejected.core.stats().nonFinite).toBe(0);

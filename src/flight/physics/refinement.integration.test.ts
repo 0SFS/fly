@@ -3,7 +3,8 @@ import { JSBSimSdk } from "@felipegalind0/jsbsim";
 import { wasmBinaryUrl, wasmModuleUrl } from "@felipegalind0/jsbsim/wasm";
 import { describe, expect, it, vi } from "vitest";
 import type { SurfaceHit, SurfaceQuery } from "foss-earth/runtime";
-import { createTerrainContact } from "@0sfs/ground-contact/terrainContact";
+import { createTerrainContact as createContact } from "@0sfs/ground-contact/terrainContact";
+import { acceptTerrainRelocations } from "../testing/acceptTerrainRelocations";
 import { createFixedStepPhysicsLoop } from "./fixedStepLoop";
 import { readFlightState } from "@0sfs/ground-contact/ecefBridge";
 import { resetFlightLocation } from "../jsbsim/resetFlightLocation";
@@ -11,6 +12,8 @@ import { getFdmProfile } from "../jsbsim/fdmProfiles";
 import { LEGACY_FIXED_DT_120, LEGACY_PHYSICS_HZ_120 } from "./physicsRate";
 
 const C172_STATIC_METERS = getFdmProfile("cessna-172").stance.staticMeters;
+// Terrain corrections are answered Yes; these scenarios measure the move itself.
+const createTerrainContact = (...args: Parameters<typeof createContact>) => acceptTerrainRelocations(createContact(...args));
 
 async function setup(altitude = 400, terrain = 300) {
   const sdk = await JSBSimSdk.create({ moduleUrl: wasmModuleUrl, wasmUrl: wasmBinaryUrl,

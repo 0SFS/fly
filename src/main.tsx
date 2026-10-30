@@ -121,7 +121,18 @@ function startPage(rootElement: HTMLElement): void {
   if (log) attachBootLog(log);
   let retainedReport: string | null = null;
   const loading = log ? createFlightLoadingScreen(log, () => retainedReport !== null
-    ? Promise.resolve(retainedReport) : diagnostics!.report({ allSettings: true })) : null;
+    ? Promise.resolve(retainedReport) : diagnostics!.report({ allSettings: true }),
+    (snapshot, urgent, outcome) => {
+      const state = snapshot as LoadingDiagnosticsSnapshot & { capturedAt?: string; phases?: unknown; failure?: unknown };
+      // Keep a small operation summary even if a large history reaches the storage cap.
+      diagnostics?.checkpoint?.("startup-state.txt", JSON.stringify({
+        capturedAt: state.capturedAt, phases: state.phases, failure: state.failure,
+        operations: state.operations.map(operation => ({ operation: operation.operation, state: operation.state,
+          startedMs: operation.startedMs, elapsedMs: operation.elapsedMs,
+          error: operation.error?.message.slice(0, 1600) })),
+      }, null, 2));
+      diagnostics?.checkpoint?.("loading.txt", JSON.stringify(snapshot, null, 2), urgent, outcome);
+    }) : null;
   if (loading) diagnostics?.addState(() => `Loading diagnostics:\n${JSON.stringify(window.osfsLoadingDiagnostics?.(), null, 2)}`);
   loading?.setPhase("app", { state: "loading", detail: "Downloading application code" });
   if (log) offerFullscreen(log);

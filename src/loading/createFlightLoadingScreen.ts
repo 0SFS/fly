@@ -22,7 +22,17 @@ export interface FlightLoadingFailure {
   actions?: GameLogEntry["actions"];
 }
 
+export interface FlightSpawnOverride {
+  label?: string;
+  detail?: string;
+  onClick(): void;
+  /** Only offered when a finite local ground height is known; the caller confirms the move. */
+  aboveGround?: { onClick(): void };
+}
+
 export interface FlightLoadingScreen {
+  /** A one-use bypass of this operation's map readiness wait. */
+  setSpawnOverride?(action: FlightSpawnOverride | null): void;
   show(options?: { title?: string; detail?: string; reset?: boolean }): void;
   setPhase(phase: FlightLoadingPhase, update: FlightLoadingPhaseUpdate): void;
   hide(): void;
@@ -48,11 +58,10 @@ const PHASE_LABELS: Record<FlightLoadingPhase, string> = {
 const DEFAULT_TITLE = "Preparing your flight";
 
 /**
- * Marks a control that stays usable while loading holds the rest of the app,
- * such as the pause button: pausing during loading starts the flight paused.
+ * Retained for controls shared with older hosts. Loading now keeps all UI
+ * and camera controls usable; the simulation owns its independent pause gate.
  */
 export const LOADING_LIVE_ATTRIBUTE = "data-loading-live";
-const LIVE_SELECTOR = `[${LOADING_LIVE_ATTRIBUTE}]`;
 
 interface PhaseLine {
   line: GameLogLine;
@@ -90,17 +99,14 @@ function describeTerrain(progress: TerrainPreparationProgress | undefined): stri
 }
 
 /**
- * Loading progress as game-log lines over a visible world. The app under the
- * log is made inert, so flight input still waits for safe terrain, except for
- * the controls marked live and the elements that contain them.
+ * Central, nonmodal loading status over a visible world, with a persistent
+ * diagnostic trail in the game log. Holding physics never locks the app UI.
  */
-export function createFlightLoadingScreen(sharedLog?: GameLog, report?: () => Promise<string>): FlightLoadingScreen {
+export function createFlightLoadingScreen(sharedLog?: GameLog, report?: () => Promise<string>, checkpoint?: (snapshot: unknown, urgent: boolean, outcome?: "loading" | "ready" | "failed") => void): FlightLoadingScreen {
   const log = sharedLog ?? createGameLog();
   const root = document.getElementById("root");
   const phases = new Map<FlightLoadingPhase, PhaseLine>();
   let failure: { line: GameLogLine; entry: GameLogEntry } | null = null;
-  // Each element the hold made inert, with whether it was inert already.
-  const held = new Map<Element, boolean>();
   let previousBusy: string | null = null;
   let visible = false;
   let destroyed = false;
@@ -108,7 +114,18 @@ export function createFlightLoadingScreen(sharedLog?: GameLog, report?: () => Pr
   let stoppedAt: number | null = null;
   let failureMessage: string | null = null;
   let failureCause: ReturnType<typeof describeLoadingCause> | null = null;
-  const diagnostics = createLoadingDiagnostics();
+  let checkpointTimer: ReturnType<typeof setTimeout> | undefined;
+  const saveCheckpoint = (urgent: boolean, outcome?: "loading" | "ready" | "failed"): void => {
+    if (!checkpoint) return;
+    if (urgent) {
+      clearTimeout(checkpointTimer); checkpointTimer = undefined;
+      checkpoint(getReport(), true, outcome);
+    } else checkpointTimer ??= setTimeout(() => {
+      checkpointTimer = undefined;
+      if (!destroyed) checkpoint(getReport(), true);
+    }, 1000);
+  };
+  const diagnostics = createLoadingDiagnostics(saveCheckpoint);
   const observations = new Map<FlightLoadingPhase, { update: FlightLoadingPhaseUpdate; recordedAt: number }>();
   const history: Array<{ elapsedMs: number; phase: FlightLoadingPhase; update: FlightLoadingPhaseUpdate }> = [];
   const getReport = () => JSON.parse(JSON.stringify({
@@ -158,44 +175,86 @@ export function createFlightLoadingScreen(sharedLog?: GameLog, report?: () => Pr
   };
   const reportAction = { label: "Copy report", onClick: () => { void copyReport(); } };
 
-  const holdElement = (element: Element): void => {
-    if (held.has(element)) return;
-    held.set(element, element.hasAttribute("inert"));
-    element.setAttribute("inert", "");
+  const status = document.createElement("section");
+  status.className = "flight-loading-status";
+  status.setAttribute("aria-label", "Flight loading");
+  status.hidden = true;
+  const titleElement = document.createElement("h2");
+  titleElement.className = "flight-loading-status__title";
+  titleElement.textContent = DEFAULT_TITLE;
+  const indicator = document.createElement("div");
+  indicator.className = "flight-loading-status__progress";
+  indicator.setAttribute("role", "progressbar");
+  indicator.setAttribute("aria-label", "Preparing flight");
+  indicator.setAttribute("aria-valuemin", "0");
+  indicator.setAttribute("aria-valuemax", "100");
+  const detailElement = document.createElement("p");
+  detailElement.className = "flight-loading-status__detail";
+  detailElement.setAttribute("role", "status");
+  const overrideDetail = document.createElement("p");
+  overrideDetail.className = "flight-loading-status__override-detail";
+  overrideDetail.hidden = true;
+  const overrideButton = document.createElement("button");
+  overrideButton.type = "button";
+  overrideButton.className = "flight-panel__command";
+  overrideButton.hidden = true;
+  const aboveGroundButton = document.createElement("button");
+  aboveGroundButton.type = "button";
+  aboveGroundButton.className = "flight-panel__command";
+  aboveGroundButton.textContent = "Teleport above ground";
+  aboveGroundButton.hidden = true;
+  const recoveryButtons = document.createElement("div");
+  recoveryButtons.className = "flight-loading-status__actions";
+  status.append(indicator, titleElement, detailElement, overrideDetail, overrideButton, aboveGroundButton, recoveryButtons);
+  document.body.append(status);
+  let spawnOverride: FlightSpawnOverride | null = null;
+  const setSpawnOverride = (action: FlightSpawnOverride | null): void => {
+    spawnOverride = action;
+    overrideButton.hidden = !action;
+    overrideButton.disabled = false;
+    aboveGroundButton.hidden = !action?.aboveGround;
+    aboveGroundButton.disabled = false;
+    overrideButton.textContent = action?.label ?? "Spawn now anyway";
+    overrideDetail.textContent = action?.detail ?? "Map detail is still loading.";
+    overrideDetail.hidden = !action;
   };
-  const releaseElement = (element: Element): void => {
-    const wasInert = held.get(element);
-    if (wasInert === undefined) return;
-    held.delete(element);
-    element.toggleAttribute("inert", wasInert);
+  overrideButton.addEventListener("click", () => {
+    const action = spawnOverride;
+    if (!action || overrideButton.disabled) return;
+    spawnOverride = null;
+    overrideButton.disabled = true;
+    aboveGroundButton.disabled = true;
+    action.onClick();
+  });
+  aboveGroundButton.addEventListener("click", () => {
+    const action = spawnOverride?.aboveGround;
+    if (!action || aboveGroundButton.disabled) return;
+    // The consent popup owns cancellation and duplicate proposal handling.
+    action.onClick();
+  });
+  // The card owns only its pointer interaction; the rest of the world stays usable.
+  for (const type of ["pointerdown", "pointermove", "pointerup", "wheel"] as const) {
+    status.addEventListener(type, event => event.stopPropagation());
+  }
+  const refreshStatus = (): void => {
+    if (failureMessage) return;
+    const active = [...observations].filter(([, value]) => value.update.state === "loading");
+    const current = active.find(([phase]) => phase === "terrain") ?? active.at(-1);
+    if (!current) { detailElement.textContent = "Preparing your flight…"; return; }
+    const [phase, { update }] = current;
+    detailElement.textContent = update.detail ?? `Preparing ${PHASE_LABELS[phase].toLowerCase()}…`;
+    // A geometry coverage fraction is not a download-completion prediction.
+    const progress = phase !== "terrain" && typeof update.progress === "number" && Number.isFinite(update.progress)
+      ? Math.max(0, Math.min(1, update.progress)) : null;
+    if (progress === null) indicator.removeAttribute("aria-valuenow");
+    else indicator.setAttribute("aria-valuenow", String(Math.round(progress * 100)));
   };
-  // Inert can only be added below an element, never taken away, so the hold
-  // goes around a live control: each element containing one stays usable and
-  // its other children are held.
-  const holdTree = (element: Element): void => {
-    if (element.matches(LIVE_SELECTOR)) {
-      releaseElement(element);
-    } else if (element.querySelector(LIVE_SELECTOR) === null) {
-      holdElement(element);
-    } else {
-      releaseElement(element);
-      for (const child of Array.from(element.children)) holdTree(child);
-    }
-  };
-  // The app builds its controls while loading shows; each one is held as it arrives.
-  const observer = root && typeof MutationObserver === "function"
-    ? new MutationObserver(() => { if (visible) holdTree(root); })
-    : null;
-
   const holdRoot = (): void => {
     if (visible) return;
     previousBusy = root?.getAttribute("aria-busy") ?? null;
-    if (root) {
-      holdTree(root);
-      observer?.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: [LOADING_LIVE_ATTRIBUTE] });
-    }
     root?.setAttribute("aria-busy", "true");
     visible = true;
+    status.hidden = false;
     log.element.setAttribute("data-loading-details", "");
     log.setBusy(true);
   };
@@ -207,10 +266,12 @@ export function createFlightLoadingScreen(sharedLog?: GameLog, report?: () => Pr
     const record = !previous || previous.update.state !== update.state
       || previous.update.detail !== update.detail || now - previous.recordedAt >= 5000;
     observations.set(phase, { update: { ...update }, recordedAt: record ? now : previous.recordedAt });
+    refreshStatus();
     if (record) {
       history.push({ elapsedMs: now - sessionStartedAt, phase, update: { ...update } });
       if (history.length > 120) history.shift();
     }
+    saveCheckpoint(!previous || previous.update.state !== update.state);
     const label = PHASE_LABELS[phase];
     const current = phases.get(phase);
     if (update.state === "ready") {
@@ -238,14 +299,15 @@ export function createFlightLoadingScreen(sharedLog?: GameLog, report?: () => Pr
     else phases.set(phase, { line: log.print(entry), startedAt: performance.now(), ready: false });
   };
 
-  const hide = (): void => {
+  const hide = (completed = true): void => {
     if (!visible) return;
     visible = false;
     stoppedAt ??= performance.now();
     diagnostics.stop();
+    if (completed) saveCheckpoint(true, failureMessage ? "failed" : "ready");
     log.element.removeAttribute("data-loading-details");
-    observer?.disconnect();
-    for (const element of Array.from(held.keys())) releaseElement(element);
+    status.hidden = true;
+    setSpawnOverride(null);
     if (root) {
       if (previousBusy === null) root.removeAttribute("aria-busy");
       else root.setAttribute("aria-busy", previousBusy);
@@ -256,6 +318,10 @@ export function createFlightLoadingScreen(sharedLog?: GameLog, report?: () => Pr
   const show: FlightLoadingScreen["show"] = (options = {}) => {
     if (destroyed) return;
     reportViewer?.close();
+    recoveryButtons.replaceChildren();
+    indicator.hidden = false;
+    titleElement.textContent = options.title ?? DEFAULT_TITLE;
+    detailElement.textContent = options.detail ?? "Preparing your flight…";
     // Keep a failure in the history, without its now-stale button.
     failure?.line.update({ ...failure.entry, actions: [] });
     failure = null;
@@ -263,6 +329,7 @@ export function createFlightLoadingScreen(sharedLog?: GameLog, report?: () => Pr
     failureCause = null;
     stoppedAt = null;
     if (options.reset) {
+      setSpawnOverride(null);
       phases.clear();
       observations.clear();
       history.length = 0;
@@ -275,12 +342,14 @@ export function createFlightLoadingScreen(sharedLog?: GameLog, report?: () => Pr
       log.print({ text: options.detail ? `${title}: ${options.detail}` : title, actions: [viewReportAction, reportAction] });
     }
     holdRoot();
+    saveCheckpoint(true, "loading");
   };
 
   show();
   return {
     show,
     setPhase,
+    setSpawnOverride,
     hide,
     trace: diagnostics.trace,
     fail(message, { retry: onRetry, cause, actions = [] } = {}) {
@@ -298,7 +367,11 @@ export function createFlightLoadingScreen(sharedLog?: GameLog, report?: () => Pr
       failureCause = cause === undefined ? null : describeLoadingCause(cause);
       stoppedAt = performance.now();
       diagnostics.stop();
+      saveCheckpoint(true, "failed");
       holdRoot();
+      titleElement.textContent = "Flight paused";
+      detailElement.textContent = message;
+      indicator.hidden = true;
       // Preserve the last measured state, but do not leave a stale loading
       // indicator suggesting that a failed or cancelled request is running.
       for (const [phase, current] of phases) {
@@ -310,11 +383,15 @@ export function createFlightLoadingScreen(sharedLog?: GameLog, report?: () => Pr
         });
       }
       const label = onRetry ? "Try again" : "Reload and try again";
+      let recoveryUsed = false;
       const disableRecovery = (): void => {
+        recoveryUsed = true;
+        for (const button of recoveryButtons.querySelectorAll<HTMLButtonElement>("[data-recovery]")) button.disabled = true;
         if (failure) failure.line.update({ ...failure.entry, actions: failure.entry.actions?.map(action =>
           action === viewReportAction || action === reportAction ? action : { ...action, disabled: true }) });
       };
       const retry = (): void => {
+        if (recoveryUsed) return;
         disableRecovery();
         if (onRetry) onRetry();
         else window.location.reload();
@@ -323,16 +400,29 @@ export function createFlightLoadingScreen(sharedLog?: GameLog, report?: () => Pr
         text: `Flight paused. ${message}` + (failureCause ? `\n${failureCause.message}` : ""),
         tone: "error",
         actions: [{ label, onClick: retry }, ...actions.map(action => ({ ...action, onClick() {
+          if (recoveryUsed) return;
           disableRecovery(); action.onClick();
         } })), viewReportAction, reportAction],
       };
       failure = { line: log.print(entry), entry };
+      for (const action of entry.actions ?? []) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "flight-panel__command";
+        button.textContent = action.label;
+        button.disabled = action.disabled ?? false;
+        if (action !== viewReportAction && action !== reportAction) button.dataset.recovery = "";
+        button.addEventListener("click", action.onClick);
+        recoveryButtons.append(button);
+      }
       failure.line.focusAction();
     },
     destroy() {
-      hide();
+      hide(false);
+      clearTimeout(checkpointTimer);
       diagnostics.stop();
       reportViewer?.destroy();
+      status.remove();
       destroyed = true;
       if (window.osfsLoadingDiagnostics === getReport) {
         if (previousReport) window.osfsLoadingDiagnostics = previousReport;

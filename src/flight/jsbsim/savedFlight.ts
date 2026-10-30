@@ -1,9 +1,9 @@
 import type { JSBSimSdk } from "@felipegalind0/jsbsim";
 import { isAircraftId, type AircraftId } from "@0sfs/aircraft/aircraftIds";
+import { currentAircraftId } from "../aircraft/aircraftAddress";
 import { readFlightState } from "@0sfs/ground-contact/ecefBridge";
 import type { FlightState } from "@0sfs/ground-contact/flightState";
-import { captureSimulation, restoreSimulation, validFlightState, type SimulationSnapshot } from "@0sfs/ground-contact/safeFlightState";
-import { getFdmProfile } from "./fdmProfiles";
+import { captureSimulation, initialTerrainElevationMeters, restoreSimulation, validFlightState, type AircraftClearanceStance, type SimulationSnapshot } from "@0sfs/ground-contact/safeFlightState";
 
 /**
  * The flight in progress, kept in browser storage so the next session carries
@@ -94,7 +94,8 @@ export function parseSavedFlight(raw: string | null): SavedFlight | null {
     return null;
   }
   if (typeof value !== "object" || value === null) return null;
-  const flight = value as Partial<SavedFlight>;
+  // A flight saved before its aircraft was renamed carries on under the new id.
+  const flight = { ...value, aircraftId: currentAircraftId((value as Partial<SavedFlight>).aircraftId) } as Partial<SavedFlight>;
   const simulation = flight.simulation as Partial<SimulationSnapshot> | undefined;
   const valid = flight.version === 1
     && finite(flight.savedAtMs)
@@ -145,9 +146,8 @@ export function createSavedFlightStore(
 }
 
 /**
- * Terrain preparation for the saved flight: its height above the ground, or
- * its altitude when that ground was unknown, and no climb to clear the hills
- * around it, so a parked aircraft is prepared on the ground it was parked on.
+ * Prepare geometry around the saved absolute pose. Changing maps or their
+ * detail never grants permission to move the aircraft with the sampled ground.
  */
 export function savedFlightTerrainRequest(flight: SavedFlight): {
   latDeg: number;
@@ -159,10 +159,28 @@ export function savedFlightTerrainRequest(flight: SavedFlight): {
   return {
     latDeg: flight.latDeg,
     lonDeg: flight.lonDeg,
-    ...(flight.aboveGroundMeters === null
-      ? { altitudeMeters: flight.altMeters }
-      : { altitudeAboveGroundMeters: Math.max(0, flight.aboveGroundMeters) }),
+    altitudeMeters: flight.altMeters,
     clearanceMeters: 0,
+  };
+}
+
+/** The saved world pose and ground-relative motion, before native restoration is ready. */
+export function savedFlightPreview(flight: SavedFlight, fallback: FlightState): FlightState {
+  const initial = flight.simulation.initial;
+  const chosen = (value: number | undefined, otherwise: number): number => Number.isFinite(value) ? value! : otherwise;
+  const degrees = Math.PI / 180;
+  return {
+    ...fallback,
+    latDeg: chosen(flight.latDeg, fallback.latDeg),
+    lonDeg: chosen(flight.lonDeg, fallback.lonDeg),
+    altMeters: chosen(flight.altMeters, fallback.altMeters),
+    headingRad: chosen(Number.isFinite(flight.headingDeg) ? flight.headingDeg * degrees : undefined, fallback.headingRad),
+    rollRad: chosen(Number.isFinite(initial["ic/phi-deg"]) ? initial["ic/phi-deg"] * degrees : undefined, fallback.rollRad),
+    pitchRad: chosen(Number.isFinite(initial["ic/theta-deg"]) ? initial["ic/theta-deg"] * degrees : undefined, fallback.pitchRad),
+    northVelocityFps: chosen(initial["ic/vn-fps"], fallback.northVelocityFps),
+    eastVelocityFps: chosen(initial["ic/ve-fps"], fallback.eastVelocityFps),
+    verticalSpeedFps: chosen(Number.isFinite(initial["ic/vd-fps"]) ? -initial["ic/vd-fps"] : undefined, fallback.verticalSpeedFps),
+    throttleNorm: chosen(flight.simulation.controls["fcs/throttle-cmd-norm"], fallback.throttleNorm),
   };
 }
 
@@ -193,18 +211,18 @@ export function applySavedControls(sdk: JSBSimSdk, flight: SavedFlight, aircraft
 }
 
 /**
- * Puts the aircraft back as the saved flight left it, on the ground prepared
- * under it this session. Height above that ground is kept rather than
- * altitude, so a parked aircraft stays parked on another map's ground, and it
- * never starts lower than resetFlightLocation places one: its static stance
- * and a settling margin. Another aircraft takes the position, attitude and
- * velocities, and keeps its own controls and engine.
+ * Puts the aircraft back at its saved absolute pose, even when the map's
+ * ground moved. Any proposed correction belongs to the host's consent flow.
+ * Another aircraft takes the position, attitude and velocities, and keeps its
+ * own controls and engine.
  */
 export function restoreSavedFlight(
   sdk: JSBSimSdk,
   flight: SavedFlight,
   aircraftId: AircraftId,
   ground: PreparedGround,
+  /** The restored aircraft's stance, which says how deep its contacts would start in that ground. */
+  stance: AircraftClearanceStance,
 ): FlightState {
   const current = captureSimulation(sdk);
   const sameAircraft = flight.aircraftId === aircraftId;
@@ -214,9 +232,11 @@ export function restoreSavedFlight(
     if (!Number.isFinite(value)) throw new Error(`The saved flight has no ${property}.`);
     initial[property] = value;
   }
-  const lowestMeters = ground.groundHeightMeters + getFdmProfile(aircraftId).stance.staticMeters + 0.17;
-  initial["ic/terrain-elevation-ft"] = ground.groundHeightMeters / METERS_PER_FOOT;
-  initial["ic/h-sl-ft"] = Math.max(ground.altitudeMeters, lowestMeters) / METERS_PER_FOOT;
+  // Ground that rose above the saved pose must not start the aircraft on
+  // compressed contacts; the terrain contact asks about it before stepping.
+  initial["ic/terrain-elevation-ft"] = initialTerrainElevationMeters(stance, flight.altMeters,
+    ground.groundHeightMeters, initial["ic/phi-deg"] * Math.PI / 180, initial["ic/theta-deg"] * Math.PI / 180) / METERS_PER_FOOT;
+  initial["ic/h-sl-ft"] = flight.altMeters / METERS_PER_FOOT;
   restoreSimulation(sdk, {
     initial,
     controls: sameAircraft

@@ -63,7 +63,7 @@ describe("switching the F-35B's engine model", () => {
     const second = await boot(to, { latDeg: 10, lonDeg: 20, throttleNorm: 0.4 });
     const after = restoreSavedFlight(second.sdk, saved, "f-35b", {
       groundHeightMeters: 0, altitudeMeters: saved.aboveGroundMeters ?? saved.altMeters,
-    });
+    }, getFdmProfile("f-35b").stance);
     expect(validFlightState(after)).toBe(true);
     expect(after.latDeg).toBeCloseTo(before.latDeg, 7);
     expect(after.lonDeg).toBeCloseTo(before.lonDeg, 7);

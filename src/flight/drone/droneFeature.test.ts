@@ -11,7 +11,7 @@ import camera from "../../../../DJI-FC7303/public/0sfs-mod.json";
 import mini from "../../../../DJI-Mini2/public/0sfs-mod.json";
 import { attach } from "./droneFeature";
 import type { CaptureRig } from "@0sfs/drone-camera/captureFrame";
-import { noteActiveAircraft, droneHeldCapture, droneHeldGimbal, droneMotorTelemetry, setDroneHeldCapture, setDroneHeldGimbal, setDroneRefusal, droneTelemetry, type DroneFeatureHooks, type DroneStickCommand, type DroneViewContext } from "./droneGate";
+import { noteActiveAircraft, droneHooks, loadDroneFeature, onModAdded, onModRemoved, setDroneRemovalSwitch, droneAcousticTelemetry, droneHeldCapture, droneHeldGimbal, droneMotorTelemetry, setDroneHeldCapture, setDroneHeldGimbal, setDroneRefusal, droneTelemetry, type DroneFeatureHooks, type DroneStickCommand, type DroneViewContext } from "./droneGate";
 import { installDroneCamera, installDjiCommon, installQuadCommon, installQuadVehicle, uninstallQuadVehicle } from "./quadRegistry";
 import { getAppSettings } from "foss-earth/settings";
 
@@ -85,14 +85,14 @@ beforeEach(() => {
   installQuadCommon(common.quadcopter as QuadcopterModData);
   installDjiCommon(dji.dji as DjiQuadModData);
   installDroneCamera(camera.id, camera.camera);
-  installQuadVehicle("dji-mini-2", "Mini 2", mini.quad as QuadVehicleModData);
-  noteActiveAircraft("dji-mini-2");
+  installQuadVehicle("dji-mini2", "Mini 2", mini.quad as QuadVehicleModData);
+  noteActiveAircraft("dji-mini2");
   attach({ setHooks: next => { hooks = next; }, setMesh: () => {} });
 });
 afterEach(() => {
   hooks?.dispose();
   releaseFlightStateReads(sdk);
-  uninstallQuadVehicle("dji-mini-2");
+  uninstallQuadVehicle("dji-mini2");
   noteActiveAircraft("cessna-172");
   document.body.replaceChildren();
 });
@@ -103,10 +103,57 @@ function step(terrainMeters: number | null, capture360 = true) {
 }
 
 describe("simulated motor telemetry", () => {
+  it.each([["dji-mini2", "0sfs/dji-mini2"], ["community-quad", "pilot/custom-aircraft"]])(
+    "immediately clears the removed %s controller's wrench and switches by its actual aircraft ID", async (id, modId) => {
+      const fallback = vi.fn();
+      setDroneRemovalSwitch(fallback);
+      // Another installed drone keeps the shared feature alive during this removal.
+      installQuadVehicle("spare-quad", "Spare", mini.quad as QuadVehicleModData);
+      if (id !== "dji-mini2") installQuadVehicle(id, "Community quad", mini.quad as QuadVehicleModData);
+      noteActiveAircraft(id);
+      onModAdded(modId);
+      try {
+        await loadDroneFeature();
+        simTimeS += 1 / 120;
+        droneHooks()!.beforeStep({ dtSeconds: 1 / 120, sdk, command: { ...command, capture360: false }, terrainMeters: 200 });
+        expect(droneAcousticTelemetry()?.valid).toBe(true);
+        const batches = vi.mocked(sdk.createPropertyBatch).mock.results.map(result => result.value);
+        const wrenchBatch = batches.find(batch => vi.isMockFunction(batch.write) && vi.mocked(batch.write).mock.calls.length > 0)!;
+        expect(wrenchBatch).toBeDefined();
+        uninstallQuadVehicle(id);
+        onModRemoved(modId, [id]);
+        expect(fallback).toHaveBeenCalledExactlyOnceWith(modId, [id]);
+        expect(droneAcousticTelemetry()).toBeNull();
+        expect(droneMotorTelemetry()).toBeNull();
+        expect([...vi.mocked(wrenchBatch.write).mock.lastCall![0]]).toEqual([0, 0, 0, 0, 0, 0, 0]);
+        expect(wrenchBatch.dispose).toHaveBeenCalledOnce();
+      } finally {
+        setDroneRemovalSwitch(null);
+        uninstallQuadVehicle("spare-quad");
+        if (id !== "dji-mini2") uninstallQuadVehicle(id);
+        uninstallQuadVehicle("dji-mini2");
+        onModRemoved(modId, [id]);
+        noteActiveAircraft("dji-mini2");
+      }
+    });
+  it("publishes fresh acoustic inputs before rendering and clears them on switch or disposal", () => {
+    expect(droneAcousticTelemetry()).toBeNull();
+    step(200, false);
+    const frame = droneAcousticTelemetry()!;
+    expect(frame).toMatchObject({ aircraftId: "dji-mini2", propulsionId: mini.quad.propulsionId, valid: true, simTimeS });
+    expect(frame.rotors).toHaveLength(4);
+    expect(frame.rotors.every(rotor => rotor.valid && rotor.rpm > 0 && rotor.thrustN > 0)).toBe(true);
+    noteActiveAircraft("cessna-172");
+    expect(droneAcousticTelemetry()).toBeNull();
+    noteActiveAircraft("dji-mini2"); step(200, false);
+    expect(droneAcousticTelemetry()).not.toBeNull();
+    hooks!.dispose(); hooks = null;
+    expect(droneAcousticTelemetry()).toBeNull();
+  });
   it("publishes live rotor speeds and directions, and freezes the physics clock while paused", () => {
     step(200, false); mountView();
     const telemetry = droneMotorTelemetry()!;
-    expect(telemetry).toMatchObject({ aircraftId: "dji-mini-2", source: "simulated", maxRpm: 13300, simTimeS });
+    expect(telemetry).toMatchObject({ aircraftId: "dji-mini2", source: "simulated", maxRpm: 13300, simTimeS });
     expect(telemetry.hoverRpm).toBeGreaterThan(8000);
     expect(telemetry.motors.map(motor => [motor.position, motor.direction]))
       .toEqual(mini.quad.rotors.map(rotor => [rotor.position, rotor.spin]));
@@ -119,7 +166,7 @@ describe("simulated motor telemetry", () => {
     for (const dispose of disposals) expect(dispose).toHaveBeenCalledOnce();
   });
   it("binds RPM and spin by physical position even when visual indices and directions differ", () => {
-    installQuadVehicle("dji-mini-2", "Mini 2", { ...mini.quad,
+    installQuadVehicle("dji-mini2", "Mini 2", { ...mini.quad,
       rotors: mini.quad.rotors.map(rotor => ({ ...rotor, spin: -rotor.spin })) } as QuadVehicleModData);
     const definition = { ...mini.aircraft.definitions[0],
       rotors: mini.aircraft.definitions[0]!.rotors.map(rotor => ({ ...rotor, direction: 1 })) };
@@ -153,7 +200,7 @@ describe("simulated motor telemetry", () => {
     noteActiveAircraft("cessna-172"); mountView(true);
     for (const batch of batches) expect(batch.dispose).toHaveBeenCalledOnce();
     expect(droneMotorTelemetry()).toBeNull();
-    noteActiveAircraft("dji-mini-2"); step(200, false);
+    noteActiveAircraft("dji-mini2"); step(200, false);
     expect(create).toHaveBeenCalledTimes(4);
   });
 });
@@ -207,7 +254,7 @@ describe("lazy Camera tab", () => {
     await vi.waitFor(() => expect(mocks.download).toHaveBeenCalled());
     expect(mocks.capture).toHaveBeenCalledTimes(1);
     expect(mocks.capture.mock.calls[0]![2]).toMatchObject({ aglM: 100, mslM: 300 });
-    expect(mocks.download.mock.calls[0]![0]).toBe('0sfs-still-dji-mini-2.zip');
+    expect(mocks.download.mock.calls[0]![0]).toBe('0sfs-still-dji-mini2.zip');
   });
   it("slews roll/yaw overrides and records the actual pose in still metadata", async () => {
     step(200, false);mountView();
@@ -237,20 +284,20 @@ describe("lazy Camera tab", () => {
     expect(roll.value).toBe('25');expect(yaw.value).toBe('-15');
   });
   it("rebinds a paused mount before posing after a switch to a tighter aircraft range", () => {
-    installQuadVehicle("dji-air-2s", "Air 2S", { ...mini.quad,
+    installQuadVehicle("dji-air2s", "Air 2S", { ...mini.quad,
       gimbalRollMinDeg: -45, gimbalRollMaxDeg: 45, gimbalYawMinDeg: -100, gimbalYawMaxDeg: 100 } as QuadVehicleModData);
     try {
-      noteActiveAircraft("dji-air-2s");mountView(true);
+      noteActiveAircraft("dji-air2s");mountView(true);
       const panel = hooks!.cameraTab!();document.body.append(panel);
       const yaw = panel.querySelector<HTMLInputElement>('[aria-label="Gimbal yaw"]')!;
       yaw.value = '80';yaw.dispatchEvent(new Event('input', { bubbles: true }));
       for (let i = 0; i < 60; i++) step(200, false);
       mountView(true);
       expect(mocks.pose).toHaveBeenLastCalledWith(viewState, expect.any(Number), { rollDeg: 0, yawDeg: 80 });
-      noteActiveAircraft("dji-mini-2");mountView(true);
+      noteActiveAircraft("dji-mini2");mountView(true);
       expect(yaw.max).toBe('20');expect(yaw.value).toBe('20');
       expect(mocks.pose).toHaveBeenLastCalledWith(viewState, expect.any(Number), { rollDeg: 0, yawDeg: 0 });
-    } finally { noteActiveAircraft("dji-mini-2");uninstallQuadVehicle("dji-air-2s"); }
+    } finally { noteActiveAircraft("dji-mini2");uninstallQuadVehicle("dji-air2s"); }
   });
   it("stops a running sequence even when the phone still holds capture, and waits for release", () => {
     step(200);mountView();

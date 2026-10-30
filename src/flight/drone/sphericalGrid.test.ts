@@ -10,8 +10,8 @@ import airMod from "../../../../DJI-Air-2S/public/0sfs-mod.json";
 import miniCamera from "../../../../DJI-FC7303/public/0sfs-mod.json";
 import airCamera from "../../../../DJI-FC3411/public/0sfs-mod.json";
 
-const mini = buildDroneProfile("dji-mini-2", "Mini 2", common.quadcopter as QuadcopterModData, dji.dji as DjiQuadModData, miniMod.quad as QuadVehicleModData, miniCamera.camera);
-const air = buildDroneProfile("dji-air-2s", "Air 2S", common.quadcopter as QuadcopterModData, dji.dji as DjiQuadModData, airMod.quad as QuadVehicleModData, airCamera.camera);
+const mini = buildDroneProfile("dji-mini2", "Mini 2", common.quadcopter as QuadcopterModData, dji.dji as DjiQuadModData, miniMod.quad as QuadVehicleModData, miniCamera.camera);
+const air = buildDroneProfile("dji-air2s", "Air 2S", common.quadcopter as QuadcopterModData, dji.dji as DjiQuadModData, airMod.quad as QuadVehicleModData, airCamera.camera);
 
 describe("sphericalGrid", () => {
   it("builds the Mini 2 and Air 2S shots from the field of view", () => {

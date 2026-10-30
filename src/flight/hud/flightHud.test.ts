@@ -723,3 +723,132 @@ describe("flight HUD and a paired phone", () => {
     t.hud.destroy();
   });
 });
+
+describe("drone instrument joysticks", () => {
+  const pointer = (type: string, pointerId: number, clientX = 100, clientY = 100) => new PointerEvent(type, {
+    pointerId, clientX, clientY, button: 0, pointerType: "touch", bubbles: true, cancelable: true,
+  });
+  function preparePad(pad: HTMLElement) {
+    const captured = new Set<number>();
+    Object.assign(pad, {
+      setPointerCapture: (id: number) => captured.add(id),
+      hasPointerCapture: (id: number) => captured.has(id),
+      releasePointerCapture: (id: number) => captured.delete(id),
+    });
+    vi.spyOn(pad, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 0, 200, 200));
+  }
+  function drone(overrides: Partial<FlightHudOptions> = {}) {
+    const climb = vi.fn();
+    const yaw = vi.fn();
+    const pitchRoll = vi.fn();
+    const throttle = vi.fn();
+    const t = mount({ drone: true, onRudderChange: yaw, onStickChange: pitchRoll, onThrottleChange: throttle,
+      climbRate: { onChange: climb, getCommand: () => 0, climbMps: 5, descentMps: 3 }, ...overrides });
+    const engine = t.host.querySelector<HTMLElement>('[data-control="climb-yaw"]')!;
+    const attitude = t.host.querySelector<HTMLElement>(".flight-hud__attitude")!;
+    preparePad(engine);
+    preparePad(attitude);
+    return { ...t, engine, attitude, climb, yaw, pitchRoll, throttle };
+  }
+
+  it("defaults to Mode 2 and omits airplane sliders and gear in both layouts", () => {
+    const t = drone();
+    const toolbar = document.createElement("div");
+    document.body.append(toolbar);
+    try {
+      expect(t.host.querySelector<HTMLElement>(".flight-hud")!.dataset.attitudeSide).toBe("right");
+      expect(t.engine.querySelector(".flight-hud__engine")).not.toBeNull();
+      for (const layout of ["compact", "classic"] as const) {
+        t.hud.setLayout(layout, toolbar);
+        for (const control of ["gear", "pitch-trim", "roll-trim", "flaps", "auto-pitch-trim", "auto-roll-trim", "rudder", "throttle"]) {
+          expect(document.querySelector(`[data-control="${control}"]`)).toBeNull();
+        }
+      }
+      expect(t.host.querySelector(".flight-climb-rate")).toBeNull();
+    } finally { t.hud.destroy(); }
+  });
+
+  it("allows a future drone to expose landing gear without restoring trims or flaps", () => {
+    const t = drone({ capabilities: { landingGear: true, flaps: false, pitchTrim: false, rollTrim: false } });
+    try {
+      const gear = t.host.querySelector<HTMLButtonElement>('[data-control="gear"]')!;
+      expect(gear).not.toBeNull();
+      gear.click();
+      expect(t.onGearChange).toHaveBeenCalledWith(false);
+      expect(t.host.querySelector('[data-control="flaps"]')).toBeNull();
+    } finally { t.hud.destroy(); }
+  });
+
+  it("flies both sticks simultaneously with full independent axis travel and never changes throttle", () => {
+    const t = drone();
+    try {
+      t.engine.dispatchEvent(pointer("pointerdown", 1, 200, 0));
+      t.attitude.dispatchEvent(pointer("pointerdown", 2, 0, 0));
+      expect(t.climb).toHaveBeenLastCalledWith(1);
+      expect(t.yaw).toHaveBeenLastCalledWith(1);
+      expect(t.pitchRoll).toHaveBeenLastCalledWith(-1, 1);
+      expect(t.hud.isPilotHolding()).toBe(true);
+      t.engine.dispatchEvent(pointer("pointerup", 1));
+      expect(t.climb).toHaveBeenLastCalledWith(-0);
+      expect(t.yaw).toHaveBeenLastCalledWith(0);
+      expect(t.hud.isPilotHolding()).toBe(true);
+      t.attitude.dispatchEvent(pointer("pointerup", 2));
+      expect(t.pitchRoll).toHaveBeenLastCalledWith(0, -0);
+      expect(t.hud.isPilotHolding()).toBe(false);
+      expect(t.throttle).not.toHaveBeenCalled();
+    } finally { t.hud.destroy(); }
+  });
+
+  it("supports keyboard climb/descent and yaw without opening engine details", () => {
+    const onEngineDetails = vi.fn();
+    const t = drone({ onEngineDetails });
+    try {
+      t.engine.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown" }));
+      t.engine.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft" }));
+      expect(t.climb).toHaveBeenLastCalledWith(-1);
+      expect(t.yaw).toHaveBeenLastCalledWith(-1);
+      t.engine.dispatchEvent(new KeyboardEvent("keyup", { key: "ArrowDown" }));
+      t.engine.dispatchEvent(new KeyboardEvent("keyup", { key: "ArrowLeft" }));
+      expect(t.climb).toHaveBeenLastCalledWith(-0);
+      expect(t.yaw).toHaveBeenLastCalledWith(0);
+      t.engine.click();
+      expect(onEngineDetails).not.toHaveBeenCalled();
+      const details = t.host.querySelector<HTMLButtonElement>('[data-control="engine-details"]')!;
+      expect(t.engine.contains(details)).toBe(false);
+      details.click();
+      expect(onEngineDetails).toHaveBeenCalledOnce();
+    } finally { t.hud.destroy(); }
+  });
+
+  it.each(["blur", "resize", "hide", "swap", "destroy", "cancel"])("neutralizes both axes on %s", event => {
+    const t = drone();
+    t.engine.dispatchEvent(pointer("pointerdown", 1, 0, 200));
+    t.attitude.dispatchEvent(pointer("pointerdown", 2, 200, 200));
+    if (event === "hide") t.hud.setHidden(true);
+    else if (event === "swap") t.hud.setAttitudeSide("left");
+    else if (event === "destroy") t.hud.destroy();
+    else if (event === "cancel") {
+      t.engine.dispatchEvent(pointer("pointercancel", 1));
+      t.attitude.dispatchEvent(pointer("pointercancel", 2));
+    } else window.dispatchEvent(new Event(event));
+    expect(t.climb).toHaveBeenLastCalledWith(-0);
+    expect(t.yaw).toHaveBeenLastCalledWith(0);
+    expect(t.pitchRoll).toHaveBeenLastCalledWith(0, -0);
+    expect(t.hud.isPilotHolding()).toBe(false);
+    if (event !== "destroy") t.hud.destroy();
+  });
+
+  it("keeps planes on the left by default and swapping idle controls sends no input", () => {
+    const onStickChange = vi.fn(), onRudderChange = vi.fn();
+    const t = mount({ onStickChange, onRudderChange });
+    try {
+      const hud = t.host.querySelector<HTMLElement>(".flight-hud")!;
+      expect(hud.dataset.attitudeSide).toBe("left");
+      t.hud.setAttitudeSide("right");
+      expect(hud.dataset.attitudeSide).toBe("right");
+      expect(onStickChange).not.toHaveBeenCalled();
+      expect(onRudderChange).not.toHaveBeenCalled();
+      expect(t.host.querySelector('[data-control="gear"]')).not.toBeNull();
+    } finally { t.hud.destroy(); }
+  });
+});
