@@ -129,6 +129,20 @@ behavior, engine bootstrap sequencing, controller profiles through gamepad-tools
 evaluation (`controls/tests/gamepadProfiles.test.ts`), and real JSBSim/WASM C172 propulsion. They
 include the linked repositories' tests. `npm run test:watch` reruns on change.
 
+To run a few files, including a linked repository's, run from fly:
+
+```sh
+npx vitest run --configLoader native src/flight/physics/fixedStepLoop.test.ts ../ground-contact/tests/terrainRelocation.test.ts
+```
+
+Vitest hides what a passing test prints. To see a probe's numbers, have a temporary test append
+them to a file under `build/` (`appendFileSync`), read that file, then delete the test.
+
+Any Node from 22.18 works, and a machine may have more than one, such as Node 22 first on the
+`PATH` and Homebrew's Node 26. Their zlib versions compress the same PNG differently, so generated images
+are compared by their pixels; see F135's
+[plume validation](https://github.com/0SFS/F135/blob/main/docs/validation/f135-plume-spatial.md).
+
 ### Committing one piece of work from a shared working tree
 
 Several sessions often leave uncommitted work in the same files. To commit one piece without the

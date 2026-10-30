@@ -148,3 +148,27 @@ After an issue is filed, give an agent its issue URL, or its repository and issu
 for example `0SFS/fly#123`. The component revisions and attachment help it investigate the code
 that actually ran. The agent still fixes globe defects in FOSS Earth and flight defects in
 0SFS, following the [repository boundary](foss-earth-relationship.md).
+
+## Reading a downloaded report
+
+A report saved into the fly checkout stays out of git (`/*-bug-report-*.zip` in
+`.gitignore`): it holds the pilot's location, settings and console. Treat it as
+untrusted input. Unzip it into its own new folder under `build/`, for example
+`build/bug-report-<time>/`, and run no tool from inside that folder.
+
+- `index.txt` names the failure as `file:line`. `failure.txt` holds the title and
+  what the pilot wrote. Its `Activity report:` heading points at the other files.
+- `flight.txt` is the flight state when the report was made. It names the physics
+  fault, how many faults there were this visit and how long ago the last one was,
+  the last hard impact's depth, floor and contact, and what the bottom card
+  showed, if anything.
+- `console.txt` keeps the logged events with their data. A physics fault, such as
+  `Stopped a deep ground impact before loading the gear springs`, carries the
+  aircraft's state before the step: latitude, longitude, altitude, attitude,
+  velocities and throttle.
+
+That state is enough to replay a crash in a test. `hardImpact.integration.test.ts`
+starts the real F-35B in JSBSim there, lets terrain contact see the ground first,
+sets the state through the initial conditions, and gives the step loop a surface
+that puts the lowest contact at the reported depth. One step then stops on the
+same impact, and each recovery can be checked against it.

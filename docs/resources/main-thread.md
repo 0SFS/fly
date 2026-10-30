@@ -161,7 +161,9 @@ engine lever), phone input, a multiplayer combat message, a weather change, a
 changed `osfs.*` setting value (notes under a control do not count), a pause
 or resume, a placement or recovery, and ground that moves the aircraft or asks
 about it. While multiplayer is connected its own 30 Hz frame demand still draws
-frames at rest.
+frames at rest. The brake key (Space) does not count as input, so it does not wake
+the aircraft, and flight time stands still while resting: an engine stopped
+before it rests does not cool meanwhile.
 
 Startup placement requires terrain. In the current composition, terrain
 streaming is intended not to pause an established flight. The pre-step contact
