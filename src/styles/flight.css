@@ -1531,15 +1531,6 @@ html[data-world-edges="flush"] .flight-toolbar-instruments :where(.flight-hud__t
   place-items: center;
   pointer-events: none;
 }
-.flight-hud[data-drone="true"] .flight-quad-engine__grid {
-  --quad-motor-size: calc(var(--flight-attitude-size) * .28);
-  gap: 5px 16px;
-}
-.flight-hud[data-drone="true"] .flight-quad-engine__summary {
-  border: 0;
-  padding: 0;
-  background: transparent;
-}
 .flight-hud__engine-stick-marker {
   position: absolute;
   left: 50%;
@@ -1621,3 +1612,11 @@ html[data-world-edges="flush"] .flight-toolbar-instruments :where(.flight-hud__t
 .flight-terrain-overlap--compact { padding: 0.5rem 0.75rem; }
 .flight-terrain-overlap--compact .flight-loading-status__detail { margin: 0 0 0.4rem; }
 
+
+/* Shared drone sizing and placement; the host reserves its toolbar space. */
+.flight-hud.drone-flight-layout {
+  --flight-attitude-size: var(--drone-pad-size);
+  --drone-left: var(--flight-hud-left);
+  --drone-right: var(--flight-hud-right);
+  --drone-bottom: var(--flight-controls-bottom);
+}

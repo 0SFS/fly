@@ -758,6 +758,10 @@ describe("drone instrument joysticks", () => {
     try {
       expect(t.host.querySelector<HTMLElement>(".flight-hud")!.dataset.attitudeSide).toBe("right");
       expect(t.engine.querySelector(".flight-hud__engine")).not.toBeNull();
+      expect(t.host.querySelector(".drone-flight-layout")).not.toBeNull();
+      expect(t.engine.closest(".drone-flight-layout__motors")).not.toBeNull();
+      expect(t.attitude.closest(".drone-flight-layout__attitude")).not.toBeNull();
+
       for (const layout of ["compact", "classic"] as const) {
         t.hud.setLayout(layout, toolbar);
         for (const control of ["gear", "pitch-trim", "roll-trim", "flaps", "auto-pitch-trim", "auto-roll-trim", "rudder", "throttle"]) {

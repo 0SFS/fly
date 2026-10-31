@@ -1,3 +1,4 @@
+import "@0sfs/rc/styles/droneFlightLayout.css";
 import type { ControlCapabilities } from "@0sfs/aircraft/aircraftCatalog";
 import { mountCenteredStick, stickResponse, inverseStickResponse } from "@0sfs/controls/centeredStick";
 import { createClimbRateLever, type ClimbRateLeverOptions } from "@0sfs/controls/climbRateLever";
@@ -605,6 +606,9 @@ export function createFlightHud(root: HTMLElement, options: FlightHudOptions): F
   if (!capabilities.landingGear) gearButton.remove();
   if (options.drone) {
     hud.dataset.drone = "true";
+    hud.classList.add("drone-flight-layout");
+    root.querySelector(".flight-hud__attitude-cluster")?.classList.add("drone-flight-layout__attitude");
+    root.querySelector(".flight-hud__yaw-throttle")?.classList.add("drone-flight-layout__motors");
     root.querySelector(".flight-hud__yaw")?.remove();
     root.querySelector(".flight-hud__throttle")?.remove();
     pad.setAttribute("aria-label", "Attitude indicator and pitch roll control. Drag up to fly forward, down to fly backward, left or right to roll.");
