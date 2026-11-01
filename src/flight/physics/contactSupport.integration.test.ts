@@ -163,8 +163,9 @@ describe.each(KERNELS)("contact support on sloped ground with real JSBSim on %s"
     const end = contactDepths(sdk, reader, height);
     expect(end.north - start.north).toBeGreaterThan(8);
     expect(end.altitude - start.altitude).toBeGreaterThan(0.5);
-    // A contact's ground is filtered over 0.29 m of travel, about 3.5 cm behind on this grade.
-    expect(deepest).toBeLessThan(0.05);
+    // Rises are adopted as soon as sampled: only the bounded footprint sample
+    // spacing and the last physics step may lag, not another 0.29 m of filtering.
+    expect(deepest).toBeLessThan(0.02);
     // The nose wheel climbed ahead of the centre: the centre's ground was this far too low.
     expect(aboveCentre).toBeGreaterThan(0.1);
     // The centre, the refinement anchor under it, and two contacts at most.

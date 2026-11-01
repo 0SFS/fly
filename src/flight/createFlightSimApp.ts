@@ -135,8 +135,9 @@ import { throttleLeverGauges } from "@0sfs/engines/throttleLever";
 import { toDroneMotorStatus, toEngineStatus } from "@0sfs/rc/engineStatus";
 import type { AircraftStatus } from "@0sfs/rc/protocol";
 import { createCollisionDebugOverlay } from "@0sfs/ground-contact/createCollisionDebugOverlay";
+import { readContactDiagnostics } from "@0sfs/ground-contact/contactDiagnostics";
+import { createAircraftWheelDebugOverlay } from "@0sfs/ground-contact/createWheelSpinDebugOverlay";
 import { createForcesDebugOverlay } from "./diagnostics/createForcesDebugOverlay";
-import { createWheelSpinDebugOverlay } from "@0sfs/ground-contact/createWheelSpinDebugOverlay";
 import { createWheelSpinExperiment } from "@0sfs/ground-contact/createWheelSpinExperiment";
 import type { WheelSpinMode } from "@0sfs/ground-contact/wheelSpin";
 import { createTireAudio } from "@0sfs/sound/createTireAudio";
@@ -1942,7 +1943,7 @@ async function createFlightSimSession(
   // Session-only debug opt-in: no overlay meshes or SDK reads until enabled.
   let collisionDebugEnabled = false;
   let collisionDebugOverlay: ReturnType<typeof createCollisionDebugOverlay> | null = null;
-  let wheelSpinDebugOverlay: ReturnType<typeof createWheelSpinDebugOverlay> | null = null;
+  let wheelSpinDebugOverlay: ReturnType<typeof createAircraftWheelDebugOverlay> | null = null;
   let forcesDebugOverlay: ReturnType<typeof createForcesDebugOverlay> | null = null;
   const meshInspector = createMeshInspector(runtime.scene, { requestRender: () => runtime.requestRender() });
   meshInspector.setEnabled(parameters.get("osfs.aircraft.wireframe"));
@@ -1982,11 +1983,10 @@ async function createFlightSimSession(
         getFdmProfile(initialAircraftId).bodyCollisionProbes);
     }
     collisionDebugOverlay?.setEnabled(collisionDebugEnabled);
-    const showWheels = collisionDebugEnabled && wheelSpinMode !== "off";
-    if (showWheels && aircraft && !wheelSpinDebugOverlay) {
-      wheelSpinDebugOverlay = createWheelSpinDebugOverlay(runtime.scene, aircraft.root, jsbsim.sdk, wheelSpin.getStates);
+    if (collisionDebugEnabled && !wheelSpinDebugOverlay) {
+      wheelSpinDebugOverlay = createAircraftWheelDebugOverlay(runtime.scene, () => aircraftModel?.getRig()?.wheels ?? []);
     }
-    wheelSpinDebugOverlay?.setEnabled(showWheels);
+    wheelSpinDebugOverlay?.setEnabled(collisionDebugEnabled);
   };
   /** Applies the resolved settings plus any Debug override; boundary choices only change when applied. */
   const applyGroundRuntime = (): void => {
@@ -2764,7 +2764,7 @@ async function createFlightSimSession(
     }
     controlPanel?.update(createPanelSnapshot(physicsLoop.getLatestState() ?? initialState));
   }));
-  const createPanelSnapshot = (flightState = initialState): FlightControlPanelSnapshot => {
+  const createPanelSnapshot = (flightState = physicsLoop.getLatestState() ?? initialState): FlightControlPanelSnapshot => {
     const tanks = readFuelTanks(jsbsim.sdk);
     const groundOnly = parameters.get(REARM_GROUND_ONLY);
     // The wheels matter to the Fuel tab only when rearm is ground only.
@@ -3507,6 +3507,16 @@ async function createFlightSimSession(
   const savedSettingsSection = createSavedSettingsSection(settings);
   let flightTicks = 0;
   let lastFlightTickAtMs: number | null = null;
+  // Read only for a report or selected Test capture. The surface sample is
+  // diagnostic evidence, not an input back into the contact solver.
+  const captureGroundDiagnostics = () => {
+    const flightState = physicsLoop.getLatestState() ?? readFlightState(jsbsim.sdk);
+    return { aircraftId, flightState, modelActiveLodId: modelState.activeLodId,
+      modelOffset: { ...getAircraftDefinition(aircraftId).modelOffset },
+      rawCenterHeightMeters: groundHeightUnder(flightState),
+      ...readContactDiagnostics(jsbsim.sdk, flightState.altMeters, flightState.altMeters) };
+  };
+  diagnostics.addState(() => `Ground contacts: ${JSON.stringify(captureGroundDiagnostics())}`);
   diagnostics.checkpoint?.("component-execution.txt", JSON.stringify(earthWasmCores(runtime) ?? [], null, 2), true);
   diagnostics.addState(() => `Component execution: ${JSON.stringify(earthWasmCores(runtime) ?? [])}`);
   diagnostics.addState(() => `Compute scheduling: ${JSON.stringify(earthComputeScheduling(runtime))}`);
@@ -3544,6 +3554,7 @@ async function createFlightSimSession(
     downloads: browserReportDownloads(URL), secrets: () => reportSecrets(settings), providers: {
       diagnostics: diagnosticsSource.report,
       flight: () => createPanelSnapshot(),
+      ground: captureGroundDiagnostics,
       armament: armamentState,
       damage: () => damage.snapshot(),
       multiplayer: () => multiplayer?.diagnostics() ?? { status: "idle" },
@@ -4391,7 +4402,6 @@ async function createFlightSimSession(
     }
     if (collisionDebugEnabled) collisionDebugOverlay?.update();
     forcesDebugOverlay?.update(true);
-    if (collisionDebugEnabled && wheelSpinMode !== "off") wheelSpinDebugOverlay?.update();
     engineVisuals.read();
     const rig = aircraftModel?.getRig();
     if (aircraftModel) {
@@ -4407,6 +4417,7 @@ async function createFlightSimSession(
       aircraftModel.updateGearVisibility(surfaceState.gearDownNorm, true);
       observeRest(surfaceState, physicsHeld || terrainBlocked || !!physicsLoop.getFault() ? 0 : deltaSeconds);
     }
+    if (collisionDebugEnabled) wheelSpinDebugOverlay?.update();
     engineVisuals.updateRig(rig ?? null, true);
     frameProfiler.add("flight/view", sectionStarted);
     sectionStarted = frameProfiler.clock();

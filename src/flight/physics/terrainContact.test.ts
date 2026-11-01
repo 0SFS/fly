@@ -260,10 +260,41 @@ describe("displayed terrain contact", () => {
     }
     expect(sdk.runIc).not.toHaveBeenCalled();
   });
-  it("gives JSBSim a ground a wheel could roll on, not the point under the axle", () => {
-    // Photogrammetry is noisy at the centimetre scale. Resampling a point at
-    // 120 Hz makes the whole ground plane twitch under the gear and keeps the
-    // oleos ringing; a real wheel bridges anything shorter than its footprint.
+  it("keeps the support plane at a small rise after taxiing onto it and stopping", () => {
+    const properties: Record<string, number> = {
+      "position/lat-geod-deg": 44.98, "position/long-gc-deg": -93.27,
+      "position/h-sl-ft": (250 + C172_STATIC_METERS) / 0.3048,
+    };
+    const sdk = {
+      getPropertyValue: vi.fn((property: string) => properties[property] ?? 0),
+      setPropertyValue: vi.fn((property: string, value: number) => { properties[property] = value; }),
+      resetToInitialConditions: vi.fn(), runIc: vi.fn(() => true),
+    } as unknown as JSBSimSdk;
+    let height = 250;
+    const contact = createTerrainContact(sdk, { raycast: () => null,
+      sample: () => ({ heightMeters: height, revision: 1 } as SurfaceHit) }, getFdmProfile("cessna-172").stance);
+    expect(contact.update(false)).toBe(true);
+    // Below the 0.58 m snap threshold. Previously the low-pass adopted only
+    // 5 mm of this 30 cm rise, then kept that low floor once travel stopped.
+    properties["position/long-gc-deg"] += 0.005 / (111320 * Math.cos(44.98 * Math.PI / 180));
+    height = 250.3;
+    expect(contact.update(false)).toBe(true);
+    expect(properties["position/terrain-elevation-asl-ft"] * 0.3048).toBeCloseTo(height, 8);
+    for (let step = 0; step < 60; step++) {
+      expect(contact.update(false)).toBe(true);
+      expect(properties["position/terrain-elevation-asl-ft"] * 0.3048).toBeCloseTo(height, 8);
+    }
+    // A parked changed sample or a downward sample must be adopted too. No
+    // distance is needed to release an old filtered elevation.
+    for (height of [250.4, 250.1, 249.8]) {
+      expect(contact.update(false)).toBe(true);
+      expect(properties["position/terrain-elevation-asl-ft"] * 0.3048).toBeCloseTo(height, 8);
+    }
+  });
+
+  it("gives JSBSim the sampled surface without smoothing its height", () => {
+    // Even centimetre-scale details come from the same displayed terrain;
+    // there is no independent rolling-height estimate.
     const properties: Record<string, number> = {
       "position/lat-geod-deg": 44.98, "position/long-gc-deg": -93.27,
       "position/h-sl-ft": (250 + C172_STATIC_METERS) / 0.3048,
@@ -283,16 +314,16 @@ describe("displayed terrain contact", () => {
     const contact = createTerrainContact(sdk, surface, getFdmProfile("cessna-172").stance);
     contact.update(false);
 
-    // Taxi at about 25 kt: 5 mm of travel per 120 Hz step.
+    // Move 5 mm between these deliberately noisy samples.
     const metresPerDegreeLon = 111320 * Math.cos(44.98 * Math.PI / 180);
     for (let step = 0; step < 300; step += 1) {
       properties["position/long-gc-deg"] += 0.005 / metresPerDegreeLon;
       hit = { heightMeters: 250 + (step % 2 === 0 ? 0.04 : -0.04), revision: 1 } as SurfaceHit;
       contact.update(false);
+      expect(elevations.at(-1)).toBeCloseTo(hit.heightMeters, 8);
     }
-    const settled = elevations.slice(10);
-    expect(Math.max(...settled)).toBeLessThan(250.01);
-    expect(Math.min(...settled)).toBeGreaterThan(249.99);
+    expect(Math.max(...elevations)).toBeCloseTo(250.04, 8);
+    expect(Math.min(...elevations)).toBeCloseTo(249.96, 8);
 
     // A kerb is not noise: the wheel has to climb it at once.
     hit = { heightMeters: 251, revision: 1 } as SurfaceHit;

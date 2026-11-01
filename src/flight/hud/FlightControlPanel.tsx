@@ -749,8 +749,13 @@ function DebugPanel({ snapshot, settings, onCollisionDebugChange, onWheelSpinMod
               These are contact points, not a solid collision mesh. Marker sizes and lines from the centre
               are visual guides. Body probes sweep between physics steps near the ground.
             </p>
-            <p>Shows the flight model's points for the aircraft you are flying, which is what the physics touches the ground with.</p>
-            <p>Each contact is a spring that sinks into the ground under the aircraft's weight, so a resting contact sits a little below its drawn wheel or foot.</p>
+            <p>
+              Amber dots are where each tire meets the ground, including suspension compression, not its axle.
+              Amber wireframe wheels are drawn on the aircraft's own wheels and turn with them, so spin is easy
+              to see; they add no collision forces.
+            </p>
+            <p>JSBSim point contacts provide suspension and ground forces on every device. Wheel inertia adds rotation feedback; it does not switch collision models.</p>
+            <p>Feet and other structural contacts sink a little under the aircraft's weight, so a resting one shows slightly below what is drawn.</p>
           </HelpTip>
         </div>
         {snapshot.collisionDebugEnabled &&
@@ -783,8 +788,8 @@ function DebugPanel({ snapshot, settings, onCollisionDebugChange, onWheelSpinMod
                 session-only override of Aircraft → Ground handling, which can keep them.
               </p>
               <p>
-                Enable collision geometry above to see tire outlines and rotating spokes.
-                The outlines show estimated tire size; amber dots remain the contact references.
+                Collision geometry shows contact dots and wireframe wheels at the actual wheel meshes,
+                independently of this experiment. The spokes follow the same rotation as the visible tires.
                 Spin-up sound fades as the tread matches ground speed.
               </p>
             </>} />

@@ -74,7 +74,7 @@ vi.mock("./bridge/floatingOrigin", () => ({ createFloatingOrigin: () => ({ aircr
 vi.mock("./hud/flightCompass", () => ({ createFlightCompass: () => ({ update: vi.fn(), destroy: vi.fn() }) }));
 vi.mock("@0sfs/aircraft/createPlaceholderAircraft", () => ({ createPlaceholderAircraft: () => mocks.aircraft }));
 vi.mock("@0sfs/ground-contact/createCollisionDebugOverlay", () => ({ createCollisionDebugOverlay: vi.fn(() => ({ setEnabled: vi.fn(), update: vi.fn(), dispose: vi.fn(), legend: vi.fn(() => null) })) }));
-vi.mock("@0sfs/ground-contact/createWheelSpinDebugOverlay", () => ({ createWheelSpinDebugOverlay: vi.fn(() => ({ setEnabled: vi.fn(), update: vi.fn(), dispose: vi.fn() })) }));
+vi.mock("@0sfs/ground-contact/createWheelSpinDebugOverlay", () => ({ createAircraftWheelDebugOverlay: vi.fn(() => ({ setEnabled: vi.fn(), update: vi.fn(), dispose: vi.fn() })) }));
 vi.mock("@0sfs/ground-contact/createWheelSpinExperiment", () => ({ createWheelSpinExperiment: () => mocks.wheelSpin }));
 vi.mock("@0sfs/sound/createTireAudio", () => ({ createTireAudio: () => mocks.tireAudio }));
 vi.mock("@0sfs/aircraft/createAircraftModel", () => ({ createAircraftModel: () => mocks.aircraftModel }));

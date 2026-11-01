@@ -207,7 +207,7 @@ vi.mock("./hud/flightCompass", () => ({ createFlightCompass: () => ({ update: vi
 vi.mock("@0sfs/aircraft/createPlaceholderAircraft", () => ({ createPlaceholderAircraft: () => mocks.aircraft }));
 vi.mock("@0sfs/ground-contact/createCollisionDebugOverlay", () => ({ createCollisionDebugOverlay: vi.fn(() => mocks.collisionOverlay) }));
 vi.mock("./diagnostics/createForcesDebugOverlay", () => ({ createForcesDebugOverlay: vi.fn(() => mocks.forcesOverlay) }));
-vi.mock("@0sfs/ground-contact/createWheelSpinDebugOverlay", () => ({ createWheelSpinDebugOverlay: vi.fn(() => mocks.wheelOverlay) }));
+vi.mock("@0sfs/ground-contact/createWheelSpinDebugOverlay", () => ({ createAircraftWheelDebugOverlay: vi.fn(() => mocks.wheelOverlay) }));
 vi.mock("@0sfs/ground-contact/createWheelSpinExperiment", () => ({ createWheelSpinExperiment: () => mocks.wheelSpin }));
 vi.mock("@0sfs/sound/createTireAudio", () => ({ createTireAudio: () => mocks.tireAudio }));
 vi.mock("@0sfs/sound/createFlightAudio", async importOriginal => {
@@ -220,6 +220,14 @@ vi.mock("@0sfs/sound/jsbsimAudioAdapter", async importOriginal => {
 });
 vi.mock("@0sfs/aircraft/createAircraftModel", () => ({ createAircraftModel: vi.fn(() => mocks.aircraftModel) }));
 vi.mock("@0sfs/aircraft/createAircraftLights", () => ({ createAircraftLights: vi.fn(() => ({ refresh: vi.fn(), dispose: vi.fn() })) }));
+vi.mock("@foss-earth/ui/browser", async importOriginal => {
+  const actual = await importOriginal<typeof import("@foss-earth/ui/browser")>();
+  return { ...actual, createTestFeedbackPanel: vi.fn(actual.createTestFeedbackPanel) };
+});
+vi.mock("@0sfs/ground-contact/contactDiagnostics", async importOriginal => {
+  const actual = await importOriginal<typeof import("@0sfs/ground-contact/contactDiagnostics")>();
+  return { ...actual, readContactDiagnostics: vi.fn(actual.readContactDiagnostics) };
+});
 vi.mock("foss-earth/diagnostics", async importOriginal => {
   const actual = await importOriginal<typeof import("foss-earth/diagnostics")>();
   return { ...actual, startAppDiagnostics: vi.fn(actual.startAppDiagnostics), issueReporterFromBuild: vi.fn(actual.issueReporterFromBuild) };
@@ -280,6 +288,8 @@ vi.mock("./hud/createFlightControlPanel", async importOriginal => {
 import type { FrameProfileSession } from "foss-earth/perf";
 import { getAppSettings, resetAppSettings, SETTINGS_STORAGE_KEY } from "foss-earth/settings";
 import { issueReporterFromBuild, startAppDiagnostics } from "foss-earth/diagnostics";
+import { createTestFeedbackPanel } from "@foss-earth/ui/browser";
+import { readContactDiagnostics } from "@0sfs/ground-contact/contactDiagnostics";
 import { flightLog } from "@0sfs/logging/flightLog";
 import { cameraAttitudeView } from "./hud/cameraAttitudeView";
 import { createFlightSimApp } from "./createFlightSimApp";
@@ -292,6 +302,7 @@ import { setRearmRule } from "./settings/rearmRule";
 import * as fuelTanks from "@0sfs/fuel/fuelTanks";
 import { setExternalFuelTankAttached } from "@0sfs/fuel/externalFuelTanks";
 import { createCollisionDebugOverlay } from "@0sfs/ground-contact/createCollisionDebugOverlay";
+import { createAircraftWheelDebugOverlay } from "@0sfs/ground-contact/createWheelSpinDebugOverlay";
 import { createForcesDebugOverlay } from "./diagnostics/createForcesDebugOverlay";
 import { createFixedStepPhysicsLoop } from "./physics/fixedStepLoop";
 import { createVisibleMeshCollision } from "@0sfs/ground-contact/visibleMeshCollision";
@@ -501,6 +512,50 @@ it("flies under the sky's dome by default, offers the Sky and Date and time tabs
   expect(references()).toEqual([null, null]);
 });
 
+it("captures the current flight and native ground contacts only when feedback requests them", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.stubGlobal("localStorage", { getItem: () => null, setItem: vi.fn() });
+  Object.defineProperty(navigator, "getGamepads", { configurable: true, value: () => [] });
+  const root = document.createElement("div"); document.body.append(root);
+  let app!: Awaited<ReturnType<typeof createFlightSimApp>>;
+  const initialLatest = mocks.physics.getLatestState;
+  await act(async () => { app = await createFlightSimApp(root); });
+  try {
+    const providers = vi.mocked(createTestFeedbackPanel).mock.calls.at(-1)![0].providers;
+    expect(readContactDiagnostics).not.toHaveBeenCalled();
+    const current = { ...mocks.state, latDeg: 1.1, lonDeg: 2.1, altMeters: 1012, rollRad: 0.1, pitchRad: -0.2 };
+    mocks.physics.getLatestState = () => current;
+    expect(await providers.flight()).toMatchObject({ flightState: current });
+    expect(readContactDiagnostics).not.toHaveBeenCalled();
+    const runtime = await vi.mocked(createJsbsimRuntime).mock.results.at(-1)!.value;
+    const values: Record<string, number> = {
+      "position/terrain-elevation-asl-ft": 3000,
+      "gear/unit[0]/compression-ft": 0.1, "gear/unit[0]/WOW": 1,
+      "gear/unit[1]/compression-ft": 0.2, "gear/unit[1]/WOW": 1,
+      "gear/unit[2]/compression-ft": 0, "gear/unit[2]/WOW": 0,
+    };
+    runtime.sdk.getPropertyValue.mockImplementation(property => values[property] ?? 0);
+    const surfaceCalls = mocks.runtime.surface.sample.mock.calls.length;
+    mocks.runtime.surface.sample.mockReturnValueOnce({ heightMeters: 915.2 } as never);
+    expect(await providers.ground()).toMatchObject({
+      aircraftId: "cessna-172", flightState: current, terrainElevationMeters: 914.4,
+      modelActiveLodId: "lod3", modelOffset: expect.objectContaining({ y: expect.any(Number) }),
+      rawCenterHeightMeters: 915.2,
+      aglBeforeMeters: 97.6, aglAfterMeters: 97.6,
+      gearCompressionMeters: [0.03, 0.061, 0], weightOnWheels: [true, true, false],
+    });
+    expect(readContactDiagnostics).toHaveBeenCalledWith(runtime.sdk, 1012, 1012);
+    expect(mocks.runtime.surface.sample.mock.calls).toHaveLength(surfaceCalls + 1);
+    expect(mocks.runtime.surface.sample).toHaveBeenLastCalledWith(1.1, 2.1);
+    const report = await shellCapture.diagnosticsSource!.report();
+    expect(report).toContain('"altMeters":1012');
+    expect(readContactDiagnostics).toHaveBeenCalledTimes(2);
+  } finally {
+    mocks.physics.getLatestState = initialLatest;
+    await act(async () => app.destroy());
+  }
+});
+
 it("runs wheel inertia by default, exposes A/B while paused, and mutes on off", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.stubGlobal("localStorage", { getItem: () => null, setItem: vi.fn() });
@@ -533,14 +588,19 @@ it("runs wheel inertia by default, exposes A/B while paused, and mutes on off", 
     onStep(mocks.state as never, 1 / 60);
     expect(mocks.wheelSpin.step).toHaveBeenLastCalledWith(1 / 60, "inertia");
     await act(async () => root.querySelector<HTMLInputElement>('[aria-label="Show aircraft collision geometry"]')!.click());
+    expect(mocks.collisionOverlay.setEnabled).toHaveBeenLastCalledWith(true);
     expect(mocks.wheelOverlay.setEnabled).toHaveBeenLastCalledWith(true);
+    expect(createAircraftWheelDebugOverlay).toHaveBeenCalledOnce();
     await act(async () => wheel("instant").click());
     onStep(mocks.state as never, 1 / 60);
     expect(mocks.wheelSpin.step).toHaveBeenLastCalledWith(1 / 60, "instant");
     await act(async () => wheel("off").click());
     expect(sound.checked).toBe(false);
     expect(mocks.tireAudio.setEnabled).toHaveBeenLastCalledWith(false);
-    expect(mocks.wheelOverlay.setEnabled).toHaveBeenLastCalledWith(false);
+    // The collision view remains enabled when spin feedback is disabled.
+    expect(mocks.collisionOverlay.setEnabled).toHaveBeenLastCalledWith(true);
+    expect(mocks.wheelOverlay.setEnabled).toHaveBeenLastCalledWith(true);
+    expect(createAircraftWheelDebugOverlay).toHaveBeenCalledOnce();
     mocks.wheelSpin.step.mockClear();
     onStep(mocks.state as never, 1 / 60);
     expect(mocks.wheelSpin.step).not.toHaveBeenCalled();
@@ -2104,9 +2164,14 @@ it("enables collision geometry from Debug while paused, skips disabled work and 
     expect(root.textContent).toContain("6 structural contacts");
     expect(root.textContent).not.toContain("C172");
     expect(root.textContent).toContain("not a solid collision mesh");
+    expect(root.textContent).toContain("3 wheel contacts");
+    expect(root.textContent).toContain("JSBSim point contacts provide suspension and ground forces on every device");
+    expect(root.textContent).toContain("wireframe wheels");
+    expect(createAircraftWheelDebugOverlay).toHaveBeenCalledOnce();
 
     await act(async () => checkbox.click());
     expect(mocks.collisionOverlay.setEnabled).toHaveBeenLastCalledWith(false);
+    expect(mocks.wheelOverlay.setEnabled).toHaveBeenLastCalledWith(false);
     mocks.collisionOverlay.update.mockClear();
     const tick = mocks.runtime.setSimTick.mock.calls.at(-1)![0] as (dt: number) => void;
     await act(async () => tick(1 / 60));

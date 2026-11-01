@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { JSBSimSdk } from "@felipegalind0/jsbsim";
 import { applyAircraftRig, bindAircraftRig, NEUTRAL_CONTROL_SURFACES, readControlSurfaceState } from "@0sfs/aircraft/aircraftAnimation";
 import { buildSkinTriangles, classifySkinEnvelope, hasEnvelopeViolation, worldVertices } from "@0sfs/f-35b/validation/gearGeometry";
+import { createAircraftWheelDebugOverlay } from "@0sfs/ground-contact/createWheelSpinDebugOverlay";
 
 interface GltfNode {
   name: string;
@@ -21,7 +22,7 @@ interface Gltf {
 }
 
 /** Use the distributed asset's actual transforms, pivots and wheel geometry. */
-function f35bRig() {
+function f35bRig(placed = false) {
   const bytes = readFileSync(new URL("../../../public/aircraft/f-35b/F-35B_AF267.glb", import.meta.url));
   const jsonLength = bytes.readUInt32LE(12);
   const gltf = JSON.parse(bytes.subarray(20, 20 + jsonLength).toString()) as Gltf;
@@ -67,10 +68,21 @@ function f35bRig() {
   gltf.nodes.forEach((definition, index) => {
     for (const child of definition.children ?? []) nodes[child].parent = nodes[index];
   });
+  let modelRoot: TransformNode | undefined;
+  if (placed) {
+    const aircraft = new TransformNode("placed-aircraft", scene);
+    aircraft.position.set(500, -200, 1000);
+    aircraft.rotationQuaternion = Quaternion.RotationYawPitchRoll(0.4, -0.3, 0.2);
+    modelRoot = new TransformNode("previous-model-placement", scene);
+    modelRoot.parent = aircraft;
+    modelRoot.position.set(0, -2.1, 0);
+    modelRoot.rotationQuaternion = Quaternion.RotationYawPitchRoll(0.9, 0, 0);
+    for (const node of nodes) if (!node.parent) node.parent = modelRoot;
+  }
   const byName = new Map(nodes.map(node => [node.name, node]));
   return {
-    nodes, byName,
-    rig: bindAircraftRig(nodes, { scene, aircraftId: "f-35b", propellerBlades: 0 }),
+    nodes, byName, modelRoot,
+    rig: bindAircraftRig(nodes, { scene, aircraftId: "f-35b", propellerBlades: 0, modelOffsetY: -1.267, modelRoot }),
     dispose: () => { scene.dispose(); engine.dispose(); },
   };
 }
@@ -118,6 +130,120 @@ describe("AF267 F-35B authored rig", () => {
       const mainWheel = t.rig.wheels.find(wheel => wheel.node.name === "leftWheel")!;
       expect(mainWheel.radius).toBeCloseTo(0.58847517 * 0.83305745, 6);
     } finally { t.dispose(); }
+  });
+
+  it("poses each lower suspension from native compression at the real tire tread", () => {
+    const t = f35bRig();
+    try {
+      expect(t.rig.suspension).toHaveLength(3);
+      const names = ["noseWheel", "leftWheel", "rightWheel"];
+      const axles = names.map(name => point(t.byName.get(name)!));
+      const upper = ["noseGear", "leftGear", "rightGear"].map(name => point(t.byName.get(name)!));
+      const struts = ["noseStrutB", "leftStrutB", "rightStrutB"].map(name => point(t.byName.get(name)!));
+      for (const compression of [0, 0.10, 0.20, 0.28]) {
+        const sdk = { getPropertyValue: (key: string) => ({
+          "gear/gear-pos-norm": 1, "inertia/cg-z-in": -15.36,
+          "gear/unit[0]/WOW": 1, "gear/unit[1]/WOW": 1, "gear/unit[2]/WOW": 1,
+          "gear/unit[0]/z-position": -73.70, "gear/unit[1]/z-position": -73.70, "gear/unit[2]/z-position": -73.70,
+          "gear/unit[0]/compression-ft": compression / 0.3048,
+          "gear/unit[1]/compression-ft": compression / 0.3048,
+          "gear/unit[2]/compression-ft": compression / 0.3048,
+        })[key] ?? 0 } as unknown as JSBSimSdk;
+        const state = readControlSurfaceState(sdk, "f-35b");
+        expect(state.wheelCompressionMeters).toEqual([compression, compression, compression]);
+        applyAircraftRig(t.rig, state, 0);
+        names.forEach((name, index) => {
+          const wheel = t.byName.get(name)! as Mesh;
+          const bottom = Math.min(...worldVertices(wheel).map(vertex => vertex.y)) - 1.267;
+          expect(bottom).toBeCloseTo((-73.70 + 15.36) * 0.0254 + compression, 6);
+          const axle = point(wheel);
+          expect(axle.x).toBeCloseTo(axles[index].x, 6);
+          expect(axle.z).toBeCloseTo(axles[index].z, 6);
+          const strut = point(t.byName.get(["noseStrutB", "leftStrutB", "rightStrutB"][index])!);
+          expect(strut.y - struts[index].y).toBeCloseTo(axle.y - axles[index].y, 6);
+        });
+        ["noseGear", "leftGear", "rightGear"].forEach((name, index) =>
+          expect(Vector3.Distance(point(t.byName.get(name)!), upper[index])).toBeLessThan(1e-8));
+        const before = names.map(name => point(t.byName.get(name)!));
+        // Pausing is a repeated observation, not another suspension integration.
+        applyAircraftRig(t.rig, state, 10, { simulationHeld: true });
+        names.forEach((name, index) => expect(Vector3.Distance(point(t.byName.get(name)!), before[index])).toBeLessThan(1e-8));
+      }
+    } finally { t.dispose(); }
+  });
+
+  it("draws each collision wireframe on its tire, meeting the compressed contact dot", () => {
+    const t = f35bRig();
+    const overlay = createAircraftWheelDebugOverlay(t.rig.wheels[0].node.getScene(), () => t.rig.wheels);
+    try {
+      const compression = [0.14, 0.16, 0.17] as const;
+      applyAircraftRig(t.rig, { ...NEUTRAL_CONTROL_SURFACES,
+        wheelCompressionMeters: compression, wheelContactUpMeters: [-1.481836, -1.481836, -1.481836] }, 0);
+      overlay.setEnabled(true);
+      // Tire sidewall half widths in the asset; the hubs reach 0.267 and 0.344.
+      const sidewall = [0.1434, 0.1934, 0.1934];
+      for (const wheel of t.rig.wheels) {
+        const node = wheel.node as Mesh;
+        const drawing = node.getChildMeshes(true).find(mesh => mesh.metadata?.collisionDebug?.kind === "wheel-spin")!;
+        const local = drawing.getVerticesData(VertexBuffer.PositionKind)!;
+        const xs = Array.from({ length: local.length / 3 }, (_, index) => local[index * 3]);
+        const bounds = node.getBoundingInfo().boundingBox;
+        expect(Math.max(-bounds.minimum.x, bounds.maximum.x)).toBeGreaterThan(sidewall[wheel.gearIndex] + 0.07);
+        expect(Math.min(...xs)).toBeCloseTo(-sidewall[wheel.gearIndex], 3);
+        expect(Math.max(...xs)).toBeCloseTo(sidewall[wheel.gearIndex], 3);
+        const world = Array.from({ length: local.length / 3 }, (_, index) =>
+          point(drawing, Vector3.FromArray(local, index * 3)));
+        // The dot is drawn at the native contact plus compression, in metres below the CG.
+        const dot = (-73.70 + 15.36) * 0.0254 + compression[wheel.gearIndex];
+        // The ring is a 32-gon, and the raked nose leg turns its wheel 5 degrees
+        // from a vertex: the lowest edge may sit up to one sagitta above the tread.
+        const ringAboveDot = Math.min(...world.map(vertex => vertex.y)) - 1.267 - dot;
+        expect(ringAboveDot).toBeGreaterThan(-1e-6);
+        expect(ringAboveDot).toBeLessThan(wheel.radius * (1 - Math.cos(Math.PI / 32)) + 1e-6);
+        expect(Math.min(...worldVertices(node).map(vertex => vertex.y)) - 1.267).toBeCloseTo(dot, 6);
+        const axle = point(node);
+        const centre = world.reduce((sum, vertex) => sum.addInPlace(vertex), Vector3.Zero()).scaleInPlace(1 / world.length);
+        expect(Math.hypot(centre.x - axle.x, centre.z - axle.z)).toBeLessThan(0.01);
+      }
+    } finally { overlay.dispose(); t.dispose(); }
+  });
+
+  it("calibrates suspension independently of the previous model placement and aircraft frame", () => {
+    const t = f35bRig(true);
+    try {
+      // Binding happened while the shared root still held another model's
+      // placement. Reveal changes it to this aircraft's authored placement.
+      t.modelRoot!.position.set(0, -1.267, 0);
+      t.modelRoot!.rotationQuaternion = Quaternion.RotationYawPitchRoll(Math.PI, 0, 0);
+      const compression = [0.13, 0.16, 0.18] as const;
+      applyAircraftRig(t.rig, { ...NEUTRAL_CONTROL_SURFACES,
+        wheelCompressionMeters: compression, wheelContactUpMeters: [-1.481836, -1.481836, -1.481836] }, 0);
+      const worldToModel = t.modelRoot!.computeWorldMatrix(true).clone().invert();
+      for (const wheel of t.rig.wheels) {
+        const bottom = Math.min(...worldVertices(wheel.node as Mesh)
+          .map(vertex => Vector3.TransformCoordinates(vertex, worldToModel).y)) - 1.267;
+        // This NullEngine fixture keeps Float32 world matrices; allow 0.1 mm
+        // of roundoff after the kilometre-scale parent placement is cancelled.
+        expect(Math.abs(bottom - (-1.481836 + compression[wheel.gearIndex]))).toBeLessThan(0.0001);
+      }
+    } finally { t.dispose(); }
+  });
+
+  it("restores authored lower-leg stow after observing physical compression", () => {
+    const t = f35bRig(), authored = f35bRig();
+    try {
+      applyAircraftRig(t.rig, { ...NEUTRAL_CONTROL_SURFACES, wheelCompressionMeters: [0.1, 0.2, 0.2],
+        wheelContactUpMeters: [-1.481836, -1.481836, -1.481836] }, 0);
+      applyAircraftRig(t.rig, { ...NEUTRAL_CONTROL_SURFACES, gearDownNorm: 0,
+        wheelCompressionMeters: [0, 0, 0], wheelContactUpMeters: [-1.481836, -1.481836, -1.481836] }, 0);
+      applyAircraftRig(authored.rig, { ...NEUTRAL_CONTROL_SURFACES, gearDownNorm: 0 }, 0);
+      for (const name of ["noseSuspension", "leftSuspension", "rightSuspension", "noseWheel", "leftWheel", "rightWheel"]) {
+        expect(Vector3.Distance(point(t.byName.get(name)!), point(authored.byName.get(name)!))).toBeLessThan(1e-8);
+      }
+      const missing = readControlSurfaceState({ getPropertyValue: () => 0 } as unknown as JSBSimSdk, "f-35b");
+      expect(missing.wheelContactUpMeters).toBeUndefined();
+      expect(missing.wheelCompressionMeters).toBeUndefined();
+    } finally { t.dispose(); authored.dispose(); }
   });
 
   it("deflects swept flaperons and canted rudders about their own hinges", () => {
