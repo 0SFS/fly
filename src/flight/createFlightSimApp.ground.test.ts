@@ -196,10 +196,9 @@ it("keeps Debug experiment choices only through the explicit Ground handling act
   } finally { await act(async () => view.app.destroy()); }
 });
 
-it("drives gamepad haptics from accepted wheel cues and cancels them on pause", async () => {
+it("enables gamepad haptics by default from accepted wheel cues and cancels them on pause", async () => {
   const actuator = { effects: ["dual-rumble"], playEffect: vi.fn(async () => "complete"), reset: vi.fn(async () => "complete") };
-  const storage = environment([{ id: "pad", index: 0, connected: true, axes: [0, 0, 0, 0], buttons: [], vibrationActuator: actuator }]);
-  storage.set("osfs.ground-interaction.v1", JSON.stringify({ version: 1, rotation: "inertia", haptics: "landing", hapticStrength: 1 }));
+  environment([{ id: "pad", index: 0, connected: true, axes: [0, 0, 0, 0], buttons: [], vibrationActuator: actuator }]);
   mocks.wheelStates = [0, 1, 2].map(() => createWheelSpinState());
   const view = await mount();
   try {
