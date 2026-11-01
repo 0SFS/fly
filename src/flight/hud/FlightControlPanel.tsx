@@ -751,7 +751,8 @@ function DebugPanel({ snapshot, settings, onCollisionDebugChange, onWheelSpinMod
             </p>
             <p>
               Amber dots are where each tire meets the ground, including suspension compression, not its axle.
-              Amber wireframe wheels are drawn on the aircraft's own wheels and turn with them, so spin is easy
+              While retractable gear moves they ride with their tires, though the physics uses them only once the
+              gear is down and locked; they go when it is stowed. Amber wireframe wheels are drawn on the aircraft's own wheels and turn with them, so spin is easy
               to see; they add no collision forces.
             </p>
             <p>JSBSim point contacts provide suspension and ground forces on every device. Wheel inertia adds rotation feedback; it does not switch collision models.</p>

@@ -118,7 +118,7 @@ import {
   type AircraftLodId,
   type AircraftSelection,
 } from "@0sfs/aircraft/aircraftCatalog";
-import { applyAircraftRig, readControlSurfaceState, readGearDownNorm, type ControlSurfaceState } from "@0sfs/aircraft/aircraftAnimation";
+import { applyAircraftRig, readControlSurfaceState, readGearDownNorm, withGearDown, type ControlSurfaceState } from "@0sfs/aircraft/aircraftAnimation";
 import { createControlPositionReader } from "./controlPositions";
 import { flightLog } from "@0sfs/logging/flightLog";
 import { createFlightRecorder } from "@0sfs/logging/flightRecorder";
@@ -1979,8 +1979,16 @@ async function createFlightSimSession(
   }
   const syncCollisionDebugOverlay = (): void => {
     if (collisionDebugEnabled && aircraft && !collisionDebugOverlay) {
+      // A wheel spins in its suspension leg, which carries it through retraction.
+      // Posing the gear down shows where on the leg its contact rides.
       collisionDebugOverlay = createCollisionDebugOverlay(runtime.scene, aircraft.root, jsbsim.sdk,
-        getFdmProfile(initialAircraftId).bodyCollisionProbes);
+        getFdmProfile(initialAircraftId).bodyCollisionProbes, {
+          carrier: unit => aircraftModel?.getRig()?.wheels.find(wheel => wheel.gearIndex === unit)?.node.parent,
+          withGearDown: read => {
+            const rig = aircraftModel?.getRig();
+            if (rig) withGearDown(rig, readControlSurfaceState(jsbsim.sdk, initialAircraftId), read);
+          },
+        });
     }
     collisionDebugOverlay?.setEnabled(collisionDebugEnabled);
     if (collisionDebugEnabled && !wheelSpinDebugOverlay) {
@@ -4400,7 +4408,6 @@ async function createFlightSimSession(
         heightAboveGroundM: sampledSurfaceHeight === null ? null : displayState.altMeters - sampledSurfaceHeight,
       });
     }
-    if (collisionDebugEnabled) collisionDebugOverlay?.update();
     forcesDebugOverlay?.update(true);
     engineVisuals.read();
     const rig = aircraftModel?.getRig();
@@ -4417,6 +4424,8 @@ async function createFlightSimSession(
       aircraftModel.updateGearVisibility(surfaceState.gearDownNorm, true);
       observeRest(surfaceState, physicsHeld || terrainBlocked || !!physicsLoop.getFault() ? 0 : deltaSeconds);
     }
+    // After the rig, so a moving wheel's dot rides where its tire is now.
+    if (collisionDebugEnabled) collisionDebugOverlay?.update();
     if (collisionDebugEnabled) wheelSpinDebugOverlay?.update();
     engineVisuals.updateRig(rig ?? null, true);
     frameProfiler.add("flight/view", sectionStarted);

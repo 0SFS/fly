@@ -335,6 +335,29 @@ describe("F-35B roll-rate law", () => {
     expect(sdk.getPropertyValue("fcs/roll-trim-error")).toBeGreaterThan(0.01);
     expect(sdk.getPropertyValue("fcs/roll-i")).toBe(0);
   });
+
+  it("holds the gear down while the main wheels carry weight and raises it once they unload", async () => {
+    const sdk = await createF35();
+    resetFlightLocation(sdk, {
+      latDeg: 35, lonDeg: -110, altMeters: 300,
+      flightPreset: { mode: "departure", headingDeg: 90, groundElevationMeters: 300, flightPathDeg: 0 },
+    }, 300, aircraftId);
+    const step = (gearDownNorm: number) => {
+      applyFlightControls(sdk, { ...neutral, throttle: 0, brake: 1 }, gearDownNorm, profile.rudderSign,
+        { commandProperty: profile.stovl!.commandProperty, commandNorm: 0 });
+      expect(sdk.run()).toBe(true);
+    };
+    for (let i = 0; i < 2 / LEGACY_FIXED_DT_120; i++) step(1);
+    const parked = sdk.getPropertyValue("position/h-agl-ft");
+    // Longer than the 5 s transit: ungated, the gear would be stowed and the jet on its belly, 1.2 m lower.
+    for (let i = 0; i < 6 / LEGACY_FIXED_DT_120; i++) step(0);
+    expect(sdk.getPropertyValue("gear/gear-pos-norm")).toBe(1);
+    expect(sdk.getPropertyValue("position/h-agl-ft")).toBeCloseTo(parked, 2);
+    sdk.setPropertyValue("position/h-sl-ft", sdk.getPropertyValue("position/h-sl-ft") + 30);
+    for (let i = 0; i < 0.5 / LEGACY_FIXED_DT_120; i++) step(0);
+    expect(sdk.getPropertyValue("gear/unit[1]/WOW")).toBe(0);
+    expect(sdk.getPropertyValue("gear/gear-pos-norm")).toBeLessThan(0.95);
+  });
 });
 
 describe("F-35B augmentation transition interlock", () => {
