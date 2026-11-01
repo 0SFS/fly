@@ -132,7 +132,10 @@ async function mount() {
 
 it("queues wheel-model changes until pause, applies audio immediately, and restores them in a new flight", async () => {
   const storage = environment();
+  // A saved explicit Off choice must survive the new inertia default.
+  storage.set(SETTINGS_STORAGE_KEY, JSON.stringify({ version: 1, values: { "osfs.ground.rotation": "off" } }));
   const view = await mount();
+  mocks.wheelSpin.reset.mockClear();
   try {
     // Named sets of ground choices are presets, applied in Settings → Presets.
     await view.openTab("Settings");
@@ -147,7 +150,9 @@ it("queues wheel-model changes until pause, applies audio immediately, and resto
     view.onStep();
     expect(mocks.wheelSpin.step).not.toHaveBeenCalled();
     expect(view.root.querySelector('[aria-label="Wheel response status"]')!.textContent).toMatch(/Applies when the simulation is paused or reset/);
-    expect(saved(storage)).toMatchObject({ "osfs.ground.rotation": "inertia", "osfs.ground.tireAudio": "slip" });
+    expect(saved(storage)).toMatchObject({ "osfs.ground.tireAudio": "slip" });
+    // Registry stores differences from defaults; inertia removes the old Off override.
+    expect(saved(storage)).not.toHaveProperty("osfs.ground.rotation");
     await act(async () => {
       const volume = view.root.querySelector<HTMLInputElement>('[aria-label="Tire audio volume"]')!;
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(volume, "0.25");

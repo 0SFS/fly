@@ -257,8 +257,9 @@ describe("flight parameter catalogue", () => {
       expect(settings.diffPreset(preset).rejected, preset.id).toEqual([]);
       expect(settings.listPresets().some(listed => listed.id === preset.id), preset.id).toBe(true);
     }
-    // A fresh flight matches the presets that stand for the defaults.
-    expect(settings.matchingPreset({ tab: "aircraft", section: "ground" })?.id).toBe("osfs-ground-minimal");
+    // Wheel inertia is on by default; Minimal remains an explicit opt-out.
+    expect(settings.get("osfs.ground.rotation")).toBe("inertia");
+    expect(settings.matchingPreset({ tab: "aircraft", section: "ground" })).toBeNull();
     expect(settings.matchingPreset({ tab: "remote", section: "camera", prefix: "osfs.camera.phone." })?.id).toBe("osfs-phone-camera-recommended");
   });
 

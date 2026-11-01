@@ -81,7 +81,7 @@ import { LoggingPanel, type LoggingAction, type LoggingPanelState } from "@0sfs/
 import { allowCloseLoggingTab } from "@0sfs/logging/loggingTab";
 import type { FlightAudioStatus } from "@0sfs/sound/createFlightAudio";
 import { AUTOPILOT_PARAMETER_IDS, type AutopilotSettingsV1 } from "@0sfs/autopilot/autopilotSettings";
-import { GROUND_PARAMETER_IDS } from "@0sfs/ground-contact/groundInteractionSettings";
+import { DEFAULT_GROUND_INTERACTION_SETTINGS, GROUND_PARAMETER_IDS } from "@0sfs/ground-contact/groundInteractionSettings";
 import type { FlightRecorder } from "@0sfs/logging/flightRecorder";
 import { MultiplayerTab, type MountMultiplayer } from "../multiplayer/MultiplayerTab";
 import { DamagePanel } from "../damage/DamagePanel";
@@ -768,7 +768,7 @@ function DebugPanel({ snapshot, settings, onCollisionDebugChange, onWheelSpinMod
         <legend>Wheel spin experiment</legend>
         {/* "[Off / A / B] ?  Tire sound [switch]" */}
         <div className="flight-panel__row">
-          <ChoiceTrack heading="Wheel spin experiment" hideHeading value={snapshot.wheelSpinMode} defaultValue="off"
+          <ChoiceTrack heading="Wheel spin experiment" hideHeading value={snapshot.wheelSpinMode} defaultValue={DEFAULT_GROUND_INTERACTION_SETTINGS.rotation}
             onChange={mode => onWheelSpinModeChange(mode as WheelSpinMode | "off")}
             choices={[
               { id: "off", label: "Off" },

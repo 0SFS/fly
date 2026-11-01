@@ -4401,6 +4401,8 @@ async function createFlightSimSession(
       if (rig) applyAircraftRig(rig, surfaceState, deltaSeconds, {
         simulationHeld: feedbackHeld,
         propellerDiscs: parameters.get("osfs.aircraft.propellerDiscs"),
+        wheelSpinStates: aircraftId === "cessna-172" && wheelSpinMode !== "off"
+          ? wheelSpin.getStates() : undefined,
       });
       aircraftModel.updateGearVisibility(surfaceState.gearDownNorm, true);
       observeRest(surfaceState, physicsHeld || terrainBlocked || !!physicsLoop.getFault() ? 0 : deltaSeconds);

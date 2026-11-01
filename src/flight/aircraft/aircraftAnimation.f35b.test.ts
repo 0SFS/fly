@@ -195,7 +195,7 @@ describe("AF267 F-35B authored rig", () => {
     const t = f35bRig();
     try {
       for (const roll of [0, 0.73, Math.PI / 2]) {
-        t.rig.wheelAngleRad = roll;
+        t.rig.wheels.forEach(wheel => { wheel.spin.angleRad = -roll; });
         applyAircraftRig(t.rig, { ...NEUTRAL_CONTROL_SURFACES, gearDownNorm: 0 }, 0, { simulationHeld: true });
         const skin = buildSkinTriangles(t.byName);
         for (const name of ["leftWheel", "rightWheel", "noseWheel"]) {
@@ -268,7 +268,7 @@ describe("AF267 F-35B authored rig", () => {
         expect(angle).toBeCloseTo((index < 2 ? 100 : 90) * Math.PI / 180, 6);
       });
       const centers = t.rig.wheels.map(wheel => point(wheel.node));
-      t.rig.wheelAngleRad = 0.73;
+      t.rig.wheels.forEach(wheel => { wheel.spin.angleRad = -0.73; });
       applyAircraftRig(t.rig, { ...NEUTRAL_CONTROL_SURFACES, gearDownNorm: 0 }, 10, { simulationHeld: true });
       t.rig.wheels.forEach((wheel, index) => {
         expect(Vector3.Distance(point(wheel.node), centers[index])).toBeLessThan(1e-6);

@@ -501,7 +501,7 @@ it("flies under the sky's dome by default, offers the Sky and Date and time tabs
   expect(references()).toEqual([null, null]);
 });
 
-it("runs wheel feedback only when selected, exposes A/B while paused, and mutes on off", async () => {
+it("runs wheel inertia by default, exposes A/B while paused, and mutes on off", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.stubGlobal("localStorage", { getItem: () => null, setItem: vi.fn() });
   Object.defineProperty(navigator, "getGamepads", { configurable: true, value: () => [] });
@@ -512,7 +512,7 @@ it("runs wheel feedback only when selected, exposes A/B while paused, and mutes 
   try {
     const onStep = vi.mocked(createFixedStepPhysicsLoop).mock.calls.at(-1)![1]!;
     onStep(mocks.state as never, 1 / 60);
-    expect(mocks.wheelSpin.step).not.toHaveBeenCalled();
+    expect(mocks.wheelSpin.step).toHaveBeenLastCalledWith(1 / 60, "inertia");
     expect(mocks.tireAudio.setEnabled).not.toHaveBeenCalled();
     await act(async () => window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyP" })));
     expect(mocks.tireAudio.setPaused).toHaveBeenLastCalledWith(true);
@@ -522,11 +522,10 @@ it("runs wheel feedback only when selected, exposes A/B while paused, and mutes 
     // "[Off / A / B] ?  Tire sound [switch]"
     const wheel = (mode: string) => root.querySelector<HTMLInputElement>(`[role="radiogroup"][aria-label="Wheel spin experiment"] input[value="${mode}"]`)!;
     const sound = root.querySelector<HTMLInputElement>('[aria-label="Enable tire sound"]')!;
-    expect(wheel("off").checked).toBe(true);
+    expect(wheel("inertia").checked).toBe(true);
     expect(wheel("inertia").getAttribute("aria-label")).toBe("B · Gradual spin-up");
     expect(sound.closest("label")!.firstElementChild!.textContent).toBe("Tire sound");
-    expect(sound.disabled).toBe(true);
-    await act(async () => wheel("inertia").click());
+    expect(sound.disabled).toBe(false);
     expect(mocks.wheelSpin.reset).toHaveBeenCalled();
     expect(sound.disabled).toBe(false);
     await act(async () => sound.click());
