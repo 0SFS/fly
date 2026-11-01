@@ -520,9 +520,9 @@ glare at night and a faint dot by day. Nothing is brightened for looks.
 - **Beams on the ground** gives the lit beams to the sky as lamps, which light the
   map's ground by the inverse square of the distance and the beam's edge. Each
   costs every pixel of ground a few operations. Lit surfaces, the aircraft's own
-  included, get nothing from them. A gear leg's beams stay with the sky, dark,
-  while the gear is up: the ground recompiles whenever its number of lamps
-  changes, and passing the gear through the lamps' position froze the flight.
+  included, get nothing from them. A beam not lit, a gear leg's with the gear up
+  among them, is not given: the ground evaluates none, and its number of lamps is
+  a uniform, so one coming or going compiles nothing.
 - **A frame at each flash.** While anti-collision lights are on and the flight is
   running, a timer asks for a frame at each flash's start and end, so a still view
   shows them flash: about three frames a second for strobes and a beacon. Their
