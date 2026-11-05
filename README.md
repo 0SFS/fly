@@ -142,7 +142,9 @@ explains main-thread work, frame times, memory, worker CPU, GPU, network,
 persistent storage and audio: owners, controls, limits, cleanup and measurement
 gaps. It is the starting point for understanding or tuning resource use.
 
-Session notes are under [docs/performance/](docs/performance/). The latest
+Session notes are under [docs/performance/](docs/performance/). The
+[5 November audit](docs/performance/2026-11-05/README.md) estimates what 60 fps
+on a Snapdragon 835-class phone needs and ranks the work. The latest
 handoff is [2026-10-27](docs/performance/2026-10-27/session-handoff.md). Earlier
 sessions are [2026-10-26](docs/performance/2026-10-26/session-handoff.md),
 [2026-10-22](docs/performance/2026-10-22/session-handoff.md) and
