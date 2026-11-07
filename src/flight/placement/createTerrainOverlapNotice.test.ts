@@ -102,4 +102,33 @@ describe("terrain overlap notice", () => {
     document.body.removeEventListener("pointerdown", camera);
     notice.dispose();
   });
+
+  it("changes nothing on the page when an update repeats what it shows", () => {
+    // The flight updates the notice every frame; a write of the same value
+    // still restyles the page.
+    const notice = createTerrainOverlapNotice(document);
+    const card = document.querySelector<HTMLElement>(".flight-terrain-overlap")!;
+    const observer = new MutationObserver(() => {});
+    observer.observe(card, { subtree: true, attributes: true, childList: true, characterData: true });
+    const onResume = vi.fn(), onTeleport = vi.fn();
+    const states = [
+      null,
+      { message: "Inside the surface", compact: true, onResume },
+      { message: "Inside the surface", compact: true, onResume, onTeleport },
+      { title: "Ground moved", message: "Ground is 2 m below you.", teleportLabel: "Move down", onResume, onTeleport },
+      { message: "Ground unknown", onResume },
+    ];
+    for (const [index, state] of states.entries()) {
+      // From a different state, the update changes the page.
+      notice.update(states[(index + 1) % states.length]);
+      observer.takeRecords();
+      notice.update(state);
+      expect(observer.takeRecords().length, JSON.stringify(state)).toBeGreaterThan(0);
+      notice.update(state);
+      notice.update(state);
+      expect(observer.takeRecords(), JSON.stringify(state)).toEqual([]);
+    }
+    observer.disconnect();
+    notice.dispose();
+  });
 });

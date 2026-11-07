@@ -16,6 +16,13 @@ export interface TerrainOverlapNoticeState {
   teleportLabel?: string;
 }
 
+// The flight updates the notice every frame, mostly with nothing to show.
+// Writing `hidden` again with the value it has still restyles the page, so
+// each write is made only when it changes something.
+function setHidden(element: HTMLElement, hidden: boolean): void {
+  if (element.hidden !== hidden) element.hidden = hidden;
+}
+
 /** One small card; it never blocks the rest of the interface or moves the aircraft. */
 export function createTerrainOverlapNotice(document: Document) {
   const card = document.createElement("section");
@@ -55,16 +62,16 @@ export function createTerrainOverlapNotice(document: Document) {
     update(next: TerrainOverlapNoticeState | null): void {
       if (disposed) return;
       state = next;
-      card.hidden = next === null;
+      setHidden(card, next === null);
       const compact = next?.compact === true;
       card.classList.toggle("flight-terrain-overlap--compact", compact);
-      title.hidden = compact;
+      setHidden(title, compact);
       const heading = next?.title ?? "Inside terrain";
       if (title.textContent !== heading) title.textContent = heading;
-      resume.hidden = compact;
+      setHidden(resume, compact);
       // Keep the same buttons and focus across telemetry/terrain updates.
       if (message.textContent !== (next?.message ?? "")) message.textContent = next?.message ?? "";
-      teleport.hidden = !next?.onTeleport;
+      setHidden(teleport, !next?.onTeleport);
       const label = next?.teleportLabel ?? "Move up";
       if (teleport.textContent !== label) teleport.textContent = label;
       const resumeLabel = next?.resumeLabel ?? "Stay here";
