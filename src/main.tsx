@@ -47,6 +47,15 @@ async function bootApp(rootElement: HTMLElement, loading: FlightLoadingScreen | 
     return;
   }
 
+  if (route === "replay") {
+    // The flight's toolbar, lent to the replay so the two pages keep one.
+    const [{ createReplayApp }, { replayHost }] = await Promise.all([import("@0sfs/replay/createReplayApp"), import("./replay/replayHost")]);
+    await createReplayApp(rootElement, { host: replayHost });
+    clearBootShell();
+    markBrowserAppReady(document);
+    return;
+  }
+
   if (route === "flight") {
     const fault = requestedGoogleTilesFault(window.location.search);
     if (fault) {

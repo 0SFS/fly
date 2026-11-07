@@ -12,7 +12,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="0SFS" />
     <title>0SFS — Open Source Flight Simulator</title>
-    <!-- Search and link previews. The build rewrites these for /fly/ and /rc/ (vite.config.ts); the home page is the website's (0sfs.github.io), see its docs/search-visibility.md. -->
+    <!-- Search and link previews. The build rewrites these for /fly/, /rc/ and /replay/ (vite.config.ts); the home page is the website's (0sfs.github.io), see its docs/search-visibility.md. -->
     <meta name="description" content="0SFS is a free, open-source flight simulator that runs in a browser tab, with JSBSim flight physics over real-world scenery. Nothing to install, no account." />
     <link rel="canonical" href="https://0sfs.github.io/" />
     <meta property="og:type" content="website" />
@@ -54,10 +54,11 @@
           return;
         }
         else if (mode === "flight" || rest === "/fly") route = "flight";
+        else if (rest === "/replay") route = "replay";
         document.documentElement.setAttribute("data-route", route);
         // Safari tints its bars with theme-color, so each page names its own
         // background: the controller's true black, the flight page's canvas.
-        var themeColor = { remote: "#000", flight: "#04060a" }[route];
+        var themeColor = { remote: "#000", flight: "#04060a", replay: "#04060a" }[route];
         if (themeColor) document.querySelector('meta[name="theme-color"]').setAttribute("content", themeColor);
         // Add to Home Screen must install the page it was done from. The
         // controller has its own manifest and name, so an icon made on /rc/

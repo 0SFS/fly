@@ -2,6 +2,7 @@ import type { HudInputMode, InputSensitivitySettings } from "foss-earth/input";
 import { attachParameterReset, checkChoice, createChoiceGroup, createExternalLinkIcon } from "@foss-earth/ui/browser";
 import "foss-earth/shell.css";
 import "foss-earth/input-mode.css";
+import "./createFlightHudBar.css";
 
 import { attachFullscreenButton, attachMapDownloadSpeed, attachRendererActivity, attachTileStreamingActivity, createInputModeHud, createHudBar, createMapSourceHud, createPositionReadout, fitHudBar, getRendererLabel, setMapSourceLabel, surfaceHeightDatum, type HudBarFitItem, type HudBarHandle, type InputModeHudOptions, type MapDetailController, type PositionSeaLevelPort, type RenderActivitySource, type TileStreamingSource, type MapDownloadSource } from "foss-earth/shell";
 import type { BabylonRuntimeStatus, RendererMode } from "foss-earth/runtime";
@@ -12,6 +13,12 @@ import type { FlightHudLayout } from "./flightHud";
 import { SEA_LEVEL_GRID_ID, seaLevelMeters } from "./seaLevel";
 
 export interface FlightHudBarOptions {
+  /** What the bar is called to assistive technology: "Flight simulator controls" when omitted. */
+  label?: string;
+  /** The pause button's titles: what pausing and resuming do. The simulation's when omitted. */
+  pauseTitles?: { pause: string; resume: string };
+  /** The tabs the FPS chip and the position open, named in their titles: Debug and Location when omitted. */
+  tabNames?: { fps?: string; position?: string };
   renderActivity: RenderActivitySource & TileStreamingSource & MapDownloadSource;
   rendererMode: RendererMode;
   runtimeStatus: BabylonRuntimeStatus;
@@ -20,9 +27,10 @@ export interface FlightHudBarOptions {
   onPausedChange(paused: boolean): void;
   /** The shared detail controller behind the rail beside the basemap and the Map tab's Detail group. */
   mapDetail: MapDetailController;
-  onSettingsClick(): void;
-  /** Toggles the shared Bug report tab. */
-  onBugReportClick(): void;
+  /** Without it the bar has no settings button. */
+  onSettingsClick?(): void;
+  /** Toggles the shared Bug report tab. Without it the bar has no bug report button. */
+  onBugReportClick?(): void;
   /** The FPS chip toggles the Debug tab. */
   onDebugClick(): void;
   /** The input-method button toggles the Controls tab, the settings' one home. */
@@ -42,12 +50,15 @@ export interface FlightHudBarOptions {
   onLogToggle?(): boolean;
 }
 
+/** What the bar reads of the aircraft: a flight's state, or where a replay draws it. */
+export type FlightHudBarReading = Pick<FlightState, "latDeg" | "lonDeg" | "altMeters" | "headingRad" | "pitchRad">;
+
 export interface FlightHudBarHandle {
   /**
    * `groundHeightMeters` is the terrain's height under the aircraft, or null
    * while none has loaded there: what the altitude above ground is measured from.
    */
-  update(state: FlightState, status: BabylonRuntimeStatus, fps: number | null, paused: boolean, groundHeightMeters?: number | null): void;
+  update(state: FlightHudBarReading, status: BabylonRuntimeStatus, fps: number | null, paused: boolean, groundHeightMeters?: number | null): void;
   /** Draws the Input method section into the Controls tab. Returns an unmount. */
   mountInputMethod(container: HTMLElement): () => void;
   /** Loading a replacement aircraft keeps pause engaged. */
@@ -111,21 +122,24 @@ function inputDeviceHints(): InputModeHudOptions["deviceHints"] {
 }
 
 export function createFlightHudBar(container: HTMLElement, options: FlightHudBarOptions): FlightHudBarHandle {
+  const pauseTitles = options.pauseTitles ?? { pause: "Pause simulation", resume: "Resume simulation" };
+  const fpsTab = options.tabNames?.fps ?? "Debug";
+  const positionTab = options.tabNames?.position ?? "Location";
   const hudBar: HudBarHandle = createHudBar(container, {
-    ariaLabel: "Flight simulator controls",
+    ariaLabel: options.label ?? "Flight simulator controls",
     items: [
-      { kind: "button", id: "flightPauseButton", title: "Pause simulation", ariaLabel: "Pause simulation", className: "flight-shell-pause-button", text: "Ⅱ" },
-      { kind: "button", id: "flightFps", title: "Rendered frames per second. Click to show or hide the Debug tab.", ariaLabel: "Frame rate. Show or hide Debug", ariaLive: "polite", appearance: "chip", className: "hud-chip-button", text: "FPS —" },
+      { kind: "button", id: "flightPauseButton", title: pauseTitles.pause, ariaLabel: pauseTitles.pause, className: "flight-shell-pause-button", text: "Ⅱ" },
+      { kind: "button", id: "flightFps", title: `Rendered frames per second. Click to show or hide the ${fpsTab} tab.`, ariaLabel: `Frame rate. Show or hide ${fpsTab}`, ariaLive: "polite", appearance: "chip", className: "hud-chip-button", text: "FPS —" },
       { kind: "button", id: "flightRendererButton", title: "GPU renderer API. Click to show or hide the Renderer tab.", ariaLabel: "GPU renderer API", appearance: "chip", className: "hud-chip-button hud-chip--gpu", text: getRendererLabel(options.rendererMode) },
       { kind: "button", id: "flightSettingsButton", title: "Open flight settings", ariaLabel: "Open flight settings", className: "settings-button", text: "⚙" },
       { kind: "button", id: "flightFullscreenButton", title: "Enter fullscreen", ariaLabel: "Enter fullscreen", className: "flight-fullscreen-button", text: "⛶" },
       { kind: "button", id: "flightLogButton", title: "Show the game log history", ariaLabel: "Show the game log history", className: "flight-log-button", text: "☰" },
       { kind: "button", id: "flightBugReportButton", title: "Show or hide Bug report", ariaLabel: "Show or hide Bug report", text: "🐞" },
-      { kind: "button", id: "flightShellStatus", appearance: "chip", className: "hud-chip-button hud-status-text", ariaLive: "polite", ariaLabel: "Aircraft position", title: "Latitude, longitude, altitude and heading. Click to show or hide the Location tab." },
-      { kind: "button", id: "flightLatLon", appearance: "chip", className: "hud-chip-button flight-reading-chip", ariaLabel: "Latitude and longitude. Show or hide Location", title: "Latitude and longitude. Click to show or hide the Location tab." },
-      { kind: "button", id: "flightAltitude", appearance: "chip", className: "hud-chip-button flight-reading-chip", ariaLabel: "Altitude. Show or hide Location", title: "Altitude, above sea level or the ground as Interface → Position readout says. Click to show or hide the Location tab." },
-      { kind: "button", id: "flightHeading", appearance: "chip", className: "hud-chip-button flight-reading-chip", ariaLabel: "Heading. Show or hide Location", title: "Heading, in degrees, over its compass point. Click to show or hide the Location tab." },
-      { kind: "button", id: "flightPitch", appearance: "chip", className: "hud-chip-button flight-reading-chip", ariaLabel: "Pitch. Show or hide Location", title: "Pitch, in degrees: positive nose up. Click to show or hide the Location tab." },
+      { kind: "button", id: "flightShellStatus", appearance: "chip", className: "hud-chip-button hud-status-text", ariaLive: "polite", ariaLabel: "Aircraft position", title: `Latitude, longitude, altitude and heading. Click to show or hide the ${positionTab} tab.` },
+      { kind: "button", id: "flightLatLon", appearance: "chip", className: "hud-chip-button flight-reading-chip", ariaLabel: `Latitude and longitude. Show or hide ${positionTab}`, title: `Latitude and longitude. Click to show or hide the ${positionTab} tab.` },
+      { kind: "button", id: "flightAltitude", appearance: "chip", className: "hud-chip-button flight-reading-chip", ariaLabel: `Altitude. Show or hide ${positionTab}`, title: `Altitude, above sea level or the ground as Interface → Position readout says. Click to show or hide the ${positionTab} tab.` },
+      { kind: "button", id: "flightHeading", appearance: "chip", className: "hud-chip-button flight-reading-chip", ariaLabel: `Heading. Show or hide ${positionTab}`, title: `Heading, in degrees, over its compass point. Click to show or hide the ${positionTab} tab.` },
+      { kind: "button", id: "flightPitch", appearance: "chip", className: "hud-chip-button flight-reading-chip", ariaLabel: `Pitch. Show or hide ${positionTab}`, title: `Pitch, in degrees: positive nose up. Click to show or hide the ${positionTab} tab.` },
       { kind: "slot", id: "flightInstrumentSlot", className: "flight-toolbar-instruments", ariaLabel: "Load, gear and autopilot" },
       { kind: "slot", id: "flightMapSourceSlot", className: "hud-bar-end map-source-hud-slot" },
     ],
@@ -206,7 +220,7 @@ export function createFlightHudBar(container: HTMLElement, options: FlightHudBar
   const updatePauseState = (nextPaused: boolean): void => {
     paused = nextPaused;
     pauseButton.textContent = paused ? "▶" : "Ⅱ";
-    pauseButton.title = paused ? "Resume simulation" : "Pause simulation";
+    pauseButton.title = paused ? pauseTitles.resume : pauseTitles.pause;
     pauseButton.setAttribute("aria-label", pauseButton.title);
     pauseButton.setAttribute("aria-pressed", String(paused));
     pauseButton.classList.toggle("is-active", paused);
@@ -225,14 +239,19 @@ export function createFlightHudBar(container: HTMLElement, options: FlightHudBar
     logButton.setAttribute("aria-pressed", "false");
   }
   logButton?.addEventListener("click", onLogClick);
+  // A host without a Settings or Bug report tab has no button for it.
+  settingsButton.hidden = !options.onSettingsClick;
+  bugReportButton.hidden = !options.onBugReportClick;
+  const onSettingsClick = (): void => options.onSettingsClick?.();
+  const onBugReportClick = (): void => options.onBugReportClick?.();
 
   pauseButton.addEventListener("click", onPauseClick);
   rendererButton.addEventListener("click", options.onRendererClick);
   statusElement.addEventListener("click", options.onStatusClick);
   for (const chip of positionChips) chip.addEventListener("click", options.onStatusClick);
-  settingsButton.addEventListener("click", options.onSettingsClick);
+  settingsButton.addEventListener("click", onSettingsClick);
   fpsButton.addEventListener("click", options.onDebugClick);
-  bugReportButton.addEventListener("click", options.onBugReportClick);
+  bugReportButton.addEventListener("click", onBugReportClick);
   mapSource.update(options.runtimeStatus);
 
   const settings = getAppSettings();
@@ -297,8 +316,8 @@ export function createFlightHudBar(container: HTMLElement, options: FlightHudBar
   setLayout("classic");
 
   /** Altitude as Interface → Position readout measures it; a dash while its base is unknown. */
-  let lastAltitude: { state: FlightState; groundHeightMeters: number | null; mode: BabylonRuntimeStatus["mode"] } | null = null;
-  const drawAltitude = (state: FlightState, groundHeightMeters: number | null, mode: BabylonRuntimeStatus["mode"]): void => {
+  let lastAltitude: { state: FlightHudBarReading; groundHeightMeters: number | null; mode: BabylonRuntimeStatus["mode"] } | null = null;
+  const drawAltitude = (state: FlightHudBarReading, groundHeightMeters: number | null, mode: BabylonRuntimeStatus["mode"]): void => {
     lastAltitude = { state, groundHeightMeters, mode };
     const reference = settings.get<"asl" | "agl">(ALTITUDE_REFERENCE_ID);
     const unit = settings.get<"m" | "ft">(ALTITUDE_UNIT_ID);
@@ -354,9 +373,9 @@ export function createFlightHudBar(container: HTMLElement, options: FlightHudBar
       rendererButton.removeEventListener("click", options.onRendererClick);
       statusElement.removeEventListener("click", options.onStatusClick);
       for (const chip of positionChips) chip.removeEventListener("click", options.onStatusClick);
-      settingsButton.removeEventListener("click", options.onSettingsClick);
+      settingsButton.removeEventListener("click", onSettingsClick);
       fpsButton.removeEventListener("click", options.onDebugClick);
-      bugReportButton.removeEventListener("click", options.onBugReportClick);
+      bugReportButton.removeEventListener("click", onBugReportClick);
       mapSource.destroy();
       detachRendererActivity();
       position.destroy();

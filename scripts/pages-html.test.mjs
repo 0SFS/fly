@@ -22,11 +22,22 @@ describe("pageHtmlFor", () => {
     expect(rc).toContain("<title>0SFS RC — Phone Controller</title>");
   });
 
+  it("gives /replay/ its own title, description and canonical address", () => {
+    const replay = pageHtmlFor("replay", home);
+    expect(replay).toContain("<title>Flight replay — 0SFS</title>");
+    expect(replay).toContain('<link rel="canonical" href="https://0sfs.github.io/replay/" />');
+    expect(replay).toMatch(/<meta name="description" content="Replays of real flights/);
+    expect(replay).toMatch(/<meta property="og:description" content="Replays of real flights/);
+    expect(replay).not.toContain("noindex");
+    expect(replay).not.toContain("application/ld+json");
+  });
+
   it("leaves the flight's files to /fly/, where the boot terminal fetches them at once", () => {
     const graph = 'installBootTerminal(window, {"base":"/","files":[["assets/index-1.js",9],["assets/createFlightSimApp-1.js",99]],"preload":["assets/createFlightSimApp-1.js"]});';
     const built = home.replace("</body>", `<script>${graph}</script></body>`);
     expect(pageHtmlFor("fly", built)).toContain(graph);
     expect(pageHtmlFor("rc", built)).toContain('installBootTerminal(window, {"base":"/","files":[["assets/index-1.js",9],["assets/createFlightSimApp-1.js",99]]});');
+    expect(pageHtmlFor("replay", built)).not.toContain('"preload"');
   });
 
   it("leaves the home page's tags for the home page", () => {

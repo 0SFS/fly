@@ -1,7 +1,7 @@
 import { configDefaults, defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { execSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { defaultClientConditions, defaultServerConditions, type Plugin } from 'vite'
 import { babylonBarrels, babylonShaderChunks, builtFrom, crossOriginIsolation, deployedIsolation, headsetEmulator, localSource, networkHttps } from 'foss-earth/vite'
@@ -37,6 +37,14 @@ function serveDevQuadMods(): Plugin {
     'turbine-sound': path.resolve(import.meta.dirname, '../turbine-sound/public'),
     'piston-sound': path.resolve(import.meta.dirname, '../piston-sound/public'),
     'electric-sound': path.resolve(import.meta.dirname, '../electric-sound/public'),
+  }
+  const parent = path.resolve(import.meta.dirname, '..')
+  for (const entry of readdirSync(parent, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    const served = path.join(parent, entry.name, 'public')
+    if (!existsSync(path.join(served, '0sfs-mod.json'))) continue
+    const slug = entry.name.toLowerCase()
+    roots[slug] ??= served
   }
   return {
     name: 'osfs-dev-quad-mods',
@@ -121,7 +129,7 @@ function copyIndexToPagesPaths(): Plugin {
       const index = path.join(outDir, 'index.html')
       if (!existsSync(index)) return
       const html = readFileSync(index, 'utf8')
-      for (const dir of ['fly', 'rc'] as const) {
+      for (const dir of ['fly', 'rc', 'replay'] as const) {
         mkdirSync(path.join(outDir, dir), { recursive: true })
         writeFileSync(path.join(outDir, dir, 'index.html'), pageHtmlFor(dir, html))
       }

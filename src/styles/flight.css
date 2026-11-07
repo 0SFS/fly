@@ -294,56 +294,7 @@
   pointer-events: none;
 }
 
-#flightFps {
-  font-variant-numeric: tabular-nums;
-}
-
-/* Compact's toolbar readings: the value over its label, as FOSS Earth's FPS chip. */
-.hud-bar .flight-reading-chip {
-  box-sizing: border-box;
-  height: 28px;
-  flex-direction: column;
-  gap: 1px;
-  padding: 2px 8px;
-}
-
-.flight-reading__value {
-  font-size: 11px;
-  line-height: 12px;
-  font-variant-numeric: tabular-nums;
-  white-space: pre;
-}
-
-.flight-reading__value .hud-position__icon {
-  width: 10px;
-  height: 10px;
-}
-
-.flight-reading__label {
-  color: #9ca3af;
-  font-size: 7px;
-  line-height: 8px;
-}
-
-:root[data-theme="light"] .flight-reading__label {
-  color: #6b7280;
-}
-
-/* Room for the widest value, so a changing one does not shift the chips after it. */
-#flightFps .flight-reading__value {
-  min-width: 3ch;
-  text-align: center;
-}
-
-#flightAltitude .flight-reading__value {
-  min-width: 5ch;
-  text-align: center;
-}
-
-#flightPitch .flight-reading__value {
-  min-width: 4ch;
-  text-align: center;
-}
+/* The toolbar's own rules are hud/createFlightHudBar.css, which goes with it to /replay/. */
 
 /*
  * Compact's load, gear and autopilot, against the toolbar's end. They keep
@@ -422,28 +373,6 @@ html[data-world-edges="flush"] .flight-toolbar-instruments :where(.flight-hud__t
   border-bottom-color: transparent;
   border-radius: 0;
   box-shadow: none;
-}
-
-.flight-shell-root {
-  position: absolute;
-  inset: 0;
-  z-index: 30;
-  pointer-events: none;
-}
-
-.flight-shell-root .hud-bar {
-  position: absolute;
-}
-
-/* Fullscreen is hidden where the browser has none (iPhone Safari). */
-.flight-shell-root .hud-bar button[hidden] {
-  display: none;
-}
-
-.flight-shell-root .flight-shell-pause-button.is-active {
-  color: #11161a;
-  background: var(--flight-panel-accent);
-  border-color: var(--flight-panel-accent);
 }
 
 .flight-panel__title {

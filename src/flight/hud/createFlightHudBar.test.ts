@@ -63,6 +63,28 @@ it("disables resume while a replacement aircraft loads and restores it afterward
   hud.destroy();
 });
 
+it("names another page's tabs and pause, and has no settings or bug report button without their tabs", () => {
+  const onPausedChange = vi.fn();
+  const { container, hud } = createTestHud({
+    label: "Replay controls",
+    pauseTitles: { pause: "Pause the replay", resume: "Play the replay" },
+    tabNames: { fps: "Renderer", position: "Map" },
+    onSettingsClick: undefined, onBugReportClick: undefined, onPausedChange,
+  });
+  expect(container.querySelector(".hud-bar")?.getAttribute("aria-label")).toBe("Replay controls");
+  const pause = container.querySelector<HTMLButtonElement>("#flightPauseButton")!;
+  hud.update({ latDeg: 0, lonDeg: 0, altMeters: 1000, headingRad: 0, pitchRad: 0 }, { mode: "fallback" } as BabylonRuntimeStatus, 60, true);
+  expect(pause.title).toBe("Play the replay");
+  pause.click();
+  expect(onPausedChange).toHaveBeenLastCalledWith(false);
+  expect(pause.getAttribute("aria-label")).toBe("Pause the replay");
+  expect(container.querySelector("#flightFps")?.getAttribute("title")).toBe("Rendered frames per second. Click to show or hide the Renderer tab.");
+  expect(container.querySelector("#flightShellStatus")?.getAttribute("title")).toBe("Latitude, longitude, altitude and heading. Click to show or hide the Map tab.");
+  expect(container.querySelector<HTMLButtonElement>("#flightSettingsButton")!.hidden).toBe(true);
+  expect(container.querySelector<HTMLButtonElement>("#flightBugReportButton")!.hidden).toBe(true);
+  hud.destroy();
+});
+
 describe("flight HUD fullscreen and log buttons", () => {
   afterEach(() => {
     Reflect.deleteProperty(document, "fullscreenEnabled");
