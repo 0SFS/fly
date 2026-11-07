@@ -1345,6 +1345,85 @@ it("restores the prior aircraft after a model failure and shows a persistent err
   }
 });
 
+it("keeps one visit record across an aircraft switch, reporting only the aircraft flying", async () => {
+  const started = vi.mocked(startAppDiagnostics).mock.calls.length;
+  const t = await mountAircraftSelection();
+  const diagnostics = vi.mocked(startAppDiagnostics).mock.results.at(-1)!.value as ReturnType<typeof startAppDiagnostics>;
+  const destroyDiagnostics = vi.spyOn(diagnostics, "destroy");
+  try {
+    await act(async () => {
+      expect(await mocks.controlPanelOptions!.onAircraftApply({ aircraftId: "cirrus-vision-jet", lodId: "auto" })).toBeNull();
+    });
+    // The switched session reports into the page's diagnostics instead of opening a second record.
+    expect(vi.mocked(startAppDiagnostics).mock.calls.length - started).toBe(1);
+    expect(destroyDiagnostics).not.toHaveBeenCalled();
+    expect(diagnostics.trail.steps().map(step => step.text)).toEqual(expect.arrayContaining([
+      "Aircraft switch cessna-172 → cirrus-vision-jet: started",
+      "Aircraft switch cessna-172 → cirrus-vision-jet: done",
+    ]));
+    const report = await diagnostics.report();
+    expect(report).toContain("Aircraft: cirrus-vision-jet;");
+    expect(report).not.toContain("Aircraft: cessna-172;");
+  } finally { await act(async () => t.app.destroy()); }
+  expect(destroyDiagnostics).toHaveBeenCalledOnce();
+});
+
+it("records a switch whose previous session fails to shut down, and flies the previous aircraft again", async () => {
+  const t = await mountAircraftSelection();
+  const diagnostics = vi.mocked(startAppDiagnostics).mock.results.at(-1)!.value as ReturnType<typeof startAppDiagnostics>;
+  const checkpoint = vi.spyOn(diagnostics, "checkpoint");
+  mocks.aircraftModel.dispose.mockImplementationOnce(() => { throw new Error("Model teardown failed"); });
+  const showModal = vi.fn(function (this: HTMLDialogElement) { this.open = true; });
+  const close = vi.fn(function (this: HTMLDialogElement) { this.open = false; });
+  Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, value: showModal });
+  Object.defineProperty(HTMLDialogElement.prototype, "close", { configurable: true, value: close });
+  try {
+    let error: string | null = null;
+    await act(async () => {
+      error = await mocks.controlPanelOptions!.onAircraftApply({ aircraftId: "cirrus-vision-jet", lodId: "auto" });
+    });
+    expect(error).toContain("Failed while taking down the cessna-172 session.");
+    expect(error).toContain("Model teardown failed");
+    expect(error).toContain("The previous aircraft remains paused.");
+    expect(getAppSettings().get("osfs.aircraft.id")).toBe("cessna-172");
+    expect(createJsbsimRuntime).toHaveBeenCalledTimes(3);
+    expect(createJsbsimRuntime).toHaveBeenLastCalledWith(expect.objectContaining({ aircraftId: "cessna-172" }));
+    const steps = diagnostics.trail.steps().map(step => step.text);
+    expect(steps).toContain("Aircraft switch cessna-172 → cirrus-vision-jet failed while taking down the cessna-172 session: Error: Model teardown failed");
+    expect(steps.some(step => step.startsWith("Aircraft switch stack 1/"))).toBe(true);
+    expect(steps).toContain("Aircraft switch cessna-172 → cirrus-vision-jet: the cessna-172 remains, paused");
+    expect(checkpoint).toHaveBeenCalledWith("aircraft-switch.txt", expect.stringContaining("Model teardown failed"), true);
+    expect(document.querySelector('dialog[aria-label="Aircraft switch failed"]')?.textContent).toContain("Model teardown failed");
+    expect(mocks.runtime.destroy).not.toHaveBeenCalled();
+  } finally {
+    await act(async () => t.app.destroy());
+    Reflect.deleteProperty(HTMLDialogElement.prototype, "showModal");
+    Reflect.deleteProperty(HTMLDialogElement.prototype, "close");
+  }
+});
+
+it("takes back a drone switch when no installed mod supplies the drone", async () => {
+  const mods = await import("./mods/modSession");
+  const t = await mountAircraftSelection();
+  const diagnostics = vi.mocked(startAppDiagnostics).mock.results.at(-1)!.value as ReturnType<typeof startAppDiagnostics>;
+  const snapshot = mods.getModsSession();
+  const session = vi.spyOn(mods, "getModsSession").mockReturnValue({ ...snapshot, records: [] });
+  try {
+    let message: string | null = null;
+    await act(async () => {
+      message = await mocks.controlPanelOptions!.onAircraftApply({ aircraftId: "dji-air2s" as SavedFlight["aircraftId"], lodId: "auto" });
+    });
+    expect(message).toBe("Install the DJI quadcopter mod from the Mods tab.");
+    expect(getAppSettings().get("osfs.aircraft.id")).toBe("cessna-172");
+    expect(document.querySelector<HTMLElement>(".flight-aircraft-switch")!.hidden).toBe(true);
+    expect(createJsbsimRuntime).toHaveBeenCalledTimes(1);
+    expect(diagnostics.trail.steps().map(step => step.text)).toContain("Aircraft switch cessna-172 → dji-air2s: Install the DJI quadcopter mod from the Mods tab.");
+  } finally {
+    session.mockRestore();
+    await act(async () => t.app.destroy());
+  }
+});
+
 it("takes back an aircraft choice that could not be saved", async () => {
   const t = await mountAircraftSelection([["osfs.aircraft", "cessna-172"], ["osfs.aircraft-lod", "lod2"]]);
   try {

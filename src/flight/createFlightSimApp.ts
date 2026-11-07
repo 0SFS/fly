@@ -462,6 +462,13 @@ export async function createFlightSimApp(
   let switching = false;
   let destroyed = false;
   const switchAbort = new AbortController();
+  // One record for the visit: every aircraft session reports into the page's
+  // diagnostics, which outlive a switch and close with the page.
+  const ownsDiagnostics = !options.diagnostics;
+  const diagnostics = options.diagnostics ?? startAppDiagnostics({
+    log: options.log ?? createGameLog(), settings: getAppSettings(), identity: getAppIdentity(),
+  });
+  const sessionOptions: FlightSimAppOptions = { ...options, diagnostics, log: options.log ?? diagnostics.log };
   const overlay = createAircraftSwitchOverlay(rootElement.ownerDocument.body);
   let switchStatus: FlightLoadingScreen | null = null;
   const switchLoading: FlightLoadingScreen = {
@@ -475,6 +482,30 @@ export async function createFlightSimApp(
     fail(message, failure) { switchStatus?.fail(message, failure); },
     setSpawnOverride(action) { switchStatus?.setSpawnOverride?.(action); },
     setPhase(phase, update) { switchStatus?.setPhase(phase, update); },
+  };
+  /** The cause's message and first frames, with each script's address cut to its file name; an AggregateError's own causes too. */
+  const failureLines = (error: unknown): string[] => {
+    const lines: string[] = [];
+    const add = (reason: unknown, depth: number): void => {
+      const cause = describeError(reason);
+      lines.push(cause.message, ...(cause.stack ?? "").split("\n").map(line => line.trim()).filter(line => line && line !== cause.message).slice(0, 12)
+        .map(line => `  ${line.replace(/(?:https?|moz-extension|chrome-extension):\/\/[^\s()]*\/(?=[^/\s()]+:\d+:\d+)/g, "")}`));
+      if (depth < 1 && reason instanceof AggregateError) for (const inner of reason.errors.slice(0, 4)) add(inner, depth + 1);
+    };
+    add(error, 0);
+    return lines;
+  };
+  /**
+   * An aircraft switch's failure, kept in the visit's record and in the startup
+   * checkpoint, so a report made after a reload still names the failed step.
+   */
+  const recordSwitchFailure = (heading: string, error: unknown): void => {
+    const lines = failureLines(error);
+    diagnostics.trail.trouble(`${heading}: ${lines[0]}`);
+    const frames = lines.slice(1).map(line => line.trim()).join(" | ");
+    const chunks = frames.slice(0, 2048).match(/[\s\S]{1,240}/g) ?? [];
+    chunks.forEach((chunk, index) => diagnostics.trail.step(`Aircraft switch stack ${index + 1}/${chunks.length}: ${chunk}`));
+    diagnostics.checkpoint?.("aircraft-switch.txt", [heading, ...lines].join("\n").slice(0, 8192), true);
   };
   const switchAircraft = async (selection: AircraftSelection, reportError = false): Promise<string | null> => {
     let retainedReport = "";
@@ -499,15 +530,20 @@ export async function createFlightSimApp(
       }
     } catch (error) {
       switching = false;
+      recordSwitchFailure("Could not prepare the aircraft switch", error);
       current.finishSwitch();
       const cause = describeError(error);
       const report = await failureReport(`Could not prepare the aircraft switch: ${cause.message}`, cause.stack ?? "");
       if (reportError) overlay.fail(report);
       return report;
     }
+    const route = `${previous.selection.aircraftId} → ${selection.aircraftId}`;
+    diagnostics.trail.step(`Aircraft switch ${route}: started`);
     overlay.show(getAircraftDefinition(selection.aircraftId).label, previous.position);
     let prepared: Awaited<ReturnType<typeof createJsbsimRuntime>> | undefined;
     let replaced = false;
+    // What the switch was doing, for the record of a failure.
+    let stage = "preparing the new aircraft";
     const runtime = current.runtime;
     const canvas = current.canvas;
     try {
@@ -515,10 +551,15 @@ export async function createFlightSimApp(
         await ensureModsSession();
         const installed = modDefinesAircraft(selection.aircraftId);
         if (!installed) {
+          const message = "Install the DJI quadcopter mod from the Mods tab.";
+          diagnostics.trail.trouble(`Aircraft switch ${route}: ${message}`);
+          parameters.setMany(aircraftSelectionValues(previous.selection));
           current.finishSwitch();
           switching = false;
-          return "Install the DJI quadcopter mod from the Mods tab.";
+          if (reportError) overlay.fail(message); else overlay.hide();
+          return message;
         }
+        stage = "loading the drone feature";
         await loadDroneFeature();
         if (!droneRateRestore) droneRateRestore = parameters.get(PHYSICS_RATE_PARAMETER_ID) as "30" | "60" | "120";
         parameters.set(PHYSICS_RATE_PARAMETER_ID, "120");
@@ -526,6 +567,7 @@ export async function createFlightSimApp(
         parameters.set(PHYSICS_RATE_PARAMETER_ID, droneRateRestore);
         droneRateRestore = null;
       }
+      stage = "loading the new aircraft's flight physics";
       const profile = getFdmProfile(selection.aircraftId);
       prepared = await createJsbsimRuntime({
         dataBaseUrl: options.dataBaseUrl,
@@ -548,36 +590,50 @@ export async function createFlightSimApp(
       parameters.setMany(aircraftSelectionValues(selection));
       // Recreate every aircraft-specific consumer around the same map renderer.
       retainedReport = await current.report().catch(() => "");
+      stage = `taking down the ${previous.selection.aircraftId} session`;
+      diagnostics.trail.step(`Aircraft switch ${route}: physics ready; ${stage}`);
       current.destroy(true);
       replaced = true;
+      stage = `starting the ${selection.aircraftId} session`;
       current = await createFlightSimSession(rootElement, {
-        ...options, diagnostics: undefined, log: undefined, loadingScreen: switchLoading,
+        ...sessionOptions, loadingScreen: switchLoading,
       }, { runtime, canvas, jsbsim: prepared, resume: previous, switching: true, selection, signal: switchAbort.signal, onAircraftSwitch: switchAircraft });
       prepared = undefined;
       if (destroyed) { current.destroy(); return null; }
+      stage = "finishing the switch";
       parameters.setMany(aircraftSelectionValues(selection));
       current.finishSwitch();
       overlay.hide();
+      diagnostics.trail.step(`Aircraft switch ${route}: done`);
       return null;
     } catch (error) {
       prepared?.dispose();
       parameters.setMany(aircraftSelectionValues(previous.selection));
+      recordSwitchFailure(`Aircraft switch ${route} failed while ${stage}`, error);
+      // A session that stopped partway through its teardown cannot fly again: recover as after a replacement.
+      if (!current.alive) replaced = true;
       let recoveryError: unknown;
       if (!destroyed) {
         if (replaced) {
           try {
+            if (current.alive) current.destroy(true);
             current = await createFlightSimSession(rootElement, {
-              ...options, diagnostics: undefined, log: undefined, loadingScreen: switchLoading,
+              ...sessionOptions, loadingScreen: switchLoading,
             }, { runtime, canvas, resume: previous, switching: true, selection: previous.selection, signal: switchAbort.signal, onAircraftSwitch: switchAircraft });
-          } catch (failure) { recoveryError = failure; }
+          } catch (failure) {
+            recoveryError = failure;
+            recordSwitchFailure(`Recovering the ${previous.selection.aircraftId} failed`, failure);
+          }
         }
         if (!recoveryError) current.finishSwitch();
       }
       const cause = describeError(error);
       const recovery = recoveryError ? `\nRecovery also failed: ${describeError(recoveryError).message}` : "\nThe previous aircraft remains paused.";
+      if (!destroyed && !recoveryError) diagnostics.trail.step(`Aircraft switch ${route}: the ${previous.selection.aircraftId} remains, paused`);
       const report = await failureReport(
-        `Aircraft switch failed: ${previous.selection.aircraftId} → ${selection.aircraftId}`,
+        `Aircraft switch failed: ${route}`,
         `Requested generation: ${selection.generationId ?? "default"}; detail: ${selection.lodId}`,
+        `Failed while ${stage}.`,
         cause.message, cause.stack ?? "", recovery,
       );
       if (!destroyed) {
@@ -588,8 +644,12 @@ export async function createFlightSimApp(
     } finally { switching = false; }
   };
   try {
-    current = await createFlightSimSession(rootElement, options, { onAircraftSwitch: switchAircraft });
-  } catch (error) { overlay.dispose(); throw error; }
+    current = await createFlightSimSession(rootElement, sessionOptions, { onAircraftSwitch: switchAircraft });
+  } catch (error) {
+    overlay.dispose();
+    if (ownsDiagnostics) diagnostics.destroy();
+    throw error;
+  }
   return {
     get runtime() { return current.runtime; },
     destroy() {
@@ -601,6 +661,10 @@ export async function createFlightSimApp(
       if (!alive) current.runtime.destroy();
       overlay.dispose();
       switchLoading.destroy();
+      if (ownsDiagnostics) {
+        if (!options.log) diagnostics.log.destroy();
+        diagnostics.destroy();
+      }
     },
   };
 }
@@ -3524,13 +3588,19 @@ async function createFlightSimSession(
       rawCenterHeightMeters: groundHeightUnder(flightState),
       ...readContactDiagnostics(jsbsim.sdk, flightState.altMeters, flightState.altMeters) };
   };
-  diagnostics.addState(() => `Ground contacts: ${JSON.stringify(captureGroundDiagnostics())}`);
+  // The page's diagnostics outlive this session; its report lines leave with it.
+  // FOSS Earth's addState returns the line's remover, though AppDiagnostics types it as void.
+  const addSessionState = (read: Parameters<AppDiagnostics["addState"]>[0]): void => {
+    const remove: unknown = diagnostics.addState(read);
+    if (typeof remove === "function") stopWatching.push(remove as () => void);
+  };
+  addSessionState(() => `Ground contacts: ${JSON.stringify(captureGroundDiagnostics())}`);
   diagnostics.checkpoint?.("component-execution.txt", JSON.stringify(earthWasmCores(runtime) ?? [], null, 2), true);
-  diagnostics.addState(() => `Component execution: ${JSON.stringify(earthWasmCores(runtime) ?? [])}`);
-  diagnostics.addState(() => `Compute scheduling: ${JSON.stringify(earthComputeScheduling(runtime))}`);
-  diagnostics.addState(() => `Isolation: ${describeIsolation(window)}`);
-  diagnostics.addState(() => `Aircraft: ${aircraftId}; generation ${aircraftGenerationId ?? "default"}; LOD ${aircraftLodId}; model ${modelState.status}; active LOD ${modelState.activeLodId ?? "none"}; ${modelState.triangles} triangles.`);
-  diagnostics.addState(() => {
+  addSessionState(() => `Component execution: ${JSON.stringify(earthWasmCores(runtime) ?? [])}`);
+  addSessionState(() => `Compute scheduling: ${JSON.stringify(earthComputeScheduling(runtime))}`);
+  addSessionState(() => `Isolation: ${describeIsolation(window)}`);
+  addSessionState(() => `Aircraft: ${aircraftId}; generation ${aircraftGenerationId ?? "default"}; LOD ${aircraftLodId}; model ${modelState.status}; active LOD ${modelState.activeLodId ?? "none"}; ${modelState.triangles} triangles.`);
+  addSessionState(() => {
     const current = physicsLoop.getFault();
     const sentence = (fault: string): string => fault.replace(/\.$/, "");
     const flight = `Flight: ${worldLoading ? "loading" : inputManager.isPaused() ? "paused" : "running"}; view ${aircraft?.getViewMode() ?? "third"}; physics fault ${current ? sentence(current) : "none"}.`;
@@ -3542,11 +3612,11 @@ async function createFlightSimSession(
     const card = overlapNotice.describe();
     return flight + history + depth + (card ? ` On screen: ${card}` : "");
   });
-  diagnostics.addState(() => `Flight progress: ${JSON.stringify({ ticks: flightTicks,
+  addSessionState(() => `Flight progress: ${JSON.stringify({ ticks: flightTicks,
     lastTickAgeMs: lastFlightTickAtMs === null ? null : Math.max(0, performance.now() - lastFlightTickAtMs),
     nativeTimeSeconds: jsbsim.sdk.getSimTime(), physics: physicsLoop.getTimeAccounting(),
   })}`);
-  diagnostics.addState(() => {
+  addSessionState(() => {
     const build = jsbsim.identity?.build;
     return build ? `JSBSim: ${build.package.name} ${build.package.version}; native ${build.native.commit}${build.native.dirty ? "-dirty" : ""}; SDK ${build.sdk.commit}${build.sdk.dirty ? "-dirty" : ""}.` : "JSBSim: build identity unavailable.";
   });
@@ -4613,7 +4683,8 @@ async function createFlightSimSession(
       diagnosticsSection.destroy();
       bugReportPanel.destroy();
       testFeedback?.destroy();
-      diagnostics.destroy();
+      // The page's diagnostics carry the visit's record across an aircraft switch.
+      if (!options.diagnostics) diagnostics.destroy();
       about.dispose();
       browserData.destroy();
       for (const { handle } of interfaceParameterSections) handle.destroy();

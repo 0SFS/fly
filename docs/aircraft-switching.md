@@ -54,6 +54,12 @@ replaces the request, so a mod that arrives later does not switch the aircraft.
   failure rebuilds it paused. Report failures in a fullscreen dialog; the body
   overlay survives disposal of the old React panel. Reports use the shared
   redaction utilities. Recovery failure is included in the report.
+- Every session reports into the page's one diagnostics. A session destroys
+  only diagnostics it created, and removes its report lines when destroyed.
+  The switch records its stages and any failure, with stage and stack, in the
+  activity trail and the `aircraft-switch.txt` checkpoint. An old session that
+  stopped partway through its teardown is recovered like a later failure. See
+  [the 6 November report](diagnostics/aircraft-switch-2026-11-06.md).
 - `floatingOrigin.dispose()` must detach renderer-owned world content before
   disposing the flight transform. Otherwise Babylon recursively disposes the
   retained map.

@@ -55,6 +55,12 @@ metadata identifies capture times, outcomes, and every shortened or omitted sect
 The recovery page's own build and environment are labeled separately. Opening the
 report repeatedly preserves the saved evidence.
 
+An aircraft switch writes its stages to the activity trail as "Aircraft switch
+f-35b → dji-air2s: …" lines. A failed switch adds the stage it failed in, the
+error, and "Aircraft switch stack" lines with its first frames. It also saves
+them as the `aircraft-switch.txt` checkpoint, so the next visit's report still
+shows them after a reload.
+
 Startup capture begins before application modules run. It saves operation starts
 before invoking expensive work, including application import, renderer, JSBSim, and
 terrain preparation. Renderer and physics may run together: several running
