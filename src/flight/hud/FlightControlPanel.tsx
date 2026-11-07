@@ -12,6 +12,7 @@ import type { FlightLocationPanel } from "../location/flightLocation";
 import {
   Blocks,
   Bug,
+  Rocket,
   CloudSun,
   Camera,
   Crosshair,
@@ -90,8 +91,10 @@ import type { AircraftDamageSnapshot } from "../damage/aircraftDamage";
 import { SharedSettingsPanel, type SharedSettingsPanelState } from "../multiplayer/SharedSettingsPanel";
 import type { SharedSettingsPatch } from "@0sfs/multiplayer/sharedSettings";
 import { ModsTab } from "../mods/ModsTab";
+import { SpaceTab } from "../space/SpaceTab";
+import { getSpaceSnapshot, subscribeSpaceSession } from "@0sfs/space/session";
 
-export type FlightPanelTab = "weather" | "aircraft" | "camera" | "fuel" | "armament" | "damage" | "shared-settings" | "autopilot" | "controls" | "remote" | "multiplayer" | "sound" | "exhaust" | "engine" | "gforces" | "logging" | "mods" | "debug";
+export type FlightPanelTab = "weather" | "aircraft" | "camera" | "fuel" | "armament" | "damage" | "shared-settings" | "autopilot" | "controls" | "remote" | "multiplayer" | "sound" | "exhaust" | "engine" | "gforces" | "logging" | "space" | "mods" | "debug";
 
 const TAB_DEFINITIONS: readonly WindowTabDefinition<FlightPanelTab>[] = [
   { id: "weather", label: "Weather" },
@@ -110,6 +113,7 @@ const TAB_DEFINITIONS: readonly WindowTabDefinition<FlightPanelTab>[] = [
   { id: "engine", label: "Engine" },
   { id: "gforces", label: "G-forces" },
   { id: "logging", label: "Logging" },
+  { id: "space", label: "Space" },
   { id: "mods", label: "Mods" },
   { id: "debug", label: "Debug" },
 ];
@@ -131,6 +135,7 @@ const TAB_ICONS = {
   engine: Fan,
   gforces: Weight,
   logging: ScrollText,
+  space: Rocket,
   mods: Blocks,
   debug: Bug,
 } satisfies Record<FlightPanelTab, typeof Plane>;
@@ -833,9 +838,10 @@ function ElementTab({ element }: { element: HTMLElement }) {
 
 export function FlightControlPanel(props: FlightControlPanelProps) {
   const hasArmament = Boolean(props.snapshot.armament);
+  const space = useSyncExternalStore(subscribeSpaceSession, getSpaceSnapshot, getSpaceSnapshot);
   const additionalTabs = useMemo(() => TAB_DEFINITIONS.filter(tab =>
-    (tab.id !== "armament" || hasArmament) && (tab.id !== "camera" || props.cameraTab)),
-    [hasArmament, props.cameraTab]);
+    (tab.id !== "armament" || hasArmament) && (tab.id !== "camera" || props.cameraTab) && (tab.id !== "space" || space.installed)),
+    [hasArmament, props.cameraTab, space.installed]);
   // Keep drafts above the tabs so visiting another tab does not discard them.
   // Each family remembers its own generation and model choices for this session.
   const [selectedAircraftFamily, setSelectedAircraftFamily] = useState<string>(
@@ -1025,6 +1031,7 @@ export function FlightControlPanel(props: FlightControlPanelProps) {
                 </div>
                 : tabId === "logging" ? <LoggingPanel state={props.snapshot.logging} onAction={props.onLoggingAction} />
                 : tabId === "camera" ? props.cameraTab && <ElementTab element={props.cameraTab} />
+                : tabId === "space" ? <SpaceTab />
                 : tabId === "mods" ? <ModsTab />
                 : <DebugPanel snapshot={props.snapshot} settings={props.settings} onCollisionDebugChange={props.onCollisionDebugChange}
                   onWheelSpinModeChange={props.onWheelSpinModeChange} onTireSoundChange={props.onTireSoundChange} />}

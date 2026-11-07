@@ -13,6 +13,9 @@ import { maxCatchUpSteps, physicsStepSeconds, type PhysicsHz } from "./physicsRa
 // Beyond normal suspension compression, this is a hard impact. Feeding deep
 // penetration into an unbounded spring turns a cliff into a launch pad.
 const MAX_GROUND_PENETRATION_METERS = 0.5;
+/** Ground-track distance one coast step may move before the loop calls it a fault. */
+const MAX_SPACE_STEP_METERS = 5_000;
+const METERS_PER_FOOT = 0.3048;
 
 /** The fault raised instead of loading the gear springs with a deep penetration. */
 export const HARD_GROUND_IMPACT_FAULT = "Hard ground impact. Reposition the aircraft to recover.";
@@ -35,6 +38,12 @@ export interface FixedStepPhysicsOptions {
   physicsHz: PhysicsHz;
   /** Deliberate arcade mode; numerical/absolute flight-state guards still apply. */
   getArcadeGroundLaunches?: () => boolean;
+  /** True when this state is coasting in the opt-in space domain instead of the atmosphere. */
+  spaceOwns?: (state: FlightState) => boolean;
+  /** Replaces `sdk.run()` for one step. Null is a fault while `spaceOwns` is true. */
+  spaceStep?: (state: FlightState, dtSeconds: number) => FlightState | null;
+  /** Envelope for a coasted state. The atmospheric 100 km cap does not apply. */
+  spaceReasons?: (state: FlightState) => readonly string[];
 }
 
 /**
@@ -73,6 +82,33 @@ export interface FixedStepPhysicsLoop {
   /** The impact behind a `HARD_GROUND_IMPACT_FAULT`, until reset. */
   getGroundImpact(): GroundImpact | null;
   getTimeAccounting(): PhysicsTimeAccounting;
+}
+
+function writeCoastedFlight(sdk: JSBSimSdk, state: FlightState): void {
+  if (typeof sdk.setPropertyValue !== "function") return;
+  sdk.setPropertyValue("position/lat-geod-deg", state.latDeg);
+  sdk.setPropertyValue("position/long-gc-deg", state.lonDeg);
+  sdk.setPropertyValue("position/h-sl-ft", state.altMeters / METERS_PER_FOOT);
+  sdk.setPropertyValue("velocities/v-north-fps", state.northVelocityFps);
+  sdk.setPropertyValue("velocities/v-east-fps", state.eastVelocityFps);
+  sdk.setPropertyValue("velocities/v-down-fps", -state.verticalSpeedFps);
+  sdk.setPropertyValue("velocities/vc-kts", state.airspeedKts);
+}
+
+/** Hands a coast that has fallen back into the atmosphere to JSBSim. */
+function adoptCoastedFlight(sdk: JSBSimSdk, state: FlightState): void {
+  writeCoastedFlight(sdk, state);
+  if (typeof sdk.setPropertyValue !== "function" || typeof sdk.resetToInitialConditions !== "function") return;
+  const horizontal = Math.hypot(state.northVelocityFps, state.eastVelocityFps);
+  sdk.setPropertyValue("ic/lat-geod-deg", state.latDeg);
+  sdk.setPropertyValue("ic/long-gc-deg", state.lonDeg);
+  sdk.setPropertyValue("ic/h-sl-ft", state.altMeters / METERS_PER_FOOT);
+  sdk.setPropertyValue("ic/psi-true-deg", state.headingRad * 180 / Math.PI);
+  sdk.setPropertyValue("ic/theta-deg", state.pitchRad * 180 / Math.PI);
+  sdk.setPropertyValue("ic/phi-deg", state.rollRad * 180 / Math.PI);
+  sdk.setPropertyValue("ic/vc-kts", state.airspeedKts);
+  sdk.setPropertyValue("ic/gamma-deg", Math.atan2(state.verticalSpeedFps, horizontal) * 180 / Math.PI);
+  sdk.resetToInitialConditions(2);
 }
 
 /** The native model's step must be the loop's: a 60 Hz label never hides a 120 Hz native loop. */
@@ -141,6 +177,35 @@ export function createFixedStepPhysicsLoop(
           break;
         }
         const before = readFlightState(sdk);
+        const owns = options.spaceOwns;
+        const spaceStep = options.spaceStep;
+        if (owns?.(before)) {
+          const coasted = spaceStep?.(before, dt) ?? null;
+          if (!coasted) {
+            fault = "Space flight stopped. Reposition the aircraft to reset the simulation.";
+            discardBacklog();
+            break;
+          }
+          const reasons = [...(options.spaceReasons?.(coasted) ?? [])];
+          const deltaLon = ((coasted.lonDeg - before.lonDeg + 540) % 360) - 180;
+          const distance = Math.hypot((coasted.latDeg - before.latDeg) * 111320,
+            deltaLon * Math.cos(before.latDeg * Math.PI / 180) * 111320, coasted.altMeters - before.altMeters);
+          if (distance > MAX_SPACE_STEP_METERS) reasons.push(`moved ${distance.toFixed(1)} m in one ${physicsHz} Hz step (limit ${MAX_SPACE_STEP_METERS})`);
+          if (reasons.length > 0) {
+            fault = "Space flight stopped. Reposition the aircraft to reset the simulation.";
+            flightLog.error("physics", "Faulted during a space step", { failed: reasons, before, after: coasted });
+            discardBacklog();
+            break;
+          }
+          if (owns(coasted)) writeCoastedFlight(sdk, coasted);
+          else adoptCoastedFlight(sdk, coasted);
+          prevState = currState;
+          currState = coasted;
+          acceptedSteps += 1;
+          onStep?.(currState, dt);
+          accumulator -= dt;
+          continue;
+        }
         const beforeReasons = invalidFlightStateReasons(before);
         if (beforeReasons.length > 0) {
           fault = "Invalid flight state. Reposition the aircraft to reset the simulation.";
@@ -228,7 +293,8 @@ export function createFixedStepPhysicsLoop(
     },
     reset(): void {
       const state = readFlightState(sdk);
-      const reasons = invalidFlightStateReasons(state);
+      const inSpace = options.spaceOwns?.(state) === true;
+      const reasons = inSpace ? [...(options.spaceReasons?.(state) ?? [])] : invalidFlightStateReasons(state);
       if (reasons.length > 0) {
         flightLog.error("physics", "Cannot reset: the simulation is still outside the envelope", {
           failed: reasons, state,

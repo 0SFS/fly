@@ -9,6 +9,7 @@ import { FDM_PROFILES, registerFdmProfile } from "../jsbsim/fdmProfiles";
 import { onModAdded } from "../drone/droneGate";
 import { installDroneCamera, installDjiCommon, installQuadCommon, installQuadVehicle } from "../drone/quadRegistry";
 import { installCameraPreview } from "../drone/cameraPreviewRegistry";
+import { applySpaceManifest } from "../space/applySpaceManifest";
 
 function applyQuadLayer(record: LoadedModRecord): void {
   const manifest = record.manifest;
@@ -34,6 +35,7 @@ export function applyDynamicMod(record: LoadedModRecord): void {
 
 function applyOne(record: LoadedModRecord): void {
   const manifest = record.manifest;
+  applySpaceManifest(manifest);
   if (manifest.audioRenderer || manifest.engine?.acousticProfile || manifest.aircraft?.audio) {
     installAudioMod(manifest, { baseUrl: record.baseUrl, bundled: record.source.bundled, owner: record.source.bundled ? manifest.id : record.source.canonicalKey });
   }

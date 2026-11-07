@@ -271,6 +271,8 @@ import { createFlightLoadingScreen, type FlightLoadingScreen } from "../loading/
 import { appendModDependencyTree } from "@0sfs/about/modTree";
 import { modAboutParts } from "@0sfs/mods";
 import { ensureModsSession, getModsSession } from "./mods/modSession";
+import { registerMissionPlacement } from "./space/missionPlacement";
+import { coastFlightStep, invalidateSpaceCoast, missionPlacementPlan, seedSpaceCoast, spaceOwnsFlight, spaceStateReasons } from "@0sfs/space/session";
 import { unavailableAircraftRequest } from "./unavailableAircraft";
 import {
   currentDroneCommand, droneCameraTab, droneHooks, droneMotorTelemetry, droneRefusal, droneTelemetry, isDroneAircraftId, loadDroneFeature, noteActiveAircraft, setDroneRemovalSwitch,
@@ -1415,6 +1417,9 @@ async function createFlightSimSession(
   }, {
     physicsHz,
     getArcadeGroundLaunches: arcadeGroundLaunches,
+    spaceOwns: spaceOwnsFlight,
+    spaceStep: coastFlightStep,
+    spaceReasons: spaceStateReasons,
   });
   const flightSurface = createFrameSurfaceQuery(runtime.surface);
   /** The terrain's height under the aircraft, which the HUD bar's altitude above ground is measured from; null while none has loaded there. */
@@ -2402,6 +2407,7 @@ async function createFlightSimSession(
   stopWatching.push(() => { offHeadsetView?.(); headsetPanel?.destroy(); headset?.dispose(); });
   let skipResumeDelta = false;
   let disposed = false;
+  let stopMissionPlacement = (): void => {};
   let lastPanelUpdateMs = 0;
   let fpsSampleStartedMs = performance.now();
   let fpsSampleFrames = 0;
@@ -3040,6 +3046,7 @@ async function createFlightSimSession(
   };
 
   const placeAircraftAtLocation = (location: FlightLocation, terrainHeightMeters: number | undefined): FlightState => {
+    invalidateSpaceCoast();
     const placed = engineTest
       ? resetFlightLocation(jsbsim.sdk, location, terrainHeightMeters, aircraftId, { holdDown: true })
       : resetFlightLocation(jsbsim.sdk, location, terrainHeightMeters, aircraftId, { preserveRequestedAltitude: true });
@@ -3048,6 +3055,35 @@ async function createFlightSimSession(
   };
 
   let destinationRequest = 0;
+  stopMissionPlacement = registerMissionPlacement(missionId => {
+    const plan = missionPlacementPlan(missionId);
+    if (!plan) return;
+    const request = ++destinationRequest;
+    const wasPaused = inputManager.isPaused();
+    setSimulationPaused(true);
+    void placement.request({
+      destination: plan.label,
+      reason: `Start ${plan.name}.`,
+    }).then(accepted => {
+      if (disposed || request !== destinationRequest) return;
+      if (!accepted) {
+        setSimulationPaused(wasPaused);
+        return;
+      }
+      try {
+        placeAircraftAtLocation(plan.location, undefined);
+        seedSpaceCoast(plan.state, missionId);
+        physicsLoop.reset();
+      } catch (error) {
+        invalidateSpaceCoast();
+        flightLog.error("space", "Mission placement failed", {
+          missionId, reason: error instanceof Error ? error.message : String(error),
+        });
+      }
+      setSimulationPaused(wasPaused);
+    });
+  });
+
   const describeDestination = (location: FlightLocation, altitude: number) =>
     `${location.latDeg.toFixed(5)}, ${location.lonDeg.toFixed(5)} at ${altitude.toFixed(1)} m`;
   const teleportToLocation = (location: FlightLocation, clearanceMeters = 0): void => {
@@ -4628,6 +4664,7 @@ async function createFlightSimSession(
     report: () => diagnostics.report({ allSettings: true }),
     destroy(preserveWorld = false): void {
       if (disposed) return;
+      stopMissionPlacement();
       cancelArmament();
       disposed = true;
       setDroneRemovalSwitch(null);

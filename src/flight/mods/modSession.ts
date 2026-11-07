@@ -14,6 +14,7 @@ import { uninstallCameraPreview } from "../drone/cameraPreviewRegistry";
 import { unregisterAircraftMod } from "@0sfs/aircraft/aircraftCatalog";
 import { unregisterFdmProfile } from "../jsbsim/fdmProfiles";
 import { BUNDLED_MODS, DEFAULT_MODPACK } from "./bundledMods";
+import { removeSpaceManifest } from "../space/applySpaceManifest";
 
 const ADDED_KEY = "osfs.mods.added";
 const CONFIRMED_KEY = "osfs.mods.confirmed";
@@ -233,6 +234,7 @@ export function ensureModsSession(): Promise<readonly LoadedModRecord[]> {
 
 function dropRecord(record: LoadedModRecord): void {
   const manifest = record.manifest;
+  removeSpaceManifest(manifest);
   const quadsBefore = quadAircraftIds();
   const removedAircraftIds = new Set<string>();
   uninstallCameraPreview(manifest.id);
