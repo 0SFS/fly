@@ -678,11 +678,12 @@ it("keeps autopilot configuration on the Autopilot tab, and shared preferences a
     expect(root.querySelector('[data-parameter="interface.toolbar.bugReport"]')).not.toBeNull();
     expect(root.querySelector('[data-parameter="interface.toolbar.renderer"]')).toBeNull();
     expect(root.querySelector('[data-parameter="interface.toolbar.activityOutline"]')).not.toBeNull();
-    expect(document.documentElement.hasAttribute("data-hud-activity")).toBe(false);
-    getAppSettings().set("interface.toolbar.activityOutline", "still");
+    // Still is the default: the chips at work are outlined without being restyled every frame.
     expect(document.documentElement.dataset.hudActivity).toBe("still");
-    getAppSettings().reset("interface.toolbar.activityOutline");
+    getAppSettings().set("interface.toolbar.activityOutline", "spinning");
     expect(document.documentElement.hasAttribute("data-hud-activity")).toBe(false);
+    getAppSettings().reset("interface.toolbar.activityOutline");
+    expect(document.documentElement.dataset.hudActivity).toBe("still");
     // The HUD bar's altitude replaces the feet tape, so it starts in feet.
     expect(getAppSettings().get("interface.position.altitudeUnit")).toBe("ft");
     expect(root.querySelector('[data-parameter="interface.log.maxLines"]')).not.toBeNull();
