@@ -183,7 +183,7 @@ import { createAircraftLights, type AircraftLightSettings, type AircraftLightsHa
 import { applySlowDeviceSkyDefaults, offerViewpointSurfaceLighting } from "./settings/skyDefaults";
 import { readFlightState } from "@0sfs/ground-contact/ecefBridge";
 import { EMPTY_FLIGHT_STATE, type FlightState } from "@0sfs/ground-contact/flightState";
-import { createFloatingOrigin, type FloatingOriginHandle } from "./bridge/floatingOrigin";
+import { createFloatingOrigin, type FloatingOriginHandle } from "@0sfs/ground-contact/floatingOrigin";
 import { takeMultiplayerInvitation } from "./multiplayer/invitationHandoff";
 import type { MountMultiplayer } from "./multiplayer/MultiplayerTab";
 import type { createMultiplayerFeature } from "./multiplayer/createMultiplayerFeature";

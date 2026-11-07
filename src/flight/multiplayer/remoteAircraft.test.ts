@@ -4,7 +4,7 @@ import { flightAttitudeToQuaternion } from "@0sfs/ground-contact/ecefBridge";
 import { createRemoteAircraft } from "./remoteAircraft";
 import { pose } from "../../../../multiplayer/tests/fixture";
 import { geodeticToEcef } from "foss-earth/cameraMath";
-import { buildWorldShiftFrame } from "../bridge/enuFrame";
+import { buildWorldShiftFrame } from "@0sfs/ground-contact/enuFrame";
 
 vi.mock("@0sfs/aircraft/createAircraftModel", () => ({ createAircraftModel: () => ({
   dispose: vi.fn(), getRig: () => null, updateGearVisibility: vi.fn(),

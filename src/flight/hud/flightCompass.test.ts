@@ -1,6 +1,6 @@
 import { Matrix, NullEngine, Quaternion, Scene, TransformNode, UniversalCamera, Vector3 } from "@babylonjs/core";
 import { expect, it, vi } from "vitest";
-import { createFloatingOrigin } from "../bridge/floatingOrigin";
+import { createFloatingOrigin } from "@0sfs/ground-contact/floatingOrigin";
 import { createFlightCompass } from "./flightCompass";
 
 const compass = vi.hoisted(() => ({ update: vi.fn(), destroy: vi.fn() }));

@@ -1,6 +1,6 @@
 import type { Camera, Node, Scene } from "@babylonjs/core";
 import { createCanvasTextureDevicePorts, createOrbitCompass } from "foss-earth/runtime";
-import type { FloatingOriginHandle } from "../bridge/floatingOrigin";
+import type { FloatingOriginHandle } from "@0sfs/ground-contact/floatingOrigin";
 
 /** The tour's horizon letters in the flight's east/up/south scene frame. */
 export function createFlightCompass(scene: Scene, origin: FloatingOriginHandle, document: Document, requestRender: () => void) {

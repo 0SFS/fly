@@ -3,7 +3,7 @@ import {
   AssetContainer, LoadAssetContainerAsync, Mesh, NullEngine, Quaternion, Scene, StandardMaterial, TransformNode, Vector3, VertexData,
 } from "@babylonjs/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildWorldShiftFrame } from "../bridge/enuFrame";
+import { buildWorldShiftFrame } from "@0sfs/ground-contact/enuFrame";
 import { getExternalTankDefinitions } from "@0sfs/fuel/externalTankDefinitions";
 import { createExternalTankVisuals, type ExternalTankVisualOptions } from "@0sfs/fuel/createExternalTankVisuals";
 

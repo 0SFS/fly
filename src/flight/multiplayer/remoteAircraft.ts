@@ -4,7 +4,7 @@ import { isAircraftId } from "@0sfs/aircraft/aircraftCatalog";
 import { createAircraftModel } from "@0sfs/aircraft/createAircraftModel";
 import { applyAircraftRig, NEUTRAL_CONTROL_SURFACES } from "@0sfs/aircraft/aircraftAnimation";
 import { flightAttitudeToQuaternion } from "@0sfs/ground-contact/ecefBridge";
-import { buildWorldShiftMatrix } from "../bridge/enuFrame";
+import { buildWorldShiftMatrix } from "@0sfs/ground-contact/enuFrame";
 import type { ShownPose } from "@0sfs/multiplayer/posePlayout";
 
 export interface RemoteAircraftFrame { origin: EcefCoord; m: ArrayLike<number> }
