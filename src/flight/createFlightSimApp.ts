@@ -120,6 +120,8 @@ import {
 } from "@0sfs/aircraft/aircraftCatalog";
 import { applyAircraftRig, readControlSurfaceState, readGearDownNorm, withGearDown, type ControlSurfaceState } from "@0sfs/aircraft/aircraftAnimation";
 import { createControlPositionReader } from "./controlPositions";
+import { createPropertySampler } from "./jsbsim/propertySampler";
+import { STEP_FLIGHT_PATHS, TRIM_FLIGHT_PATHS, stepFlightFrom, trimFlightFrom, type StepFlight, type TrimFlight } from "./physics/stepFlight";
 import { flightLog } from "@0sfs/logging/flightLog";
 import { createFlightRecorder } from "@0sfs/logging/flightRecorder";
 import { createEvaluationInstruments } from "./hud/evaluationInstruments";
@@ -1220,18 +1222,16 @@ async function createFlightSimSession(
     const wow = jsbsim.sdk.getPropertyValue(`gear/unit[${index}]/WOW`);
     return Number.isFinite(wow) && wow > 0.5;
   });
-  const readArbiterFlight = (dt: number) => ({
-    dt,
-    onGround: aircraftOnGround(),
-    rollRad: jsbsim.sdk.getPropertyValue("attitude/phi-deg") * Math.PI / 180,
-    rollRateRad: jsbsim.sdk.getPropertyValue("velocities/p-rad_sec"),
-    pitchRad: jsbsim.sdk.getPropertyValue("attitude/theta-deg") * Math.PI / 180,
-    pitchRateRad: jsbsim.sdk.getPropertyValue("velocities/q-rad_sec"),
-    headingRad: jsbsim.sdk.getPropertyValue("attitude/psi-deg") * Math.PI / 180,
-    yawRateRad: jsbsim.sdk.getPropertyValue("velocities/r-rad_sec"),
-    airspeedKts: jsbsim.sdk.getPropertyValue("velocities/vc-kts"),
-  });
-  const syncArbiter = (pilot = inputManager.getControls()): ControlArbiterResult => {
+  // The arbiter's flight state, and the dynamic pressure and true airspeed the
+  // step reads after it, through one batch: nothing between the two writes to JSBSim.
+  const stepFlightSampler = createPropertySampler(jsbsim.sdk, STEP_FLIGHT_PATHS);
+  stopWatching.push(() => stepFlightSampler.dispose());
+  const readStepFlight = (dt: number): StepFlight => stepFlightFrom(stepFlightSampler.read(), dt);
+  // The auto-trims' and automatic flaps' readings come after the engine's
+  // writes, so they are a second batch, read once when the first is needed.
+  const trimFlightSampler = createPropertySampler(jsbsim.sdk, TRIM_FLIGHT_PATHS);
+  stopWatching.push(() => trimFlightSampler.dispose());
+  const syncArbiter = (pilot = inputManager.getControls(), flight?: StepFlight): ControlArbiterResult => {
     if (benchmarkRouteRun) {
       const target = benchmarkRouteRun.targets(readFlightState(jsbsim.sdk));
       const held = arbiterState.our;
@@ -1248,7 +1248,7 @@ async function createFlightSimSession(
       ardupilot: ardupilotStatus,
       pilot,
       gearDownNorm: inputManager.getGearDownNorm(),
-      flight: readArbiterFlight(physicsDt),
+      flight: flight ?? readStepFlight(physicsDt),
       stickOverride: parameters.get("osfs.autopilot.stickOverride"),
     });
     arbiterState = stepped.state;
@@ -4298,11 +4298,12 @@ async function createFlightSimSession(
       if (collisionReset) { resetWheelSpin("reset"); return "reset"; }
       if (phoneSession?.getSnapshot().owner === "phone") noticeRemoteFlaps(selected.flaps);
       else noticeLocalFlaps();
-      const ap = engineTest ? { ...lastApResult, engaged: false, controls: selected, owners: idleAutopilotOwners() } : syncArbiter(selected);
+      const flight = readStepFlight(physicsDt);
+      const ap = engineTest ? { ...lastApResult, engaged: false, controls: selected, owners: idleAutopilotOwners() } : syncArbiter(selected, flight);
       if (benchmarkRouteRun?.status === "failed") { inputManager.setPaused(true); return false; }
-      const onGround = aircraftOnGround();
-      const qbarPsf = jsbsim.sdk.getPropertyValue("aero/qbar-psf");
-      const vtFps = jsbsim.sdk.getPropertyValue("velocities/vt-fps");
+      const { onGround, qbarPsf, vtFps } = flight;
+      let trimFlight: TrimFlight | null = null;
+      const readTrimFlight = (): TrimFlight => trimFlight ??= trimFlightFrom(trimFlightSampler.read());
       const trimTuning = readAutoTrimTuning(parameters);
       const commanded = { ...ap.controls };
       // Gear and weapon-bay doors never move together. Nothing waiting, this reads nothing.
@@ -4334,8 +4335,8 @@ async function createFlightSimSession(
           ? jsbsim.sdk.getPropertyValue("fcs/pusher-cmd-norm") : 0;
         const pitched = stepPitchAutoTrim(pitchAutoTrim, {
           dt: physicsDt,
-          pitchAccelRad: jsbsim.sdk.getPropertyValue("accelerations/qdot-rad_sec2"),
-          pitchRateRad: jsbsim.sdk.getPropertyValue("velocities/q-rad_sec"),
+          pitchAccelRad: readTrimFlight().pitchAccelRad,
+          pitchRateRad: readTrimFlight().pitchRateRad,
           elevator: selected.elevator + (Number.isFinite(pusher) ? pusher : 0),
           pitchTrim: commanded.pitchTrim,
           qbarPsf,
@@ -4352,8 +4353,8 @@ async function createFlightSimSession(
       } else if (!engineTest && ap.owners.roll === "pilot") {
         const rolled = stepRollAutoTrim(rollAutoTrim, {
           dt: physicsDt,
-          rollAccelRad: jsbsim.sdk.getPropertyValue("accelerations/pdot-rad_sec2"),
-          rollRateRad: jsbsim.sdk.getPropertyValue("velocities/p-rad_sec"),
+          rollAccelRad: readTrimFlight().rollAccelRad,
+          rollRateRad: readTrimFlight().rollRateRad,
           aileron: selected.aileron,
           rollTrim: commanded.rollTrim,
           qbarPsf,
@@ -4367,7 +4368,7 @@ async function createFlightSimSession(
       const autoFlapsEnabled = !engineTest && parameters.get("osfs.assist.autoFlaps") && ap.owners.flaps === "pilot";
       if (autoFlapsEnabled && profile.automaticFlaps.kind === "assist") {
         commanded.flaps = automaticFlapCommand(profile.automaticFlaps, {
-          airspeedKts: jsbsim.sdk.getPropertyValue("velocities/vc-kts"),
+          airspeedKts: readTrimFlight().airspeedKts,
           throttleNorm: commanded.throttle,
           gearDown: gearDownNorm > 0.5,
           onGround,

@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => {
     state: "ready", minimumReady: true, finalReady: true, readyTiles: 1, totalTiles: 1, pendingTiles: 0,
     estimatedRemainingMs: null, reason: null, groundHeightMeters: 250, sourceGeneration: 1,
   };
+  const stepPaths = new Set<string>();
   const regionLeases: Array<{
     request: import("foss-earth/runtime").TerrainRegionOptions;
     progress: import("foss-earth/runtime").TerrainRegionProgress;
@@ -53,17 +54,23 @@ const mocks = vi.hoisted(() => {
   };
   return {
     state, snapshot, phoneControls, phone, engineVisualValues, regionProgress, regionLeases, createRegionLease,
+    // The step's batched flight state; filled from the app's path lists below.
+    stepPaths,
     createPhoneSession: vi.fn(() => phone),
     pairingPanel: { destroy: vi.fn() }, createPairingPanel: vi.fn(),
     resetLocation: vi.fn(() => state),
     sdk: {
       setPropertyValue: vi.fn(), run: vi.fn(),
-      createPropertyBatch: vi.fn(function (this: { setPropertyValue(path: string, value: number): void }, paths: readonly string[]) {
+      createPropertyBatch: vi.fn(function (this: { setPropertyValue(path: string, value: number): void; getPropertyValue(path: string): number }, paths: readonly string[]) {
         const sdk = this;
         return {
           missing: [],
+          // The step's flight state reads what a scalar read would, as it did before it was
+        // batched, without counting as one.
           read: vi.fn((target = new Float64Array(paths.length)) => {
-            paths.forEach((path, index) => { target[index] = engineVisualValues.get(path) ?? Number.NaN; });
+            paths.forEach((path, index) => {
+              target[index] = engineVisualValues.get(path) ?? (stepPaths.has(path) ? vi.mocked(sdk.getPropertyValue).getMockImplementation()!(path) : Number.NaN);
+            });
             return target;
           }),
           dispose: vi.fn(),
@@ -151,10 +158,13 @@ vi.mock("@0sfs/rc/createPhonePairingPanel", () => ({ createPhonePairingPanel: mo
 
 import { getAppSettings, resetAppSettings } from "foss-earth/settings";
 import { createFlightSimApp } from "./createFlightSimApp";
+import { STEP_FLIGHT_PATHS, TRIM_FLIGHT_PATHS } from "./physics/stepFlight";
 import { registerFlightSettings } from "./settings/registerFlightSettings";
 import { getAircraftDefinition } from "@0sfs/aircraft/aircraftCatalog";
 import { setDroneRefusal } from "./drone/droneGate";
 import { parseMessage } from "@0sfs/rc/protocol";
+
+for (const path of [...STEP_FLIGHT_PATHS, ...TRIM_FLIGHT_PATHS]) mocks.stepPaths.add(path);
 
 let app: Awaited<ReturnType<typeof createFlightSimApp>> | null = null;
 let tick: (dt: number) => void;

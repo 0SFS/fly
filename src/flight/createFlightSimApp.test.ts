@@ -119,6 +119,8 @@ const mocks = vi.hoisted(() => {
     surfaceState: { elevatorRad: 0.1, gearDownNorm: 1 },
     readControlSurfaceState: vi.fn(),
     engineVisualValues: new Map<string, number>(),
+    // The step's batched flight state; filled from the app's path lists below.
+    stepPaths: new Set<string>(),
     externalTankAttached: new Map([[2, true], [3, true]]),
     externalTanks: {
       ready: Promise.resolve(), sync: vi.fn(), jettison: vi.fn(), update: vi.fn(),
@@ -184,11 +186,15 @@ vi.mock("./jsbsim/createJsbsimRuntime", () => ({ createJsbsimRuntime: vi.fn(asyn
     ...(mocks.weaponStations ? {
       queryPropertyCatalog: vi.fn((check: string) => check === "stores/station[1]/occupied" ? check : ""),
     } : {}),
-    createPropertyBatch: vi.fn(function (this: { setPropertyValue(path: string, value: number): void }, paths: readonly string[]) {
+    createPropertyBatch: vi.fn(function (this: { setPropertyValue(path: string, value: number): void; getPropertyValue(path: string): number }, paths: readonly string[]) {
       const sdk = this;
       return {
+        // The step's flight state reads what a scalar read would, as it did before it was
+        // batched, without counting as one.
         read: vi.fn((target = new Float64Array(paths.length)) => {
-          paths.forEach((path, index) => { target[index] = mocks.engineVisualValues.get(path) ?? Number.NaN; });
+          paths.forEach((path, index) => {
+            target[index] = mocks.engineVisualValues.get(path) ?? (mocks.stepPaths.has(path) ? vi.mocked(sdk.getPropertyValue).getMockImplementation()!(path) : Number.NaN);
+          });
           return target;
         }),
         dispose: vi.fn(),
@@ -315,6 +321,9 @@ import { createJsbsimAudioAdapter } from "@0sfs/sound/jsbsimAudioAdapter";
 import { createFlightAudio } from "@0sfs/sound/createFlightAudio";
 import { captureSavedFlight, restoreSavedFlight, SAVED_FLIGHT_STORAGE_KEY, type SavedFlight } from "./jsbsim/savedFlight";
 import { getFdmProfile } from "./jsbsim/fdmProfiles";
+import { STEP_FLIGHT_PATHS, TRIM_FLIGHT_PATHS } from "./physics/stepFlight";
+
+for (const path of [...STEP_FLIGHT_PATHS, ...TRIM_FLIGHT_PATHS]) mocks.stepPaths.add(path);
 
 function confirmTeleport(accepted = true): void {
   const dialog = document.querySelector<HTMLDialogElement>('.flight-placement-dialog[open]')!;
@@ -879,6 +888,35 @@ it("reads neither every contact's weight nor the rest motion while an engine tur
     mocks.onGround = false;
     vi.mocked(runtime.sdk.getPropertyValue).mockImplementation(previousRead);
     delete (runtime.sdk as { queryPropertyCatalog?: unknown }).queryPropertyCatalog;
+    await act(async () => t.app.destroy());
+  }
+});
+
+it("reads each step's flight state through two batch reads, not one property at a time", async () => {
+  const t = await mountAircraftSelection();
+  const runtime = await vi.mocked(createJsbsimRuntime).mock.results.at(-1)!.value;
+  try {
+    await act(async () => mocks.hudBarOptions!.onPausedChange(false));
+    const createBatch = vi.mocked(runtime.sdk.createPropertyBatch);
+    const batchFor = (paths: readonly string[]) => {
+      const made = createBatch.mock.calls.flatMap(([batchPaths, options], index) =>
+        batchPaths.join() === paths.join() ? [{ options, batch: createBatch.mock.results[index]!.value }] : []);
+      expect(made).toHaveLength(1);
+      expect(made[0]!.options).toEqual({ create: false });
+      return made[0]!.batch as { read: ReturnType<typeof vi.fn> };
+    };
+    const [step, trim] = [batchFor(STEP_FLIGHT_PATHS), batchFor(TRIM_FLIGHT_PATHS)];
+    const tick = mocks.runtime.setSimTick.mock.calls.at(-1)![0] as (dt: number) => void;
+    vi.mocked(runtime.sdk.getPropertyValue).mockClear();
+    step.read.mockClear(); trim.read.mockClear();
+    for (let frame = 0; frame < 10; frame++) tick(1 / 60);
+    // One read of each a step: the pilot flies both axes, so both auto-trims read.
+    expect(step.read).toHaveBeenCalledTimes(10);
+    expect(trim.read).toHaveBeenCalledTimes(10);
+    const read = vi.mocked(runtime.sdk.getPropertyValue).mock.calls.map(([property]) => property);
+    for (const path of ["attitude/phi-deg", "attitude/theta-deg", "attitude/psi-deg", "velocities/r-rad_sec", "aero/qbar-psf",
+      "velocities/vt-fps", "accelerations/qdot-rad_sec2", "accelerations/pdot-rad_sec2"]) expect(read).not.toContain(path);
+  } finally {
     await act(async () => t.app.destroy());
   }
 });
