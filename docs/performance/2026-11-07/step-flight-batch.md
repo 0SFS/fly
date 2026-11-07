@@ -88,11 +88,46 @@ and maximum. Script: `build/step-flight/bench.test.ts`.
 At 60 steps a second, about 0.62 ms/s of main thread on the C172 and
 0.83 ms/s on the jets. These are Node timings, not frame rates.
 
+## Recount in Chrome
+
+`build/prop-count/count.mjs` (see [the rest check's note](rest-check-order.md#recount-in-chrome)),
+headless Chrome on the M5 (WebGPU, Metal), 10 s after a 6 s settle, physics
+stepping once a frame. Counts only. Before is the 11:08 count (fly `ce8c850`,
+ground-contact `2f1b707`, controls and engines before P-118 and P-119). After
+is fly `62b6632`, ground-contact `3fe5b2c`, controls `72fc160` and engines
+`7cebc17`, so it also holds P-118 (the commands' batch write) and P-119 (the
+engine sample's batch read), which had not been counted in the browser.
+
+| Case | Scalar reads a step, before → after | Batch reads | Scalar writes | Batch writes |
+| --- | ---: | ---: | ---: | ---: |
+| C172 in flight | 52.7 → 16.7 | 9 → 13 | 13 → 2 | 0 → 1 |
+| F-35B in flight | 69.4 → 30.3 | 14 → 18 | 17 → 6 | 0 → 1 |
+| C172 on the ground | 56.5 → 14.5 | 11 → 15 | 13 → 2 | 0 → 1 |
+
+By caller, C172 in flight:
+
+- This change (P-120): 20 fewer scalar reads, 2 more batch reads.
+- The wheel-spin batch (ground-contact, P-121): 5 fewer, 1 more batch read.
+  On the ground it is 15 fewer (the three wheels' compression, compression
+  speed and wheel speed, and the steering).
+- The engine sample (P-119): 11 fewer, 1 more batch read.
+- The commands' batch write (P-118): 11 fewer sets, one batch write.
+
 ## Left
 
-- A Chrome recount of property calls per step with `build/prop-count`
-  (perf lock), with the wheel-spin batch in ground-contact (P-121).
-- Still scalar each step in flight: altitude twice (kept on purpose), the
-  engine control's running and fuel reads, terrain elevation, the contact
-  count, the flight recorder's brake, the pilot load factor, and paths the
-  model lacks in the aircraft repository's surface batch.
+- Still scalar each step in flight on the C172 (16.7 a step):
+  - altitude twice (kept on purpose);
+  - the engine control's running flag and fuel;
+  - the terrain elevation;
+  - the contact count;
+  - the flight recorder's brake;
+  - the pilot load factor;
+  - the two ruddervator paths the C172 lacks;
+  - once a frame, the reading tints' flaps, angle of attack, weight and three
+    contacts' weight.
+- On the F-35B also:
+  - six propeller and rotor rpm candidates a frame, all missing on a jet;
+  - the external tanks;
+  - the STOVL position twice;
+  - the fly-by-wire flag;
+  - four conditional mode sets a step.
