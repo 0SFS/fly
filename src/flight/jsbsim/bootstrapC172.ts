@@ -110,12 +110,16 @@ export async function bootstrapAircraft(
   // Keep their synthetic floor below it; pressure still uses the requested MSL altitude.
   if (opts.holdDown) sdk.setPropertyValue("ic/terrain-elevation-ft", opts.altFt - 1000 / 0.3048);
   sdk.setPropertyValue("ic/psi-true-deg", opts.headingDeg);
-  sdk.setPropertyValue("ic/theta-deg", opts.holdDown ? 0 : profile.initialPitchDeg ?? 0);
+  const airspeedKts = options.airspeedKts ?? profile.initialAirspeedKts ?? opts.airspeedKts;
+  const pitchDeg = opts.holdDown ? 0 : profile.initialPitchDeg ?? 0;
+  sdk.setPropertyValue("ic/theta-deg", pitchDeg);
   sdk.setPropertyValue("ic/phi-deg", 0);
-  sdk.setPropertyValue("ic/vc-kts", options.airspeedKts ?? profile.initialAirspeedKts ?? opts.airspeedKts);
+  sdk.setPropertyValue("ic/vc-kts", airspeedKts);
   if (profile.initialPitchDeg !== undefined) {
     sdk.setPropertyValue("ic/gamma-deg", 0);
     sdk.setPropertyValue("ic/alpha-deg", opts.holdDown ? 0 : profile.initialPitchDeg);
+    // Fitting an angle of attack at zero airspeed levels the nose. Put the attitude back.
+    if (airspeedKts === 0 && pitchDeg !== 0) sdk.setPropertyValue("ic/theta-deg", pitchDeg);
   }
   // Commands and physical actuator positions must agree before RunIC, which
   // already evaluates the FCS and ground contacts. These are not IC properties.

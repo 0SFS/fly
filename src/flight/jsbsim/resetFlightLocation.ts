@@ -105,17 +105,19 @@ export function resetFlightLocation(
   sdk.setPropertyValue("ic/long-gc-deg", location.lonDeg);
   sdk.setPropertyValue("ic/psi-true-deg", preset?.headingDeg ?? location.headingDeg ?? state.headingRad * 180 / Math.PI);
   const flightPathDeg = held ? 0 : preset?.flightPathDeg ?? location.flightPathDeg ?? 0;
+  const airspeedKts = held ? 0 : runway?.airspeedKts ?? location.airspeedKts ?? state.airspeedKts;
   sdk.setPropertyValue("ic/theta-deg", pitchDeg);
   sdk.setPropertyValue("ic/phi-deg", 0);
-  sdk.setPropertyValue("ic/vc-kts", held ? 0 : runway?.airspeedKts ?? location.airspeedKts ?? state.airspeedKts);
+  sdk.setPropertyValue("ic/vc-kts", airspeedKts);
   sdk.setPropertyValue("ic/gamma-deg", flightPathDeg);
   if (held) sdk.setPropertyValue("ic/alpha-deg", 0);
   else if (preset?.mode === "arrival") sdk.setPropertyValue("ic/alpha-deg", 6);
   // Pitch is the path plus the wing's angle to the air: alpha keeps the path and sets pitch.
   else if (sharedPitchDeg !== undefined) sdk.setPropertyValue("ic/alpha-deg", sharedPitchDeg - flightPathDeg);
   else if (!runway && profile.initialPitchDeg !== undefined) sdk.setPropertyValue("ic/alpha-deg", pitchDeg);
-  // Without airspeed there is no angle to the air: set the attitude itself.
+  // Without airspeed JSBSim levels the nose while fitting alpha: the pitch is set last.
   if (sharedPitchDeg !== undefined) sdk.setPropertyValue("ic/theta-deg", sharedPitchDeg);
+  else if (airspeedKts === 0 && pitchDeg !== 0) sdk.setPropertyValue("ic/theta-deg", pitchDeg);
   if (departure || held) sdk.setPropertyValue("ic/vg-fps", 0);
   if (runway) {
     sdk.setPropertyValue("fcs/elevator-cmd-norm", 0);
