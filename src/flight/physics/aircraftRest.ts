@@ -94,6 +94,11 @@ export function createAircraftRest(options: AircraftRestOptions = {}): AircraftR
   };
 }
 
+/** A sample for an aircraft that cannot rest: `observe` looks at nothing else in it, so nothing is read for it. */
+export const INELIGIBLE_FOR_REST: AircraftRestSample = Object.freeze({
+  eligible: false, speedMetersPerSecond: Number.POSITIVE_INFINITY, rateRadPerSecond: Number.POSITIVE_INFINITY, pose: Object.freeze([]),
+});
+
 /** The motion JSBSim reports, as a rest sample's speed and rate. */
 export function readAircraftMotion(sdk: { getPropertyValue(name: string): number }):
   Pick<AircraftRestSample, "speedMetersPerSecond" | "rateRadPerSecond"> {

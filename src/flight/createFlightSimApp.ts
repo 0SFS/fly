@@ -258,7 +258,7 @@ import { createJsbsimRuntime } from "./jsbsim/createJsbsimRuntime";
 import { CONTROL_LAW_MODE_VALUES, getFdmProfile, resolveEngineModel } from "./jsbsim/fdmProfiles";
 import { createAircraftEngineVisuals } from "@0sfs/aircraft/createAircraftEngineVisuals";
 import { createFixedStepPhysicsLoop, type GroundImpact, HARD_GROUND_IMPACT_FAULT } from "./physics/fixedStepLoop";
-import { createAircraftRest, enginesTurning, readAircraftMotion, touchingGround } from "./physics/aircraftRest";
+import { createAircraftRest, enginesTurning, INELIGIBLE_FOR_REST, readAircraftMotion, touchingGround } from "./physics/aircraftRest";
 import { groundContactUnits } from "@0sfs/ground-contact/groundContactClearance";
 import { maxCatchUpSteps, PHYSICS_RATE_PARAMETER_ID, physicsStepSeconds, readPhysicsHz } from "./physics/physicsRate";
 import { readPilotG } from "@0sfs/g-forces/gForce";
@@ -4164,10 +4164,14 @@ async function createFlightSimSession(
    */
   const observeRest = (surfaces: ControlSurfaceState, dtSeconds: number): void => {
     if (aircraftRest.isResting()) return;
+    // Every test only reads, so the order is free: the engines first, since a turning one or its propeller
+    // answers without reading every contact's weight, as each flying frame would otherwise.
     const eligible = !engineTest && !benchmarkRouteRun && !worldLoading && !inputManager.isPaused()
       && terrainContact.getRelocationProposal() === null && !lastApResult.engaged && !pilot.isOut()
       && !(inputManager.hasActiveFlightInput() || localStartHeld || flightHud.isPilotHolding())
-      && touchingGround(jsbsim.sdk, contactPrefixes()) && enginesStill(surfaces);
+      && enginesStill(surfaces) && touchingGround(jsbsim.sdk, contactPrefixes());
+    // Motion and pose say nothing about an aircraft that cannot rest: they are read only for one that can.
+    if (!eligible) { aircraftRest.observe(INELIGIBLE_FOR_REST, dtSeconds); return; }
     const pose = [surfaces.aileronLeftRad, surfaces.aileronRightRad, surfaces.elevatorRad, surfaces.rudderRad,
       surfaces.ruddervatorLeftRad, surfaces.ruddervatorRightRad, surfaces.flapRad, surfaces.gearDownNorm,
       surfaces.stovlPositionNorm ?? 0, surfaces.nozzlePitchRad ?? 0, surfaces.nozzleYawRad ?? 0];

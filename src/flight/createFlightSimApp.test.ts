@@ -814,6 +814,70 @@ it("rests a parked aircraft with nothing turning: no frames or physics until the
   }
 });
 
+it("waits a whole still period again after a frame in which the aircraft could not rest", async () => {
+  const t = await mountAircraftSelection();
+  const runtime = await vi.mocked(createJsbsimRuntime).mock.results.at(-1)!.value;
+  const previousRead = vi.mocked(runtime.sdk.getPropertyValue).getMockImplementation()!;
+  let engineRunning = 0;
+  try {
+    await act(async () => mocks.hudBarOptions!.onPausedChange(false));
+    mocks.onGround = true;
+    vi.mocked(runtime.sdk.getPropertyValue).mockImplementation(property =>
+      property.endsWith("/set-running") ? engineRunning : property === "gear/num-units" ? 3 : previousRead(property));
+    runtime.sdk.queryPropertyCatalog = vi.fn((check: string) => check === "/unit"
+      ? [0, 1, 2].map(unit => `gear/unit[${unit}]/x-position \n`).join("") : "");
+    const tick = mocks.runtime.setSimTick.mock.calls.at(-1)![0] as (dt: number) => void;
+    for (let frame = 0; frame < 2.5 * 60; frame++) tick(1 / 60);
+    // One frame with the engine running: the still time starts over.
+    engineRunning = 1;
+    tick(1 / 60);
+    engineRunning = 0;
+    for (let frame = 0; frame < 2.5 * 60; frame++) tick(1 / 60);
+    expect(mocks.runtime.setSimRunning).toHaveBeenLastCalledWith(true);
+    for (let frame = 0; frame < 1 * 60; frame++) tick(1 / 60);
+    expect(mocks.runtime.setSimRunning).toHaveBeenLastCalledWith(false);
+  } finally {
+    mocks.onGround = false;
+    vi.mocked(runtime.sdk.getPropertyValue).mockImplementation(previousRead);
+    delete (runtime.sdk as { queryPropertyCatalog?: unknown }).queryPropertyCatalog;
+    await act(async () => t.app.destroy());
+  }
+});
+
+it("reads neither every contact's weight nor the rest motion while an engine turns", async () => {
+  const t = await mountAircraftSelection();
+  const runtime = await vi.mocked(createJsbsimRuntime).mock.results.at(-1)!.value;
+  const previousRead = vi.mocked(runtime.sdk.getPropertyValue).getMockImplementation()!;
+  try {
+    await act(async () => mocks.hudBarOptions!.onPausedChange(false));
+    // Three wheels and a structure contact, none touching; the engine runs, as a flight starts.
+    vi.mocked(runtime.sdk.getPropertyValue).mockImplementation(property => property === "gear/num-units" ? 4 : previousRead(property));
+    runtime.sdk.queryPropertyCatalog = vi.fn((check: string) => check === "/unit"
+      ? ["gear/unit", "gear/unit[1]", "gear/unit[2]", "contact/unit[3]"].map(unit => `${unit}/x-position \n`).join("") : "");
+    const tick = mocks.runtime.setSimTick.mock.calls.at(-1)![0] as (dt: number) => void;
+    vi.mocked(runtime.sdk.getPropertyValue).mockClear();
+    for (let frame = 0; frame < 10; frame++) tick(1 / 60);
+    const read = vi.mocked(runtime.sdk.getPropertyValue).mock.calls.map(([property]) => property);
+    expect(read).toContain("propulsion/engine/set-running");
+    expect(read).not.toContain("contact/unit[3]/WOW");
+    expect(read).not.toContain("velocities/vg-fps");
+    // The engine stops on the ground: the rest test reads both again.
+    mocks.onGround = true;
+    vi.mocked(runtime.sdk.getPropertyValue).mockImplementation(property => property.endsWith("/set-running") ? 0
+      : property === "gear/num-units" ? 4 : previousRead(property));
+    vi.mocked(runtime.sdk.getPropertyValue).mockClear();
+    tick(1 / 60);
+    const parked = vi.mocked(runtime.sdk.getPropertyValue).mock.calls.map(([property]) => property);
+    expect(parked).toContain("gear/unit/WOW");
+    expect(parked).toContain("velocities/vg-fps");
+  } finally {
+    mocks.onGround = false;
+    vi.mocked(runtime.sdk.getPropertyValue).mockImplementation(previousRead);
+    delete (runtime.sdk as { queryPropertyCatalog?: unknown }).queryPropertyCatalog;
+    await act(async () => t.app.destroy());
+  }
+});
+
 it("samples visible terrain contact in Google mode and resets a recoverable fault on Resume", async () => {
   vi.stubGlobal("localStorage", { getItem: (key: string) => key === "foss-earth.inputMode" ? "trackpad" : null, setItem: vi.fn() });
   Object.defineProperty(navigator, "getGamepads", { configurable: true, value: () => [] });
