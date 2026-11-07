@@ -184,13 +184,18 @@ vi.mock("./jsbsim/createJsbsimRuntime", () => ({ createJsbsimRuntime: vi.fn(asyn
     ...(mocks.weaponStations ? {
       queryPropertyCatalog: vi.fn((check: string) => check === "stores/station[1]/occupied" ? check : ""),
     } : {}),
-    createPropertyBatch: vi.fn((paths: readonly string[]) => ({
-      read: vi.fn((target = new Float64Array(paths.length)) => {
-        paths.forEach((path, index) => { target[index] = mocks.engineVisualValues.get(path) ?? Number.NaN; });
-        return target;
-      }),
-      dispose: vi.fn(),
-    })),
+    createPropertyBatch: vi.fn(function (this: { setPropertyValue(path: string, value: number): void }, paths: readonly string[]) {
+      const sdk = this;
+      return {
+        read: vi.fn((target = new Float64Array(paths.length)) => {
+          paths.forEach((path, index) => { target[index] = mocks.engineVisualValues.get(path) ?? Number.NaN; });
+          return target;
+        }),
+        dispose: vi.fn(),
+        // As the SDK's batch: every slot set in slot order.
+        write: vi.fn((values: ArrayLike<number>) => paths.forEach((path, index) => sdk.setPropertyValue(path, values[index]!))),
+      };
+    }),
     setPropertyValue: vi.fn(),
     getPropertyValue: vi.fn((property: string) => property.endsWith("/WOW") ? Number(mocks.onGround)
       : property === "fcs/throttle-cmd-norm"

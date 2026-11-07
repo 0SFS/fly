@@ -58,14 +58,19 @@ const mocks = vi.hoisted(() => {
     resetLocation: vi.fn(() => state),
     sdk: {
       setPropertyValue: vi.fn(), run: vi.fn(),
-      createPropertyBatch: vi.fn((paths: readonly string[]) => ({
-        missing: [],
-        read: vi.fn((target = new Float64Array(paths.length)) => {
-          paths.forEach((path, index) => { target[index] = engineVisualValues.get(path) ?? Number.NaN; });
-          return target;
-        }),
-        dispose: vi.fn(),
-      })),
+      createPropertyBatch: vi.fn(function (this: { setPropertyValue(path: string, value: number): void }, paths: readonly string[]) {
+        const sdk = this;
+        return {
+          missing: [],
+          read: vi.fn((target = new Float64Array(paths.length)) => {
+            paths.forEach((path, index) => { target[index] = engineVisualValues.get(path) ?? Number.NaN; });
+            return target;
+          }),
+          dispose: vi.fn(),
+          // As the SDK's batch: every slot set in slot order.
+          write: vi.fn((values: ArrayLike<number>) => paths.forEach((path, index) => sdk.setPropertyValue(path, values[index]!))),
+        };
+      }),
       // The engine runs, as a flight starts: an engine that is off holds the throttle at idle.
       getPropertyValue: vi.fn((property: string) => property === "fcs/throttle-cmd-norm" ? 0.65 : property === "gear/gear-cmd-norm" ? 1
         : property.endsWith("/set-running") ? 1 : 0),
