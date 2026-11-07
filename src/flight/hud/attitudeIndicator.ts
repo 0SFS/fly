@@ -178,35 +178,137 @@ export function labelFontPx(projection: AttitudeProjection): number {
   return Math.max(8, Math.round(9 * projection.half / DESIGN_HALF));
 }
 
+type GridLines = "horizon" | "skyRings" | "groundRings" | "meridians" | "cardinalMeridians";
+
+/** One polyline of the grid: its first point, its segments, and the scene's lines it joins. */
+interface GridRun {
+  first: number;
+  segments: number;
+  lines: GridLines;
+}
+
 /**
- * Polylines through the points, split wherever they pass too near the tail
- * and trimmed to the frame: most of every ring is off the square, and the
- * canvas strokes whatever it is given, visible or not.
+ * The grid's directions in local north/east/down, three numbers a point, in
+ * the order it is traced: the horizon, the rings, the meridians, then each
+ * heading tick's lower and upper end. They never change but for the ticks'
+ * length, which follows the projection, so they are made once, as
+ * `View.sphere` makes them, and each frame only turns and projects them.
  */
-function trace(projection: AttitudeProjection, count: number, point: (index: number) => ScreenPoint, out: number[][]): void {
+interface Grid {
+  runs: GridRun[];
+  /** The first tick's lower end, as a point index. */
+  firstTick: number;
+  tickAzimuths: number[];
+  /** The ticks' half length, radians, their directions were made for. */
+  ticksFor: number | null;
+  directions: Float64Array;
+  /** Each point's x, y and angle from the nose in the frame being drawn. */
+  points: Float64Array;
+}
+
+let grid: Grid | null = null;
+
+/** `View.sphere`'s direction for this elevation and azimuth, written at `k`. */
+function writeDirection(out: Float64Array, k: number, elevation: number, azimuth: number): void {
+  const level = Math.cos(elevation);
+  out[k] = level * Math.cos(azimuth);
+  out[k + 1] = level * Math.sin(azimuth);
+  out[k + 2] = -Math.sin(elevation);
+}
+
+function buildGrid(): Grid {
+  const angles: number[] = [];
+  const runs: GridRun[] = [];
+  const run = (segments: number, lines: GridLines, elevation: (index: number) => number, azimuth: (index: number) => number): void => {
+    runs.push({ first: angles.length / 2, segments, lines });
+    for (let index = 0; index <= segments; index++) angles.push(elevation(index), azimuth(index));
+  };
+  run(180, "horizon", () => 0, index => index * 2 * DEG);
+  for (let deg = -80; deg <= 80; deg += 10) {
+    if (deg === 0) continue;
+    run(90, deg > 0 ? "skyRings" : "groundRings", () => deg * DEG, index => index * 4 * DEG);
+  }
+  for (let deg = 0; deg < 360; deg += 30) {
+    run(60, deg % 90 === 0 ? "cardinalMeridians" : "meridians", index => (index * 3 - 90) * DEG, () => deg * DEG);
+  }
+  const tickAzimuths: number[] = [];
+  for (let deg = 10; deg < 360; deg += 10) if (deg % 30 !== 0) tickAzimuths.push(deg * DEG);
+  const firstTick = angles.length / 2;
+  const directions = new Float64Array((firstTick + tickAzimuths.length * 2) * 3);
+  for (let point = 0; point < firstTick; point++) writeDirection(directions, point * 3, angles[point * 2], angles[point * 2 + 1]);
+  return { runs, firstTick, tickAzimuths, ticksFor: null, directions, points: new Float64Array(directions.length) };
+}
+
+/** The grid, its ticks remade only when their length changes, as it does when the instrument is resized. */
+function gridFor(tick: number): Grid {
+  const made = grid ??= buildGrid();
+  if (made.ticksFor === null || !Object.is(made.ticksFor, tick)) {
+    made.tickAzimuths.forEach((azimuth, index) => {
+      const k = (made.firstTick + index * 2) * 3;
+      writeDirection(made.directions, k, -tick, azimuth);
+      writeDirection(made.directions, k + 3, tick, azimuth);
+    });
+    made.ticksFor = tick;
+  }
+  return made;
+}
+
+/**
+ * Every grid point where `local` in `createView` puts it, with the same
+ * expressions in the same order, so each number is the one it gives.
+ */
+function projectGrid(m: AttitudeView, projection: AttitudeProjection, { directions, points }: Grid): void {
+  const centre = projection.size / 2;
+  const m0 = m[0], m1 = m[1], m2 = m[2], m3 = m[3], m4 = m[4], m5 = m[5], m6 = m[6], m7 = m[7], m8 = m[8];
+  for (let k = 0; k < directions.length; k += 3) {
+    const north = directions[k], east = directions[k + 1], down = directions[k + 2];
+    const y = m1 * north + m4 * east + m7 * down;
+    const z = m2 * north + m5 * east + m8 * down;
+    const x = m0 * north + m3 * east + m6 * down;
+    const lateral = Math.hypot(y, z);
+    const angle = Math.atan2(lateral, x);
+    points[k + 2] = angle;
+    if (lateral < 1e-12) {
+      points[k] = centre;
+      points[k + 1] = centre;
+      continue;
+    }
+    const scale = radiusForAngle(projection, angle) / lateral;
+    points[k] = centre + y * scale;
+    points[k + 1] = centre + z * scale;
+  }
+}
+
+/**
+ * Polylines through one run's projected points, split wherever they pass too
+ * near the tail and trimmed to the frame: most of every ring is off the
+ * square, and the canvas strokes whatever it is given, visible or not.
+ */
+function trace(projection: AttitudeProjection, points: Float64Array, run: GridRun, out: number[][]): void {
   const centre = projection.size / 2;
   const reach = projection.half + 1;
   let line: number[] = [];
-  let previous: ScreenPoint | null = null;
+  // The previous point's index in `points`, or -1 when there is none to lead in from.
+  let previous = -1;
   let previousInside = false;
   const finish = (): void => {
     if (line.length >= 4) out.push(line);
     line = [];
   };
-  for (let index = 0; index <= count; index++) {
-    const at = point(index);
-    if (!(at.angle <= TRACE_LIMIT)) {
+  for (let index = 0, k = run.first * 3; index <= run.segments; index++, k += 3) {
+    if (!(points[k + 2] <= TRACE_LIMIT)) {
       finish();
-      previous = null;
+      previous = -1;
       previousInside = false;
       continue;
     }
-    const inside = Math.abs(at.x - centre) <= reach && Math.abs(at.y - centre) <= reach;
+    const x = points[k], y = points[k + 1];
+    const inside = Math.abs(x - centre) <= reach && Math.abs(y - centre) <= reach;
     // The first point outside on either side is kept, so the line reaches the edge.
-    if (inside && line.length === 0 && previous) line.push(previous.x, previous.y);
-    if (inside || previousInside) line.push(at.x, at.y);
+    if (inside && line.length === 0 && previous >= 0) line.push(points[previous], points[previous + 1]);
+    if (inside || previousInside) line.push(x, y);
     if (!inside && previousInside) finish();
-    previous = at;
+    previous = k;
     previousInside = inside;
   }
   finish();
@@ -410,22 +512,16 @@ function velocityMarkers(view: View, state: AttitudeState, projection: AttitudeP
  * elevation, meridians every 30° of heading, the horizon, and heading ticks
  * every 10° across it.
  */
-function traceGrid(view: View, projection: AttitudeProjection, scene: AttitudeScene): void {
-  trace(projection, 180, index => view.sphere(0, index * 2 * DEG), scene.horizon);
-  for (let deg = -80; deg <= 80; deg += 10) {
-    if (deg === 0) continue;
-    trace(projection, 90, index => view.sphere(deg * DEG, index * 4 * DEG), deg > 0 ? scene.skyRings : scene.groundRings);
-  }
-  for (let deg = 0; deg < 360; deg += 30) {
-    trace(projection, 60, index => view.sphere((index * 3 - 90) * DEG, deg * DEG),
-      deg % 90 === 0 ? scene.cardinalMeridians : scene.meridians);
-  }
+/** The horizon, rings, meridians and heading ticks: about 2,400 points a frame, turned and projected into one reused array. */
+function traceGrid(m: AttitudeView, projection: AttitudeProjection, scene: AttitudeScene): void {
   const tick = ATTITUDE_TICK_HALF_LENGTH * attitudeArtScale(projection) / projection.a;
-  for (let deg = 10; deg < 360; deg += 10) {
-    if (deg % 30 === 0) continue;
-    const below = view.sphere(-tick, deg * DEG);
-    const above = view.sphere(tick, deg * DEG);
-    if (below.angle <= TRACE_LIMIT && above.angle <= TRACE_LIMIT) scene.ticks.push(below.x, below.y, above.x, above.y);
+  const traced = gridFor(tick);
+  projectGrid(m, projection, traced);
+  const { points } = traced;
+  for (const run of traced.runs) trace(projection, points, run, scene[run.lines]);
+  // Each tick's lower end, then its upper end.
+  for (let index = 0, k = traced.firstTick * 3; index < traced.tickAzimuths.length; index++, k += 6) {
+    if (points[k + 2] <= TRACE_LIMIT && points[k + 5] <= TRACE_LIMIT) scene.ticks.push(points[k], points[k + 1], points[k + 3], points[k + 4]);
   }
 }
 
@@ -489,7 +585,7 @@ export function computeAttitudeScene(
     labels: [],
     markers: [],
   };
-  if (lines) traceGrid(view, projection, scene);
+  if (lines) traceGrid(frame, projection, scene);
   // The view's own heading: its forward direction's, which is the nose's in the aircraft's.
   const headingRad = from ? Math.atan2(frame[3], frame[0]) : state.headingRad;
   scene.labels = placeLabels(candidateLabels(view, headingRad, projection), projection, scene.symbol);

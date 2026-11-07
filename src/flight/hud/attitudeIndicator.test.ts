@@ -1,13 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
+  ATTITUDE_TICK_HALF_LENGTH,
   angleForRadius,
+  attitudeArtScale,
   bodyToLocal,
   colourAtElevation,
   computeAttitudeScene,
   createAttitudeProjection,
   radiusForAngle,
   type AttitudeMarkerKind,
+  type AttitudeProjection,
+  type AttitudeScene,
   type AttitudeState,
+  type AttitudeView,
 } from "./attitudeIndicator";
 
 const DEG = Math.PI / 180;
@@ -234,5 +239,118 @@ describe("attitude indicator drawn from the camera", () => {
   it("draws the velocity markers against the camera's view too", () => {
     const prograde = computeAttitudeScene(state(), projection, { view: camera(90) }).markers.find(item => item.kind === "prograde")!;
     expect(prograde.x).toBeLessThan(CENTRE - 80);
+  });
+});
+
+/**
+ * The grid as the indicator traced it before its directions were cached
+ * (as at fly c67157c): one sphere() call per point, each projecting a fresh
+ * direction. The cached grid must give every number of it, bit for bit.
+ */
+function referenceGrid(m: AttitudeView, projection: AttitudeProjection) {
+  const TRACE_LIMIT = 175 * DEG;
+  const centre = projection.size / 2;
+  const local = (north: number, east: number, down: number) => {
+    const y = m[1] * north + m[4] * east + m[7] * down;
+    const z = m[2] * north + m[5] * east + m[8] * down;
+    const x = m[0] * north + m[3] * east + m[6] * down;
+    const lateral = Math.hypot(y, z);
+    const angle = Math.atan2(lateral, x);
+    if (lateral < 1e-12) return { x: centre, y: centre, angle };
+    const scale = radiusForAngle(projection, angle) / lateral;
+    return { x: centre + y * scale, y: centre + z * scale, angle };
+  };
+  const sphere = (elevation: number, azimuth: number) => {
+    const level = Math.cos(elevation);
+    return local(level * Math.cos(azimuth), level * Math.sin(azimuth), -Math.sin(elevation));
+  };
+  const trace = (count: number, point: (index: number) => { x: number; y: number; angle: number }, out: number[][]) => {
+    const reach = projection.half + 1;
+    let line: number[] = [];
+    let previous: { x: number; y: number } | null = null;
+    let previousInside = false;
+    const finish = () => {
+      if (line.length >= 4) out.push(line);
+      line = [];
+    };
+    for (let index = 0; index <= count; index++) {
+      const at = point(index);
+      if (!(at.angle <= TRACE_LIMIT)) {
+        finish();
+        previous = null;
+        previousInside = false;
+        continue;
+      }
+      const inside = Math.abs(at.x - centre) <= reach && Math.abs(at.y - centre) <= reach;
+      if (inside && line.length === 0 && previous) line.push(previous.x, previous.y);
+      if (inside || previousInside) line.push(at.x, at.y);
+      if (!inside && previousInside) finish();
+      previous = at;
+      previousInside = inside;
+    }
+    finish();
+  };
+  const grid: Pick<AttitudeScene, "horizon" | "skyRings" | "groundRings" | "meridians" | "cardinalMeridians" | "ticks"> = {
+    horizon: [], skyRings: [], groundRings: [], meridians: [], cardinalMeridians: [], ticks: [],
+  };
+  trace(180, index => sphere(0, index * 2 * DEG), grid.horizon);
+  for (let deg = -80; deg <= 80; deg += 10) {
+    if (deg === 0) continue;
+    trace(90, index => sphere(deg * DEG, index * 4 * DEG), deg > 0 ? grid.skyRings : grid.groundRings);
+  }
+  for (let deg = 0; deg < 360; deg += 30) {
+    trace(60, index => sphere((index * 3 - 90) * DEG, deg * DEG), deg % 90 === 0 ? grid.cardinalMeridians : grid.meridians);
+  }
+  const tick = ATTITUDE_TICK_HALF_LENGTH * attitudeArtScale(projection) / projection.a;
+  for (let deg = 10; deg < 360; deg += 10) {
+    if (deg % 30 === 0) continue;
+    const below = sphere(-tick, deg * DEG);
+    const above = sphere(tick, deg * DEG);
+    if (below.angle <= TRACE_LIMIT && above.angle <= TRACE_LIMIT) grid.ticks.push(below.x, below.y, above.x, above.y);
+  }
+  return grid;
+}
+
+describe("attitude grid", () => {
+  it("traces every number of the grid as projecting each point afresh does, at every attitude, view and size", () => {
+    const LINES = ["horizon", "skyRings", "groundRings", "meridians", "cardinalMeridians"] as const;
+    // Sizes alternate call by call, so the ticks' length changes between frames,
+    // and the smallest is below the size where the artwork stops shrinking.
+    const projections = [projection, createAttitudeProjection(160, 72), createAttitudeProjection(96, 43.2), createAttitudeProjection(300, 135)];
+    const angles = [0, 1e-9, 0.3, 45 * DEG, 89.999 * DEG, 90 * DEG, 135 * DEG, 180 * DEG, -30 * DEG, -90 * DEG, -179.9 * DEG];
+    let compared = 0, frames = 0;
+    const check = (flying: AttitudeState, view: AttitudeView | null, size: AttitudeProjection) => {
+      const scene = computeAttitudeScene(flying, size, { view });
+      const expected = referenceGrid(view ?? bodyToLocal(flying.rollRad, flying.pitchRad, flying.headingRad), size);
+      for (const key of LINES) {
+        expect(scene[key].length, key).toBe(expected[key].length);
+        scene[key].forEach((line, index) => {
+          const reference = expected[key][index]!;
+          expect(line.length, `${key} ${index}`).toBe(reference.length);
+          for (let n = 0; n < line.length; n++) {
+            if (!Object.is(line[n], reference[n])) expect.fail(`${key} ${index}[${n}]: ${line[n]} vs ${reference[n]}`);
+          }
+          compared += line.length;
+        });
+      }
+      expect(scene.ticks.length).toBe(expected.ticks.length);
+      for (let n = 0; n < scene.ticks.length; n++) if (!Object.is(scene.ticks[n], expected.ticks[n])) expect.fail(`tick ${n}: ${scene.ticks[n]} vs ${expected.ticks[n]}`);
+      compared += scene.ticks.length;
+      frames++;
+    };
+    // Level, rolled, inverted, vertical and backwards, each drawn from the aircraft and from cameras around it.
+    let call = 0;
+    for (const roll of angles) for (const pitch of angles) for (const heading of [0, 0.3, 90 * DEG, 180 * DEG, -100 * DEG]) {
+      const flying = state({ rollRad: roll, pitchRad: pitch, headingRad: heading });
+      check(flying, null, projections[call++ % projections.length]!);
+      check(flying, bodyToLocal(0, pitch * 0.5, heading + 180 * DEG), projections[call++ % projections.length]!);
+    }
+    // And a slow tumble through every attitude.
+    for (let index = 0; index < 600; index++) {
+      const flying = state({ rollRad: (index * 0.0137) % (2 * Math.PI) - Math.PI, pitchRad: Math.sin(index * 0.031) * 1.5707963, headingRad: (index * 0.0091) % (2 * Math.PI) });
+      check(flying, index % 3 === 0 ? bodyToLocal(0.1, -0.2, index * 0.05) : null, projections[index % projections.length]!);
+    }
+    expect(frames).toBe(angles.length ** 2 * 10 + 600);
+    expect(compared).toBeGreaterThan(1_000_000);
   });
 });
