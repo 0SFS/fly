@@ -375,6 +375,30 @@ html[data-world-edges="flush"] .flight-toolbar-instruments :where(.flight-hud__t
   box-shadow: none;
 }
 
+/*
+ * Interface → Flight instruments → Backgrounds over the view (osfs.hud.backdrop),
+ * Flat: no backdrop blur, so the compositor stops blurring the moving view
+ * behind each item every frame. Each see-through fill lets through about 5/8
+ * of what it did (dark 76% → 85% opaque), so about as much of the view shows,
+ * only sharp. `:where` keeps each fill at the weight of the rule it replaces,
+ * so the lit gear and autopilot keep their own.
+ */
+.flight-app[data-hud-backdrop="flat"] .flight-toolbar-instruments :where(.flight-hud__tape, .flight-hud__gear, .flight-hud__ap) {
+  backdrop-filter: none;
+}
+
+:where(.flight-app[data-hud-backdrop="flat"]) .flight-toolbar-instruments :where(.flight-hud__tape, .flight-hud__gear, .flight-hud__ap) {
+  background: rgba(10, 14, 22, 0.85);
+}
+
+:where(.flight-app[data-hud-backdrop="flat"]) .flight-toolbar-instruments :is(.flight-hud__tape[data-tint], [data-tint] > .flight-hud__tape) {
+  background: hsl(var(--hud-tint-hue) 75% 15% / 0.85);
+}
+
+:root[data-theme="light"] :where(.flight-app[data-hud-backdrop="flat"]) .flight-toolbar-instruments :where(:not([data-tint]) > .flight-hud__tape, .flight-hud__gear:not(.is-down), .flight-hud__ap:not(.is-on)) {
+  background: rgba(248, 250, 252, 0.89);
+}
+
 .flight-panel__title {
   display: flex;
   align-items: center;
@@ -1333,6 +1357,11 @@ html[data-world-edges="flush"] .flight-toolbar-instruments :where(.flight-hud__t
   color: #e6edef;
   pointer-events: auto;
   backdrop-filter: blur(3px);
+}
+
+/* Backgrounds over the view, Flat: the fill is already 90% opaque. */
+.flight-app[data-hud-backdrop="flat"] .flight-status-overlay__card {
+  backdrop-filter: none;
 }
 
 .flight-status-overlay[data-kind="fault"] .flight-status-overlay__card {

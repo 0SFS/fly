@@ -187,19 +187,18 @@ vi.mock("./jsbsim/createJsbsimRuntime", () => ({ createJsbsimRuntime: vi.fn(asyn
       queryPropertyCatalog: vi.fn((check: string) => check === "stores/station[1]/occupied" ? check : ""),
     } : {}),
     createPropertyBatch: vi.fn(function (this: { setPropertyValue(path: string, value: number): void; getPropertyValue(path: string): number }, paths: readonly string[]) {
-      const sdk = this;
       return {
         // The step's flight state reads what a scalar read would, as it did before it was
         // batched, without counting as one.
         read: vi.fn((target = new Float64Array(paths.length)) => {
           paths.forEach((path, index) => {
-            target[index] = mocks.engineVisualValues.get(path) ?? (mocks.stepPaths.has(path) ? vi.mocked(sdk.getPropertyValue).getMockImplementation()!(path) : Number.NaN);
+            target[index] = mocks.engineVisualValues.get(path) ?? (mocks.stepPaths.has(path) ? vi.mocked(this.getPropertyValue).getMockImplementation()!(path) : Number.NaN);
           });
           return target;
         }),
         dispose: vi.fn(),
         // As the SDK's batch: every slot set in slot order.
-        write: vi.fn((values: ArrayLike<number>) => paths.forEach((path, index) => sdk.setPropertyValue(path, values[index]!))),
+        write: vi.fn((values: ArrayLike<number>) => paths.forEach((path, index) => this.setPropertyValue(path, values[index]!))),
       };
     }),
     setPropertyValue: vi.fn(),

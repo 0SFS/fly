@@ -62,20 +62,19 @@ const mocks = vi.hoisted(() => {
     sdk: {
       setPropertyValue: vi.fn(), run: vi.fn(),
       createPropertyBatch: vi.fn(function (this: { setPropertyValue(path: string, value: number): void; getPropertyValue(path: string): number }, paths: readonly string[]) {
-        const sdk = this;
         return {
           missing: [],
           // The step's flight state reads what a scalar read would, as it did before it was
         // batched, without counting as one.
           read: vi.fn((target = new Float64Array(paths.length)) => {
             paths.forEach((path, index) => {
-              target[index] = engineVisualValues.get(path) ?? (stepPaths.has(path) ? vi.mocked(sdk.getPropertyValue).getMockImplementation()!(path) : Number.NaN);
+              target[index] = engineVisualValues.get(path) ?? (stepPaths.has(path) ? vi.mocked(this.getPropertyValue).getMockImplementation()!(path) : Number.NaN);
             });
             return target;
           }),
           dispose: vi.fn(),
           // As the SDK's batch: every slot set in slot order.
-          write: vi.fn((values: ArrayLike<number>) => paths.forEach((path, index) => sdk.setPropertyValue(path, values[index]!))),
+          write: vi.fn((values: ArrayLike<number>) => paths.forEach((path, index) => this.setPropertyValue(path, values[index]!))),
         };
       }),
       // The engine runs, as a flight starts: an engine that is off holds the throttle at idle.

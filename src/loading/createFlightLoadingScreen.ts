@@ -352,7 +352,7 @@ export function createFlightLoadingScreen(sharedLog?: GameLog, report?: () => Pr
     setSpawnOverride,
     hide,
     trace: diagnostics.trace,
-    fail(message, { retry: onRetry, cause, actions = [] } = {}) {
+    fail(message: string, { retry: onRetry, cause, actions = [] }: FlightLoadingFailure = {}) {
       if (destroyed) return;
       if (failure) {
         if (failureCause === null && cause !== undefined) {

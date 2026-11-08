@@ -759,6 +759,22 @@ export const OSFS_PARAMETERS = [
     appliesLive: true,
     source: "src/flight/hud/flightHud.ts",
   },
+  {
+    id: "osfs.hud.backdrop",
+    label: "Backgrounds over the view",
+    description: "How the load, gear and autopilot in the toolbar, and the paused or fault card, show the view behind them. Blurred: the browser blurs the moving view behind each one again every frame. Flat: no blur, and the fill is a little more opaque, so about as much of the view shows through, only sharp.",
+    unit: "none",
+    kind: "choice",
+    choices: [
+      { id: "blurred", label: "Blurred", description: "The view behind is blurred, every frame." },
+      { id: "flat", label: "Flat", description: "No blur; a slightly more opaque fill." },
+    ],
+    default: "blurred",
+    defaultReason: "The look the flight has always had; Flat changes it slightly and waits for a measurement on a phone.",
+    home: main(HUD),
+    appliesLive: true,
+    source: "src/styles/flight.css",
+  },
 
   // Renderer → Instruments.
   {

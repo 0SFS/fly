@@ -31,7 +31,6 @@ import djiMini2 from "@0sfs/dji-mini2/manifest" with { type: "json" };
 import djiFc3411 from "@0sfs/dji-fc3411/manifest" with { type: "json" };
 import djiAir2sPropulsion from "@0sfs/dji-air2s-propulsion/manifest" with { type: "json" };
 import djiAir2s from "@0sfs/dji-air2s/manifest" with { type: "json" };
-import starship from "@0sfs/starship/manifest" with { type: "json" };
 import cameraPreview from "@0sfs/camera-preview/manifest" with { type: "json" };
 import defaultModpack from "@0sfs/default-modpack/manifest" with { type: "json" };
 
@@ -69,7 +68,6 @@ const manifests: readonly (readonly [string, unknown])[] = [
   ["0SFS/DJI-FC3411", djiFc3411],
   ["0SFS/DJI-Air-2S-propulsion", djiAir2sPropulsion],
   ["0SFS/DJI-Air-2S", djiAir2s],
-  ["0SFS/Starship", starship],
   ["0SFS/camera-preview", cameraPreview],
   ["0SFS/default-modpack", defaultModpack],
 ];

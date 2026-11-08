@@ -128,6 +128,7 @@ import { createEvaluationInstruments } from "./hud/evaluationInstruments";
 import { INSTRUMENT_BANDS, readingTints } from "./hud/instrumentBands";
 import { seaLevelMeters } from "./hud/seaLevel";
 import { createHostFlightUi } from "./hud/hostFlightUi";
+import { watchHudBackdrop } from "./hud/hudBackdrop";
 import { createGMeter } from "@0sfs/g-forces/gMeter";
 import { createGVisionOverlay } from "@0sfs/g-forces/gVisionOverlay";
 import type { LoggingAction, LoggingPanelState } from "@0sfs/logging/LoggingPanel";
@@ -4028,6 +4029,8 @@ async function createFlightSimSession(
   };
   applyUiScale();
   stopWatching.push(parameters.watch("osfs.ui.scale", applyUiScale));
+  // Interface → Flight instruments → Backgrounds over the view: Flat drops flight.css's backdrop blurs.
+  stopWatching.push(watchHudBackdrop(parameters, flightAppElement));
   statusOverlay = createFlightStatusOverlay(statusRoot, {
     onResume: () => setSimulationPaused(false),
   });

@@ -192,36 +192,50 @@ function getColourmap(): Uint32Array {
   return colourmap;
 }
 
+/** The colourmap's word for a pixel whose direction has this sine of elevation. */
+function shade(lookup: Uint32Array, sine: number): number {
+  return lookup[Math.max(0, Math.min(COLOURMAP_STEPS, Math.round((sine + 1) * (COLOURMAP_STEPS / 2))))];
+}
+
 /**
  * Paints sky and ground on the CPU, one pixel per CSS px. Each pixel's
  * direction in body axes never changes, so it is worked out once; a frame is
  * then one dot product with local up and a colourmap lookup per pixel.
+ *
+ * The four pixels mirrored about the centre have the same direction but for
+ * the signs of right and down, which are exact: only the top-left quarter's
+ * directions are kept, and each of its pixels gives the other three their
+ * sines from the same three products, added as `f·ux + r·uy + d·uz` adds them.
  */
 function createSkyField(doc: Document) {
   const canvas = doc.createElement("canvas");
   const ctx = canvas.getContext("2d");
   let key = "";
+  let side = 0;
+  /** Columns, and rows, in the top-left quarter; with an odd side, the middle one too. */
+  let quarter = 0;
   let forward = new Float32Array(0);
   let right = new Float32Array(0);
   let down = new Float32Array(0);
   let image: ImageData | null = null;
   let pixels = new Uint32Array(0);
 
-  const rebuild = (projection: AttitudeProjection, side: number): void => {
+  const rebuild = (projection: AttitudeProjection): void => {
     canvas.width = side;
     canvas.height = side;
-    const count = side * side;
+    quarter = Math.ceil(side / 2);
+    const count = quarter * quarter;
     forward = new Float32Array(count);
     right = new Float32Array(count);
     down = new Float32Array(count);
     const pxPerCell = 2 * projection.half / side;
-    for (let row = 0; row < side; row++) {
-      for (let column = 0; column < side; column++) {
+    for (let row = 0; row < quarter; row++) {
+      for (let column = 0; column < quarter; column++) {
         const u = (column + 0.5 - side / 2) * pxPerCell;
         const v = (row + 0.5 - side / 2) * pxPerCell;
         const radius = Math.hypot(u, v);
         const angle = angleForRadius(projection, radius);
-        const index = row * side + column;
+        const index = row * quarter + column;
         const lateral = radius > 0 ? Math.sin(angle) / radius : 0;
         forward[index] = Math.cos(angle);
         right[index] = u * lateral;
@@ -234,19 +248,28 @@ function createSkyField(doc: Document) {
 
   return (projection: AttitudeProjection, up: Vec3): HTMLCanvasElement | null => {
     if (!ctx) return null;
-    const side = Math.max(1, Math.ceil(2 * projection.half));
-    const nextKey = `${side}:${projection.a}:${projection.b}`;
+    const nextSide = Math.max(1, Math.ceil(2 * projection.half));
+    const nextKey = `${nextSide}:${projection.a}:${projection.b}`;
     if (nextKey !== key) {
       key = nextKey;
-      rebuild(projection, side);
+      side = nextSide;
+      rebuild(projection);
     }
     if (!image) return null;
     const lookup = getColourmap();
-    const half = COLOURMAP_STEPS / 2;
     const [ux, uy, uz] = up;
-    for (let index = 0; index < pixels.length; index++) {
-      const sine = forward[index] * ux + right[index] * uy + down[index] * uz;
-      pixels[index] = lookup[Math.max(0, Math.min(COLOURMAP_STEPS, Math.round((sine + 1) * half)))];
+    for (let row = 0; row < quarter; row++) {
+      // The mirrored column's right, the mirrored row's down, and both, are this pixel's negated.
+      const top = row * side, bottom = (side - 1 - row) * side;
+      for (let column = 0, index = row * quarter; column < quarter; column++, index++) {
+        const fx = forward[index] * ux, ry = right[index] * uy, dz = down[index] * uz;
+        const kept = fx + ry, flipped = fx - ry;
+        const mirror = side - 1 - column;
+        pixels[top + column] = shade(lookup, kept + dz);
+        pixels[top + mirror] = shade(lookup, flipped + dz);
+        pixels[bottom + column] = shade(lookup, kept - dz);
+        pixels[bottom + mirror] = shade(lookup, flipped - dz);
+      }
     }
     ctx.putImageData(image, 0, 0);
     return canvas;
@@ -315,16 +338,37 @@ export function createCanvasAttitudePainter(doc: Document): CanvasAttitudePainte
     frame(ctx, projection, corner);
     ctx.stroke();
 
-    // Placement already keeps all of these inside the frame.
-    const fontPx = labelFontPx(projection);
-    for (const label of scene.labels) {
+    // Placement already keeps all of these inside the frame. Each is drawn as
+    // `drawLabelGlyph` draws it, but the text's state is set once for them all,
+    // and the font and colour only where they change from the label before:
+    // each label's own save and restore then covers just its turn.
+    if (scene.labels.length > 0) {
+      const fontPx = labelFontPx(projection);
       ctx.save();
-      ctx.translate(label.x, label.y);
-      // Whole degrees: Chrome rasterises glyphs afresh for every new angle, and
-      // a label turning smoothly with the ball made one at every frame. Half a
-      // degree moves the end of a label a tenth of a pixel.
-      ctx.rotate(Math.round(label.angle / DEG) * DEG);
-      drawLabelGlyph(ctx, label.text, label.kind, fontPx);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = OUTLINE;
+      ctx.lineWidth = 2.5;
+      let font = "";
+      let kind: AttitudeLabel["kind"] | null = null;
+      for (const label of scene.labels) {
+        if (label.kind !== kind) {
+          kind = label.kind;
+          const next = labelFont(kind, fontPx);
+          if (next !== font) ctx.font = font = next;
+          ctx.fillStyle = LABEL_COLOURS[kind];
+        }
+        ctx.save();
+        ctx.translate(label.x, label.y);
+        // Whole degrees: Chrome rasterises glyphs afresh for every new angle, and
+        // a label turning smoothly with the ball made one at every frame. Half a
+        // degree moves the end of a label a tenth of a pixel.
+        ctx.rotate(Math.round(label.angle / DEG) * DEG);
+        ctx.strokeText(label.text, 0, 0);
+        ctx.fillText(label.text, 0, 0);
+        ctx.restore();
+      }
       ctx.restore();
     }
     if (scene.symbol) {
