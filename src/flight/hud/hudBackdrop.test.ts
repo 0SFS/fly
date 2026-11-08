@@ -33,30 +33,40 @@ function splitSelectors(list: string): string[] {
 }
 
 describe("Backgrounds over the view", () => {
-  it("defaults to Blurred and leaves the flight's root unmarked", () => {
+  it("defaults to Flat and marks the flight's root", () => {
     const { registry, parameters } = store();
     const spec = registry.inspect(HUD_BACKDROP_ID).spec;
-    expect(spec.default).toBe("blurred");
+    expect(spec.default).toBe("flat");
     expect(spec.home).toEqual({ tab: "interface", section: "hud", level: "main" });
-    expect(registry.get(HUD_BACKDROP_ID)).toBe("blurred");
+    expect(registry.get(HUD_BACKDROP_ID)).toBe("flat");
     const root = document.createElement("div");
     const stop = watchHudBackdrop(parameters, root);
+    expect(root.getAttribute("data-hud-backdrop")).toBe("flat");
+    stop();
+  });
+
+  it("leaves the flight's root unmarked while Blurred", () => {
+    const { registry, parameters } = store();
+    registry.set(HUD_BACKDROP_ID, "blurred");
+    const root = document.createElement("div");
+    watchHudBackdrop(parameters, root)();
     expect(root.hasAttribute("data-hud-backdrop")).toBe(false);
     expect(root.attributes.length).toBe(0);
-    stop();
   });
 
   it("marks the root while Flat, live, and stops with its watch", () => {
     const { registry, parameters } = store();
+    registry.set(HUD_BACKDROP_ID, "blurred");
     const root = document.createElement("div");
     const stop = watchHudBackdrop(parameters, root);
+    expect(root.hasAttribute("data-hud-backdrop")).toBe(false);
     expect(registry.set(HUD_BACKDROP_ID, "flat")).toEqual({ ok: true });
     expect(root.getAttribute("data-hud-backdrop")).toBe("flat");
     expect(registry.set(HUD_BACKDROP_ID, "blurred")).toEqual({ ok: true });
     expect(root.hasAttribute("data-hud-backdrop")).toBe(false);
-    registry.set(HUD_BACKDROP_ID, "flat");
     registry.reset(HUD_BACKDROP_ID);
-    expect(root.hasAttribute("data-hud-backdrop")).toBe(false);
+    expect(root.getAttribute("data-hud-backdrop")).toBe("flat");
+    registry.set(HUD_BACKDROP_ID, "blurred");
     stop();
     registry.set(HUD_BACKDROP_ID, "flat");
     expect(root.hasAttribute("data-hud-backdrop")).toBe(false);

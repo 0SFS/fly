@@ -6,7 +6,7 @@ export const HUD_BACKDROP_ID = "osfs.hud.backdrop";
 /**
  * Flat marks the flight's root with `data-hud-backdrop="flat"`, and flight.css
  * then drops the backdrop blurs of the toolbar's load, gear and autopilot and
- * of the status card. Blurred, the default, leaves the root unmarked, so the
+ * of the status card. Flat is the default. Blurred leaves the root unmarked, so the
  * page is styled as it was before the setting. Returns the watch's stop.
  */
 export function watchHudBackdrop(

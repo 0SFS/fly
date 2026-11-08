@@ -696,9 +696,10 @@ async function createFlightSimSession(
   // the sky ladder built, and needs nothing a device may lack: no float texture,
   // no render target and no shader of its own.
   settings.setHostDefault("sky.model", "dome", "a flight is lit by the Sun and the sky; the dome draws on any renderer");
-  // The aircraft's underside is lit by the ground below it as it is drawn; and a
-  // low flight may light its imagery as at the aircraft, the default only on a very slow device.
-  settings.setHostDefault("sky.groundLight.mode", "rendered", "a flight lights the aircraft from the ground below it as it is drawn");
+  // The aircraft's underside is lit by one colour from the ground, with no image of the
+  // ground rendered and read back; and a low flight may light its imagery as at the
+  // aircraft, the default only on a very slow device.
+  settings.setHostDefault("sky.groundLight.mode", "uniform", "for speed: the light from the ground as one colour, with no image of the ground rendered and read back twice a second (tried on 8 November 2026 and kept)");
   offerViewpointSurfaceLighting(settings);
   const engineTest = isEngineTestStandRequested(window.location.search);
   const engineInitialState = engineTestStandInitialState(window.location.search);

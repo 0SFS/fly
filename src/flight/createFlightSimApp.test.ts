@@ -480,8 +480,8 @@ it("flies under the sky's dome by default, offers the Sky and Date and time tabs
   try {
     // The flight's own default, which a pilot's saved choice still overrides.
     expect(settings.inspect("sky.model")).toMatchObject({ value: "dome", provenance: "host-default" });
-    // The aircraft's underside is lit by the ground below it as drawn, measured from the aircraft.
-    expect(settings.inspect("sky.groundLight.mode")).toMatchObject({ value: "rendered", provenance: "host-default" });
+    // The aircraft's underside is lit by one colour from the ground, for speed; Rendered stays a choice.
+    expect(settings.inspect("sky.groundLight.mode")).toMatchObject({ value: "uniform", provenance: "host-default" });
     const receiver = mocks.runtime.sky.setGroundLightReceiver.mock.calls.at(-1)![0] as (() => unknown) | null;
     expect(receiver).toBeTypeOf("function");
     // Imagery lit as at the aircraft is the flight's own choice to offer; per point stays the default on this device.
@@ -1899,12 +1899,12 @@ it("persists the stowed gear debug override and feeds the model actual gear posi
   expect(mocks.aircraftModel.setRenderStowedGear).not.toHaveBeenCalled();
 });
 
-it("draws each part of the model on its own unless instanced parts are saved on", async () => {
-  for (const saved of [{}, { "osfs.aircraft.instancedParts": true }]) {
+it("draws repeated parts of the model together unless instanced parts are saved off", async () => {
+  for (const saved of [{}, { "osfs.aircraft.instancedParts": false }]) {
     resetAppSettings();
     const t = await mountAircraftSelection([["osfs.aircraft", "f-35b"], [SETTINGS_STORAGE_KEY, JSON.stringify({ version: 1, values: saved })]]);
     try {
-      expect(vi.mocked(createAircraftModel).mock.calls.at(-1)?.[2]).toMatchObject({ instancedParts: "osfs.aircraft.instancedParts" in saved });
+      expect(vi.mocked(createAircraftModel).mock.calls.at(-1)?.[2]).toMatchObject({ instancedParts: !("osfs.aircraft.instancedParts" in saved) });
     } finally {
       await act(async () => t.app.destroy());
     }
