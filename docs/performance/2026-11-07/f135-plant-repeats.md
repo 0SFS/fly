@@ -241,9 +241,10 @@ Setup:
   - the fused lookups' self time, 12.0% (`HCp`) and 6.7% (`PhiCp`).
 - **Exact candidates not tried:**
   - The outputs' `Fill` repeats the last evaluation's required-pressure solve
-    for the main nozzle. Keeping that solve in the gas path would save one
-    solve a step.
-  - The steady solve (`SolveSteady`) has repeats of its own.
+    for the main nozzle. Done later the same day as P-138, in
+    [the nozzles' kept solves](f135-nozzle-memo.md).
+  - The steady solve (`SolveSteady`) has repeats of its own. It runs only
+    in `InitializeRunning`.
 - **Numerical changes,** such as warm starts for the area-ratio solve or the
   inversions, or running the plant every second step (prompt 06's step 3),
   would change trajectories. They need tolerances the user accepts and a
