@@ -24,30 +24,32 @@ describe("dev model override", () => {
     const loader = createModelOverrideLoader("before-closeout", { base: "/", fetchManifest, load, onSubstitute });
     const onProgress = (): void => {};
 
-    await loader("/aircraft/f-35b/F-35B_AF267-airframe.glb", scene, onProgress);
-    await loader("/aircraft/f-35b/engine/F135-PW-600-installed.glb", scene, onProgress);
+    for (const createInstances of [true, false]) {
+      await loader("/aircraft/f-35b/F-35B_AF267-airframe.glb", scene, onProgress, { createInstances });
+      await loader("/aircraft/f-35b/engine/F135-PW-600-installed.glb", scene, onProgress, { createInstances });
+    }
 
     expect(fetchManifest).toHaveBeenCalledOnce();
     expect(fetchManifest).toHaveBeenCalledWith("/build/model-overrides/before-closeout/manifest.json");
-    expect(load.mock.calls.map(call => call[0])).toEqual([
-      "/build/model-overrides/before-closeout/aircraft/f-35b/F-35B_AF267-airframe.glb",
-      "/aircraft/f-35b/engine/F135-PW-600-installed.glb",
-    ]);
-    expect(onSubstitute).toHaveBeenCalledExactlyOnceWith(
+    expect(load.mock.calls.map(call => [call[0], call[3]])).toEqual([true, false].flatMap(createInstances => [
+      ["/build/model-overrides/before-closeout/aircraft/f-35b/F-35B_AF267-airframe.glb", { createInstances }],
+      ["/aircraft/f-35b/engine/F135-PW-600-installed.glb", { createInstances }],
+    ]));
+    expect(onSubstitute.mock.calls).toEqual(Array(2).fill([
       "aircraft/f-35b/F-35B_AF267-airframe.glb",
       "/build/model-overrides/before-closeout/aircraft/f-35b/F-35B_AF267-airframe.glb",
-    );
+    ]));
   });
 
   it("fails the load when the set cannot be read rather than showing the public model", async () => {
     const load = vi.fn(async () => container);
     const missing = createModelOverrideLoader("missing", { base: "/", fetchManifest: async () => { throw new Error("404"); }, load });
-    await expect(missing("/aircraft/f-35b/F-35B_AF267-airframe.glb", scene, () => {})).rejects.toThrow("404");
+    await expect(missing("/aircraft/f-35b/F-35B_AF267-airframe.glb", scene, () => {}, { createInstances: false })).rejects.toThrow("404");
     const escaping = createModelOverrideLoader("bad", {
       base: "/", load,
       fetchManifest: async () => ({ schema: MODEL_OVERRIDE_SCHEMA, assets: { "a.glb": { file: "../../public/a.glb" } } }),
     });
-    await expect(escaping("/a.glb", scene, () => {})).rejects.toThrow(/no file inside the set/);
+    await expect(escaping("/a.glb", scene, () => {}, { createInstances: false })).rejects.toThrow(/no file inside the set/);
     expect(load).not.toHaveBeenCalled();
   });
 });

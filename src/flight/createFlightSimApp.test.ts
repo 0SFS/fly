@@ -1900,6 +1900,18 @@ it("persists the stowed gear debug override and feeds the model actual gear posi
   expect(mocks.aircraftModel.setRenderStowedGear).not.toHaveBeenCalled();
 });
 
+it("draws each part of the model on its own unless instanced parts are saved on", async () => {
+  for (const saved of [{}, { "osfs.aircraft.instancedParts": true }]) {
+    resetAppSettings();
+    const t = await mountAircraftSelection([["osfs.aircraft", "f-35b"], [SETTINGS_STORAGE_KEY, JSON.stringify({ version: 1, values: saved })]]);
+    try {
+      expect(vi.mocked(createAircraftModel).mock.calls.at(-1)?.[2]).toMatchObject({ instancedParts: "osfs.aircraft.instancedParts" in saved });
+    } finally {
+      await act(async () => t.app.destroy());
+    }
+  }
+});
+
 it("starts the model at a quarter of its window tint and applies the Aircraft tab's slider live", async () => {
   const t = await mountAircraftSelection([["osfs.aircraft", "f-35b"]]);
   try {

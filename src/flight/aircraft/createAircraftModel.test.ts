@@ -583,6 +583,30 @@ describe("aircraft model loader", () => {
     t.teardown();
   });
 
+  it("loads the parts that share a glTF mesh as meshes of their own unless instanced parts are on", async () => {
+    for (const instancedParts of [undefined, false, true]) {
+      const t = setup();
+      const airframe = f35bVisibilityContainer(t.scene);
+      const loadings: unknown[] = [];
+      const model = createAircraftModel(t.scene, t.parent, {
+        aircraftId: "f-35b", lodId: "hd", ...(instancedParts === undefined ? {} : { instancedParts }),
+        loadContainer: async (url, scene, _onProgress, loading) => {
+          loadings.push(loading);
+          return url.includes("/engine/") ? LoadAssetContainerAsync(new Uint8Array(readFileSync(`public${url}`)), scene,
+            { pluginExtension: ".glb", pluginOptions: { gltf: { createInstances: loading.createInstances } } }) : airframe;
+        },
+      });
+      try {
+        await vi.waitFor(() => expect(model.getState().status).toBe("ready"));
+        const on = instancedParts === true;
+        expect(loadings).toEqual([{ createInstances: on }, { createInstances: on }]);
+        const flaps = t.scene.meshes.filter(mesh => /^F135_\w+_\d\d_/.test(mesh.name));
+        expect(flaps).toHaveLength(128);
+        expect(flaps.filter(mesh => mesh.isAnInstance)).toHaveLength(on ? 120 : 0);
+      } finally { model.dispose(); t.teardown(); }
+    }
+  });
+
   it("loads the requested level, parents it, and reports triangle count", async () => {
     const t = setup();
     const model = createAircraftModel(t.scene, t.parent, {

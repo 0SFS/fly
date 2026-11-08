@@ -1,4 +1,5 @@
 import { LoadAssetContainerAsync, type AssetContainer, type ISceneLoaderProgressEvent, type Scene } from "@babylonjs/core";
+import type { AircraftContainerLoading } from "@0sfs/aircraft/createAircraftModel";
 
 /**
  * A dev server's way to fly an aircraft with models other than the ones public/
@@ -15,7 +16,8 @@ export interface ModelOverrideManifest {
   assets: Record<string, { file: string }>;
 }
 
-export type ContainerLoader = (url: string, scene: Scene, onProgress: (event: ISceneLoaderProgressEvent) => void) => Promise<AssetContainer>;
+export type ContainerLoader = (url: string, scene: Scene, onProgress: (event: ISceneLoaderProgressEvent) => void,
+  loading: AircraftContainerLoading) => Promise<AssetContainer>;
 
 export interface ModelOverrideLoaderOptions {
   base?: string;
@@ -64,16 +66,17 @@ export function createModelOverrideLoader(set: string, options: ModelOverrideLoa
     if (!response.ok) throw new Error(`Model override ${set} has no manifest at ${url} (${response.status}); run scripts/model-override.mjs`);
     return response.json();
   });
-  const load = options.load ?? ((url, scene, onProgress) => LoadAssetContainerAsync(url, scene, { onProgress }));
+  const load = options.load ?? ((url, scene, onProgress, { createInstances }) =>
+    LoadAssetContainerAsync(url, scene, { onProgress, pluginOptions: { gltf: { createInstances } } }));
   let manifest: Promise<ModelOverrideManifest> | null = null;
-  return async (url, scene, onProgress) => {
+  return async (url, scene, onProgress, loading) => {
     manifest ??= fetchManifest(`${directory}manifest.json`).then(value => parseManifest(set, value));
     const assets = (await manifest).assets;
     const assetPath = url.startsWith(base) ? url.slice(base.length) : null;
     const asset = assetPath === null ? undefined : assets[assetPath];
-    if (!asset) return load(url, scene, onProgress);
+    if (!asset) return load(url, scene, onProgress, loading);
     const overridden = `${directory}${asset.file}`;
     options.onSubstitute?.(assetPath!, overridden);
-    return load(overridden, scene, onProgress);
+    return load(overridden, scene, onProgress, loading);
   };
 }

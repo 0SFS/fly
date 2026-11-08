@@ -2511,6 +2511,7 @@ async function createFlightSimSession(
       lodId: aircraftLodId,
       renderStowedGear: parameters.get("osfs.debug.renderStowedGear"),
       windowTint: parameters.get("osfs.aircraft.windowTint"),
+      instancedParts: parameters.get("osfs.aircraft.instancedParts"),
       engineOnly: engineTest,
       loadContainer: loadOverriddenContainer,
       // The weapon-bay doors are cut from the airframe's own belly, once per load.
@@ -2545,6 +2546,7 @@ async function createFlightSimSession(
       },
       requestRender: () => runtime.requestRender(),
     });
+    markParametersApplied(settings, ["osfs.aircraft.instancedParts"]);
     aircraftModel.updateGearVisibility(readControlSurfaceState(jsbsim.sdk, aircraftId).gearDownNorm);
     syncForcesDebugOverlay();
     if (!engineTest) {
