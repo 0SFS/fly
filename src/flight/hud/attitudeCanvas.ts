@@ -258,17 +258,19 @@ function createSkyField(doc: Document) {
     if (!image) return null;
     const lookup = getColourmap();
     const [ux, uy, uz] = up;
-    for (let row = 0; row < quarter; row++) {
+    // Locals, not the closure's variables, so the loop reads registers.
+    const n = side, q = quarter, f = forward, r = right, d = down, out = pixels;
+    for (let row = 0; row < q; row++) {
       // The mirrored column's right, the mirrored row's down, and both, are this pixel's negated.
-      const top = row * side, bottom = (side - 1 - row) * side;
-      for (let column = 0, index = row * quarter; column < quarter; column++, index++) {
-        const fx = forward[index] * ux, ry = right[index] * uy, dz = down[index] * uz;
+      const top = row * n, bottom = (n - 1 - row) * n;
+      for (let column = 0, index = row * q; column < q; column++, index++) {
+        const fx = f[index] * ux, ry = r[index] * uy, dz = d[index] * uz;
         const kept = fx + ry, flipped = fx - ry;
-        const mirror = side - 1 - column;
-        pixels[top + column] = shade(lookup, kept + dz);
-        pixels[top + mirror] = shade(lookup, flipped + dz);
-        pixels[bottom + column] = shade(lookup, kept - dz);
-        pixels[bottom + mirror] = shade(lookup, flipped - dz);
+        const mirror = n - 1 - column;
+        out[top + column] = shade(lookup, kept + dz);
+        out[top + mirror] = shade(lookup, flipped + dz);
+        out[bottom + column] = shade(lookup, kept - dz);
+        out[bottom + mirror] = shade(lookup, flipped - dz);
       }
     }
     ctx.putImageData(image, 0, 0);
