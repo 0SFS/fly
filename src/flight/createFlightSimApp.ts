@@ -121,6 +121,7 @@ import {
 import { applyAircraftRig, readControlSurfaceState, readGearDownNorm, withGearDown, type ControlSurfaceState } from "@0sfs/aircraft/aircraftAnimation";
 import { createControlPositionReader } from "./controlPositions";
 import { createPropertySampler } from "./jsbsim/propertySampler";
+import { createHudReadingSampler } from "./hud/hudReadingSampler";
 import { STEP_FLIGHT_PATHS, TRIM_FLIGHT_PATHS, stepFlightFrom, trimFlightFrom, type StepFlight, type TrimFlight } from "./physics/stepFlight";
 import { flightLog } from "@0sfs/logging/flightLog";
 import { createFlightRecorder } from "@0sfs/logging/flightRecorder";
@@ -1156,11 +1157,8 @@ async function createFlightSimSession(
     if (Number.isFinite(flaps)) inputManager.replaceFlaps(flaps);
   }
   let appliedControls = inputManager.getControls();
-  const readActualFlaps = (): number => {
-    const flap = getFdmProfile(initialAircraftId).flapPosition;
-    return jsbsim.sdk.getPropertyValue(flap.property) / flap.fullTravel;
-  };
   const controlPositionReader = createControlPositionReader(jsbsim.sdk, getFdmProfile(initialAircraftId));
+  const readActualFlaps = (): number => controlPositionReader.flapPosition();
   let actualControls = controlPositionReader.read();
   stopWatching.push(() => controlPositionReader.dispose());
   let actualFlaps = readActualFlaps();
@@ -1220,10 +1218,9 @@ async function createFlightSimSession(
     ownsGear: lastApResult.owners.gear !== "pilot",
     ownsFlaps: lastApResult.owners.flaps !== "pilot",
   });
-  const aircraftOnGround = (): boolean => [0, 1, 2].some((index) => {
-    const wow = jsbsim.sdk.getPropertyValue(`gear/unit[${index}]/WOW`);
-    return Number.isFinite(wow) && wow > 0.5;
-  });
+  const hudReadingSampler = createHudReadingSampler(jsbsim.sdk, getFdmProfile(initialAircraftId).stovl?.positionProperty);
+  stopWatching.push(() => hudReadingSampler.dispose());
+  const aircraftOnGround = (): boolean => hudReadingSampler.read().onGround;
   // The arbiter's flight state, and the dynamic pressure and true airspeed the
   // step reads after it, through one batch: nothing between the two writes to JSBSim.
   const stepFlightSampler = createPropertySampler(jsbsim.sdk, STEP_FLIGHT_PATHS);
@@ -3192,8 +3189,8 @@ async function createFlightSimSession(
       flightAudio.setHeld(false, "loading");
       runtime.setSimRunning(!inputManager.isPaused());
       skipResumeDelta = true;
-      actualFlaps = readActualFlaps();
       actualControls = controlPositionReader.read();
+      actualFlaps = readActualFlaps();
       phoneSession?.syncStatus();
       lastLocalFlapsRevision = inputManager.getFlapsInputRevision();
       lastRemoteFlaps = null;
@@ -4548,8 +4545,8 @@ async function createFlightSimSession(
     frameProfiler.add("flight/view", sectionStarted);
     sectionStarted = frameProfiler.clock();
     const phoneOwned = phoneSession?.getSnapshot().owner === "phone";
-    actualFlaps = readActualFlaps();
     actualControls = controlPositionReader.read();
+    actualFlaps = readActualFlaps();
     if (parameters.get("osfs.assist.autoFlaps") && lastApResult.owners.flaps === "pilot") {
       inputManager.replaceFlaps(appliedControls.flaps);
     }
@@ -4583,11 +4580,11 @@ async function createFlightSimSession(
     if (shownPilotG !== null) gMeter.update(shownPilotG);
     steppedPilotG = null;
     const aoaDeg = evaluationInstruments.aoaDeg();
+    const nativeReading = hudReadingSampler.read();
     const tints = readingTints(instrumentBands, {
       iasKt: displayState.airspeedKts, aoaDeg, g: shownPilotG,
       vsFpm: displayState.verticalSpeedFps * 60, flaps: actualFlaps,
-      weightLb: jsbsim.sdk.getPropertyValue("inertia/weight-lbs"), onGround: aircraftOnGround(),
-      jetBorne: vtolProfile !== undefined && jsbsim.sdk.getPropertyValue(vtolProfile.positionProperty) > 0.01,
+      ...nativeReading,
     });
     flightHud.setReadingTints(tints);
     // The phone's pitch/roll pad draws the instrument this HUD does, from the
@@ -4821,8 +4818,8 @@ async function createFlightSimSession(
     // persisted assist request owns it, while feedback remains observational.
     noticeLocalFlaps();
     syncNativeAutoFlaps();
-    actualFlaps = readActualFlaps();
     actualControls = controlPositionReader.read();
+    actualFlaps = readActualFlaps();
     const restoredFlapCommand = jsbsim.sdk.getPropertyValue("fcs/flap-cmd-norm");
     if (parameters.get("osfs.assist.autoFlaps") && lastApResult.owners.flaps === "pilot" && Number.isFinite(actualFlaps)) {
       inputManager.replaceFlaps(actualFlaps);

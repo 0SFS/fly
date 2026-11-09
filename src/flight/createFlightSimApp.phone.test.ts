@@ -63,6 +63,7 @@ const mocks = vi.hoisted(() => {
       setPropertyValue: vi.fn(), run: vi.fn(),
       createPropertyBatch: vi.fn(function (this: { setPropertyValue(path: string, value: number): void; getPropertyValue(path: string): number }, paths: readonly string[]) {
         return {
+          missing: paths[0] === "fcs/throttle-pos-norm" ? paths.filter(path => !engineVisualValues.has(path)) : [],
           missing: [],
           // The step's flight state reads what a scalar read would, as it did before it was
         // batched, without counting as one.
@@ -158,12 +159,13 @@ vi.mock("@0sfs/rc/createPhonePairingPanel", () => ({ createPhonePairingPanel: mo
 import { getAppSettings, resetAppSettings } from "foss-earth/settings";
 import { createFlightSimApp } from "./createFlightSimApp";
 import { STEP_FLIGHT_PATHS, TRIM_FLIGHT_PATHS } from "./physics/stepFlight";
+import { HUD_READING_PATHS } from "./hud/hudReadingSampler";
 import { registerFlightSettings } from "./settings/registerFlightSettings";
 import { getAircraftDefinition } from "@0sfs/aircraft/aircraftCatalog";
 import { setDroneRefusal } from "./drone/droneGate";
 import { parseMessage } from "@0sfs/rc/protocol";
 
-for (const path of [...STEP_FLIGHT_PATHS, ...TRIM_FLIGHT_PATHS]) mocks.stepPaths.add(path);
+for (const path of [...STEP_FLIGHT_PATHS, ...TRIM_FLIGHT_PATHS, ...HUD_READING_PATHS, "fcs/stovl-pos-norm"]) mocks.stepPaths.add(path);
 
 let app: Awaited<ReturnType<typeof createFlightSimApp>> | null = null;
 let tick: (dt: number) => void;

@@ -22,6 +22,27 @@ function fixture(aircraft: AircraftId, positions: Record<string, number>) {
 }
 
 describe("actual control positions", () => {
+  it("reuses the exact unclamped flap sample, with live scalar fallback for absent or failed observations", () => {
+    const h = fixture("cessna-172", { "fcs/flap-pos-deg": 15 });
+    h.reader.read();
+    expect(h.reader.flapPosition()).toBe(.5);
+    expect(h.getPropertyValue).not.toHaveBeenCalled();
+    for (const value of [-0, 31, -3, NaN, Infinity]) {
+      h.values.set("fcs/flap-pos-deg", value);
+      h.reader.read();
+      expect(Object.is(h.reader.flapPosition(), value / 30)).toBe(true);
+    }
+    h.read.mockImplementationOnce(() => { throw new Error("Unloaded"); });
+    h.reader.read();
+    expect(h.reader.flapPosition()).toBe(1 / 30);
+    expect(h.getPropertyValue).toHaveBeenLastCalledWith("fcs/flap-pos-deg");
+    h.reader.dispose();
+    expect(() => h.reader.flapPosition()).toThrow(/disposed/);
+    const absent = fixture("cessna-172", {});
+    absent.reader.read();
+    expect(absent.reader.flapPosition()).toBe(1 / 30);
+    absent.reader.dispose();
+  });
   it("reads measured positions rather than commands, normalizing the C172's degrees and yaw sign", () => {
     const h = fixture("cessna-172", {
       "fcs/throttle-pos-norm": .35, "fcs/flap-pos-deg": 15, "fcs/rudder-pos-norm": -.4,

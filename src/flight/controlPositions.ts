@@ -10,6 +10,8 @@ type PositionProfile = Pick<FdmProfile, "sf50VariantId" | "rudderSign" | "flapPo
  */
 export function createControlPositionReader(sdk: JSBSimSdk, profile: PositionProfile): {
   read(): ActualControlPositions;
+  /** Unclamped flap position from the last read; scalar fallback when unavailable. */
+  flapPosition(): number;
   dispose(): void;
 } {
   // SF50 does not populate rudder-pos-norm. Its two ruddervators combine
@@ -25,6 +27,7 @@ export function createControlPositionReader(sdk: JSBSimSdk, profile: PositionPro
   const missing = new Set(batch?.missing ?? paths);
   const values = new Float64Array(paths.length);
   let disposed = false;
+  let sampled = false;
   const withinStops = (position: number, minimum: number): number | undefined =>
     Number.isFinite(position) && position >= minimum - 1e-6 && position <= 1 + 1e-6
       ? Math.max(minimum, Math.min(1, position)) : undefined;
@@ -42,8 +45,10 @@ export function createControlPositionReader(sdk: JSBSimSdk, profile: PositionPro
   };
   return {
     read() {
+      sampled = false;
       if (disposed || !batch) return {};
       try { batch.read(values); } catch { return {}; }
+      sampled = true;
       const throttle = observed(0, 1, 0);
       const flaps = observed(1, profile.flapPosition.fullTravel, profile.flapPosition.minNorm ?? 0);
       const nativeRudder = rudder();
@@ -52,6 +57,12 @@ export function createControlPositionReader(sdk: JSBSimSdk, profile: PositionPro
         ...(flaps === undefined ? {} : { flaps }),
         ...(nativeRudder === undefined ? {} : { rudder: nativeRudder * profile.rudderSign }),
       };
+    },
+    flapPosition() {
+      if (disposed) throw new Error("This control position reader has been disposed.");
+      const native = sampled && !missing.has(paths[1]!) ? values[1]!
+        : sdk.getPropertyValue(profile.flapPosition.property);
+      return native / profile.flapPosition.fullTravel;
     },
     dispose() {
       if (disposed) return;

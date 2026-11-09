@@ -1,0 +1,29 @@
+{
+  "sha256": "7fb8253486b5ce6ae17707763bd1de0222e7fd530617f0dde76bb231b560407f",
+  "members": [
+    {
+      "path": "build/perf-20261109-io/old/controlPositions.ts",
+      "sha256": "c2671cfac5e74332a8ab99e289ccc0e9f923d6c7a964027e2e6a190adb49a32b"
+    },
+    {
+      "path": "build/perf-20261109-io/bench.test.ts",
+      "sha256": "5d7bc62d777f6bfc6dbdcabb3636f5c597434c466d90ea01b326ab258f61e705"
+    },
+    {
+      "path": "build/perf-20261109-io/vitest.config.ts",
+      "sha256": "430a31393700a88037f07e804e34dc5757e56db577d9babbe74f3eedec02410b"
+    },
+    {
+      "path": "build/perf-20261109-io/mutants.py",
+      "sha256": "1d283b876fcda15cbc97fa8cdd1f5bcf7962922de079313672b04d5fac29fef0"
+    },
+    {
+      "path": "build/perf-20261109-io/mutants.json",
+      "sha256": "7f862588aa190d2bc22b06a8852e3ba56b0b53053a942b52e2d04fb068211fe4"
+    },
+    {
+      "path": "build/perf-20261109-io/report.json",
+      "sha256": "d3c80ac768be16371a89d5b33b181390b9221fa4e610502eb23a7bc487963007"
+    }
+  ]
+}

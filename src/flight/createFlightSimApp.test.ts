@@ -188,6 +188,8 @@ vi.mock("./jsbsim/createJsbsimRuntime", () => ({ createJsbsimRuntime: vi.fn(asyn
     } : {}),
     createPropertyBatch: vi.fn(function (this: { setPropertyValue(path: string, value: number): void; getPropertyValue(path: string): number }, paths: readonly string[]) {
       return {
+        // Optional actuator feedback is absent unless this fixture supplies it.
+        missing: paths[0] === "fcs/throttle-pos-norm" ? paths.filter(path => !mocks.engineVisualValues.has(path)) : [],
         // The step's flight state reads what a scalar read would, as it did before it was
         // batched, without counting as one.
         read: vi.fn((target = new Float64Array(paths.length)) => {
@@ -321,8 +323,9 @@ import { createFlightAudio } from "@0sfs/sound/createFlightAudio";
 import { captureSavedFlight, restoreSavedFlight, SAVED_FLIGHT_STORAGE_KEY, type SavedFlight } from "./jsbsim/savedFlight";
 import { getFdmProfile } from "./jsbsim/fdmProfiles";
 import { STEP_FLIGHT_PATHS, TRIM_FLIGHT_PATHS } from "./physics/stepFlight";
+import { HUD_READING_PATHS } from "./hud/hudReadingSampler";
 
-for (const path of [...STEP_FLIGHT_PATHS, ...TRIM_FLIGHT_PATHS]) mocks.stepPaths.add(path);
+for (const path of [...STEP_FLIGHT_PATHS, ...TRIM_FLIGHT_PATHS, ...HUD_READING_PATHS, "fcs/stovl-pos-norm"]) mocks.stepPaths.add(path);
 
 function confirmTeleport(accepted = true): void {
   const dialog = document.querySelector<HTMLDialogElement>('.flight-placement-dialog[open]')!;
@@ -1651,6 +1654,38 @@ it("observes native engine visuals with sound off and releases its model-bound r
     expect(runtime.sdk.setPropertyValue).not.toHaveBeenCalledWith("propulsion/engine[0]/nozzle-pos-norm", expect.anything());
     expect(runtime.sdk.setPropertyValue).not.toHaveBeenCalledWith("propulsion/engine[0]/egt-degc", expect.anything());
   } finally { await act(async () => t.app.destroy()); canvas.mockRestore(); }
+  expect(batch.dispose).toHaveBeenCalledOnce();
+});
+
+it("uses this frame's actuator and native HUD observations for the reading tints", async () => {
+  mocks.engineVisualValues.set("fcs/flap-pos-deg", 0);
+  mocks.engineVisualValues.set("inertia/weight-lbs", 1880);
+  const previousAirspeed = mocks.state.airspeedKts;
+  const t = await mountAircraftSelection();
+  const runtime = await vi.mocked(createJsbsimRuntime).mock.results.at(-1)!.value;
+  const { INSTRUMENT_BANDS, readingTints } = await import("./hud/instrumentBands");
+  const calls = vi.mocked(runtime.sdk.createPropertyBatch);
+  const hudBatchIndex = calls.mock.calls.findIndex(([paths]) => paths[0] === "inertia/weight-lbs");
+  const batch = calls.mock.results[hudBatchIndex]!.value;
+  try {
+    mocks.state.airspeedKts = 50;
+    const tick = mocks.runtime.setSimTick.mock.calls.at(-1)![0] as (dt: number) => void;
+    for (const flaps of [0.5, 1, 0, 0.25]) {
+      mocks.engineVisualValues.set("fcs/flap-pos-deg", flaps * 30);
+      tick(1 / 60);
+      const expected = readingTints(INSTRUMENT_BANDS["cessna-172"], {
+        iasKt: 50, aoaDeg: null, g: null, vsFpm: 0, flaps, weightLb: 1880, onGround: false, jetBorne: false,
+      });
+      expect(mocks.flightHud.setReadingTints).toHaveBeenLastCalledWith(expect.objectContaining({ ias: expected.ias }));
+    }
+    mocks.onGround = true;
+    tick(1 / 60);
+    expect(mocks.flightHud.setReadingTints).toHaveBeenLastCalledWith(expect.objectContaining({ ias: 0 }));
+    expect(batch.read).toHaveBeenCalled();
+  } finally {
+    mocks.state.airspeedKts = previousAirspeed;
+    await act(async () => t.app.destroy());
+  }
   expect(batch.dispose).toHaveBeenCalledOnce();
 });
 
