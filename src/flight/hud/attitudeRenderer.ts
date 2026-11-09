@@ -5,6 +5,7 @@ import {
   computeAttitudeScene,
   createAttitudeProjection,
   type AttitudeProjection,
+  type AttitudeScene,
   type AttitudeState,
   type AttitudeView,
 } from "./attitudeIndicator";
@@ -94,6 +95,7 @@ export function createAttitudeRenderer(host: HTMLElement, options: AttitudeRende
   let canvas: HTMLCanvasElement | null = null;
   let backend: Backend | null = null;
   let projection: AttitudeProjection | null = null;
+  let scene: AttitudeScene | null = null;
   /** The last frame asked for, redrawn when a new backend takes over, even while the sim is paused. */
   let last: [AttitudeState, AttitudeStick, AttitudeView | null] | null = null;
   let destroyed = false;
@@ -116,6 +118,7 @@ export function createAttitudeRenderer(host: HTMLElement, options: AttitudeRende
     next.width = next.height = Math.max(1, Math.round(cssSize));
     host.append(next);
     canvas = next;
+    scene = null;
     drawn.fill(Number.NaN);
     return next;
   };
@@ -133,11 +136,14 @@ export function createAttitudeRenderer(host: HTMLElement, options: AttitudeRende
     // The UI scale zooms the HUD, so a CSS pixel here covers fewer device pixels.
     const pixelRatio = Math.min(3, Math.max(1, (globalThis.devicePixelRatio || 1) * (host.currentCSSZoom || 1)));
     const backing = Math.max(1, Math.round(cssSize * pixelRatio));
-    let changed = false;
+    let changed = false, sceneChanged = false, gridChanged = false;
     const note = (index: number, value: number): void => {
       if (Object.is(drawn[index], value)) return;
       drawn[index] = value;
       changed = true;
+      // The stick is drawn over the scene; velocity affects only its markers.
+      if (index < 8 || index > 10) sceneChanged = true;
+      if (index < 5 || index > 10) gridChanged = true;
     };
     note(0, backing);
     note(1, cssSize);
@@ -161,14 +167,28 @@ export function createAttitudeRenderer(host: HTMLElement, options: AttitudeRende
       canvas.height = backing;
     }
     if (projection?.size !== cssSize) projection = createAttitudeProjection(cssSize, cssSize * ATTITUDE_HALF_SHARE);
+    if (sceneChanged || !scene) {
+      const previous = scene;
+      scene = computeAttitudeScene(state, projection, { lines: backend.kind === "canvas2d" && (gridChanged || !previous), view });
+      // A new velocity moves the markers, but every grid point still has the
+      // same view and projection. These arrays stay private to this renderer.
+      if (backend.kind === "canvas2d" && !gridChanged && previous) {
+        scene.horizon = previous.horizon;
+        scene.skyRings = previous.skyRings;
+        scene.groundRings = previous.groundRings;
+        scene.meridians = previous.meridians;
+        scene.cardinalMeridians = previous.cardinalMeridians;
+        scene.ticks = previous.ticks;
+      }
+    }
     if (backend.kind === "webgpu") {
-      backend.gpu.render(computeAttitudeScene(state, projection, { lines: false, view }), stick, backing / cssSize);
+      backend.gpu.render(scene, stick, backing / cssSize);
       // Its picture lasts only this task: a copy of the page, such as the cockpit screen's, takes it now.
       noteCanvasDrawn(canvas);
     } else {
       backend.ctx.setTransform(backing / cssSize, 0, 0, backing / cssSize, 0, 0);
       backend.ctx.clearRect(0, 0, cssSize, cssSize);
-      backend.paint(backend.ctx, computeAttitudeScene(state, projection, { view }), stick);
+      backend.paint(backend.ctx, scene, stick);
     }
     profiler?.add(PROFILE_SECTION, started);
   };

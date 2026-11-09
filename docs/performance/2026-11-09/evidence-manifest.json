@@ -1,0 +1,130 @@
+{
+  "archiveSha256": "af094225c20381c190c6d40f788cef064ef21a13d0547323be1e0f7e48dd6a53",
+  "files": [
+    {
+      "path": "exhaust/build/perf-20261109/axes-report.json",
+      "bytes": 3023,
+      "sha256": "0e67a7c5bc01d815de76927fe1b2c8e24bd98f57adda5ab02814efe5a36592de"
+    },
+    {
+      "path": "exhaust/build/perf-20261109/compare.mjs",
+      "bytes": 3779,
+      "sha256": "632e0a281b6c241a415dce487e963303a8ae711a0a1a9b7499e1fc212ae4d76d"
+    },
+    {
+      "path": "exhaust/build/perf-20261109/old/engineGasOptics.axes.ts",
+      "bytes": 48344,
+      "sha256": "4caf55b831b66cc3cdc794f13127e2a5c323e45839c36f908ad9ab65fc64e3dd"
+    },
+    {
+      "path": "exhaust/build/perf-20261109/old/engineGasOptics.ts",
+      "bytes": 46918,
+      "sha256": "f2636cd74bf574f841189793f75921725f2c6cad16280d5a0a9fa946f05595c0"
+    },
+    {
+      "path": "exhaust/build/perf-20261109/old/engineReactionEmission.ts",
+      "bytes": 4203,
+      "sha256": "1d0e736b8a5b816a66d68a57c5674ce7f0af0a9a457fe4faaeaa6eccca8cec91"
+    },
+    {
+      "path": "exhaust/build/perf-20261109/report.json",
+      "bytes": 3032,
+      "sha256": "683f22c79d196244c363fcbc24ba4064cbbd15bf4b440fa762decb66528731d1"
+    },
+    {
+      "path": "fly/build/perf-20261109/attitude-comparison.png",
+      "bytes": 57297,
+      "sha256": "22580f2feec0ba63fc15c9e5d709831ffd2da9dc9b194c3508bc2fa0ec2f6ee4"
+    },
+    {
+      "path": "fly/build/perf-20261109/browser-entry.ts",
+      "bytes": 4772,
+      "sha256": "bf3bedce9b1d3b3398eb0fe26aec5d9e048692d41ebbc54dddc0ab874969b8e8"
+    },
+    {
+      "path": "fly/build/perf-20261109/browser-report.json",
+      "bytes": 11444,
+      "sha256": "fa885f8f60e9d7d40b3114cd201b1295b0c5f26841aa70d8123e3d1d42e44908"
+    },
+    {
+      "path": "fly/build/perf-20261109/browser.mjs",
+      "bytes": 2016,
+      "sha256": "66e9210858e597e080d02d506385e3cd20e92019bcfc5c615771d117743b3140"
+    },
+    {
+      "path": "fly/build/perf-20261109/instrument-bench.test.ts",
+      "bytes": 2702,
+      "sha256": "56f17b58e529e51c50f5c8597337de49d861682fe89193958cd1e51ad9ffd5eb"
+    },
+    {
+      "path": "fly/build/perf-20261109/instrument-report.json",
+      "bytes": 4323,
+      "sha256": "1af9f6fc181ce101427f62e2549b562c5544414c4988099e85f992a278d47a29"
+    },
+    {
+      "path": "fly/build/perf-20261109/mutants-first.json",
+      "bytes": 821,
+      "sha256": "cb01904b0573c582a4962b9abe820311a8c9a3a43b3e74beb232edd58c30c9ea"
+    },
+    {
+      "path": "fly/build/perf-20261109/mutants.json",
+      "bytes": 818,
+      "sha256": "1cbf66061159ab86f82fd9cdd5564fee7a01da8ce8ec60cc3da7c3d7d991f5f2"
+    },
+    {
+      "path": "fly/build/perf-20261109/mutants.py",
+      "bytes": 2772,
+      "sha256": "3b212c935e19e8b427f2554ee88b30638db42a7bcaaea202c75623bd0ea64155"
+    },
+    {
+      "path": "fly/build/perf-20261109/old/attitudeCanvas.ts",
+      "bytes": 15528,
+      "sha256": "ee921bff454539a76d74e9515cf1afdddff6cb8898016a4bb9b89ba5c6708a74"
+    },
+    {
+      "path": "fly/build/perf-20261109/old/attitudeIndicator.ts",
+      "bytes": 25632,
+      "sha256": "7cac76cf53d6361d6e0e98c82c208de78f633d71da3771439ceee1440d19f93e"
+    },
+    {
+      "path": "fly/build/perf-20261109/old/attitudeRenderer.ts",
+      "bytes": 9852,
+      "sha256": "26ebc63df7a01ea911dd26e700de11523628688592e769103663df8174fc5a6d"
+    },
+    {
+      "path": "fly/build/perf-20261109/old/attitudeWebGpu.ts",
+      "bytes": 20994,
+      "sha256": "62d117d3279a81ab5450bdc134724430f3a4fc23a34dd587cc102c415819fe14"
+    },
+    {
+      "path": "fly/build/perf-20261109/old/evaluationInstruments.css",
+      "bytes": 689,
+      "sha256": "ac7b395bdc1de190e3b912213ceef22c804e2dcf765ada205ca21c4a4d093ed4"
+    },
+    {
+      "path": "fly/build/perf-20261109/old/evaluationInstruments.ts",
+      "bytes": 3582,
+      "sha256": "fdd983acdc0dc3a0ebb04372fdc97b6d0ab6ed4b4ae42e839691b9b45892a49c"
+    },
+    {
+      "path": "fly/build/perf-20261109/painter-bench.ts",
+      "bytes": 2086,
+      "sha256": "404d122a9a22d57d692831f58cd1607f9ac3816e913a6673310dcd77dd4c6b57"
+    },
+    {
+      "path": "fly/build/perf-20261109/painter-report.json",
+      "bytes": 6152,
+      "sha256": "99cdf1f497ba0a2e23aa6ad7e7653b176891e81c6c90aef3a0182cb00907efe7"
+    },
+    {
+      "path": "fly/build/perf-20261109/register.mjs",
+      "bytes": 299,
+      "sha256": "db0951b396da0f99605fc4d11e25e1ce94a87f3dd81974884119ea1a25dc9379"
+    },
+    {
+      "path": "fly/build/perf-20261109/vitest.config.ts",
+      "bytes": 189,
+      "sha256": "5b29fc27943b2fea8d1b67da124c61201df0fefb82168d4f738354e59fd36c58"
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 import "./evaluationInstruments.css";
 import { propertyInCatalog, type FlightRecorderPropertyReader } from "@0sfs/logging/flightRecorder";
+import { createPropertySampler, type PropertySampler, type PropertySamplerSdk } from "../jsbsim/propertySampler";
 
 /**
  * Angle-of-attack tape and CAS warnings for pilot evaluation. AoA sits in the
@@ -12,7 +13,7 @@ import { propertyInCatalog, type FlightRecorderPropertyReader } from "@0sfs/logg
  */
 
 export interface EvaluationInstrumentsHandle {
-  update(reader: FlightRecorderPropertyReader): void;
+  update(reader: FlightRecorderPropertyReader & PropertySamplerSdk): void;
   /** The angle of attack last read, in degrees; null when the aircraft has none. */
   aoaDeg(): number | null;
   destroy(): void;
@@ -49,30 +50,48 @@ export function createEvaluationInstruments(root: HTMLElement): EvaluationInstru
   const cas = query(".flight-eval__cas");
 
   let available: Record<"aoa" | "stallWarning" | "stickPusher", boolean> | null = null;
+  let sampledReader: FlightRecorderPropertyReader | null = null;
+  let sampler: PropertySampler | null = null;
+  let slots = { aoa: -1, stickPusher: -1, stallWarning: -1 };
   let lastCas = "";
   let lastAoaDeg: number | null = null;
 
   return {
-    update(reader: FlightRecorderPropertyReader): void {
-      // Property sets are fixed once an aircraft is loaded; changing aircraft reloads the app.
-      if (!available) {
+    update(reader): void {
+      // A flight owns one loaded SDK. Replacing the reader releases its nodes
+      // and discovers the new aircraft's readouts before sampling them.
+      if (!available || reader !== sampledReader) {
+        sampler?.dispose();
+        sampler = null;
+        sampledReader = reader;
         available = {
           aoa: propertyInCatalog(reader, ALPHA),
           stallWarning: propertyInCatalog(reader, STALL_WARNING),
           stickPusher: propertyInCatalog(reader, STICK_PUSHER),
         };
         aoa.hidden = !available.aoa;
+        lastAoaDeg = null;
+        const paths: string[] = [];
+        const slot = (exists: boolean, path: string): number => exists ? paths.push(path) - 1 : -1;
+        // Keep the original read order: AoA, pusher, then stall warning.
+        slots = {
+          aoa: slot(available.aoa, ALPHA),
+          stickPusher: slot(available.stickPusher, STICK_PUSHER),
+          stallWarning: slot(available.stallWarning, STALL_WARNING),
+        };
+        if (paths.length) sampler = createPropertySampler(reader, paths);
       }
+      const values = sampler?.read();
       if (available.aoa) {
-        lastAoaDeg = reader.getPropertyValue(ALPHA);
+        lastAoaDeg = values![slots.aoa]!;
         // Room for "12.3" and "-4.5"; only a deep negative stall is wider.
         const text = lastAoaDeg.toFixed(1).padStart(4, " ");
         if (aoaText.data !== text) aoaText.data = text;
       }
 
       // STICK PUSHER outranks STALL WARNING; both are red CAS warnings in the AFM.
-      const next = available.stickPusher && reader.getPropertyValue(STICK_PUSHER) > 0.5 ? "STICK PUSHER"
-        : available.stallWarning && reader.getPropertyValue(STALL_WARNING) > 0.5 ? "STALL WARNING" : "";
+      const next = available.stickPusher && values![slots.stickPusher]! > 0.5 ? "STICK PUSHER"
+        : available.stallWarning && values![slots.stallWarning]! > 0.5 ? "STALL WARNING" : "";
       if (next !== lastCas) {
         lastCas = next;
         cas.textContent = next;
@@ -81,6 +100,8 @@ export function createEvaluationInstruments(root: HTMLElement): EvaluationInstru
     },
     aoaDeg: () => lastAoaDeg,
     destroy(): void {
+      sampler?.dispose();
+      sampler = null;
       aoa.remove();
       container.remove();
     },

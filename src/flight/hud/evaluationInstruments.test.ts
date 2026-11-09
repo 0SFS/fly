@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { PropertyBatch } from "@felipegalind0/jsbsim";
 import { createEvaluationInstruments } from "./evaluationInstruments";
 import type { FlightRecorderPropertyReader } from "@0sfs/logging/flightRecorder";
 
@@ -90,6 +91,55 @@ describe("evaluation instruments", () => {
     expect(text(".flight-eval__cas")).toBe("STICK PUSHER");
     handle.update(reader(SF50));
     expect(root.querySelector(".flight-eval__cas")?.classList.contains("is-active")).toBe(false);
+  });
+
+  it("samples only the available readings in one batch, keeping live values and releasing a replaced reader", () => {
+    const values = { ...SF50 };
+    const batches: Array<{ paths: readonly string[]; disposed: boolean; read: ReturnType<typeof vi.fn> }> = [];
+    const sdk = {
+      ...reader(values),
+      getPropertyValue: vi.fn((path: string) => values[path as keyof typeof values] ?? 0),
+      createPropertyBatch: vi.fn((paths: readonly string[], options?: { create?: boolean }) => {
+        expect(options).toEqual({ create: false });
+        const batch = {
+          paths, disposed: false, missing: [],
+          read: vi.fn((target: Float64Array) => {
+            if (batch.disposed) throw new Error("Model reloaded");
+            paths.forEach((path, index) => { target[index] = values[path as keyof typeof values] ?? NaN; });
+            return target;
+          }),
+          dispose() { batch.disposed = true; },
+        };
+        batches.push(batch);
+        return batch as unknown as PropertyBatch;
+      }),
+    };
+    const handle = mount();
+    for (const [aoa, pusher, warning] of [[3.14, 0, 0], [-0, 0, 1], [15.5, 1, 1], [NaN, 0, 0]]) {
+      values["aero/alpha-deg"] = aoa!;
+      values["fcs/stick-pusher"] = pusher!;
+      values["fcs/stall-warning"] = warning!;
+      handle.update(sdk);
+      expect(Object.is(handle.aoaDeg(), aoa)).toBe(true);
+      expect(text(".flight-eval__cas")).toBe(pusher! > 0.5 ? "STICK PUSHER" : warning! > 0.5 ? "STALL WARNING" : "");
+    }
+    expect(sdk.getPropertyValue).not.toHaveBeenCalled();
+    expect(sdk.createPropertyBatch).toHaveBeenCalledOnce();
+    expect(batches[0]!.paths).toEqual(["aero/alpha-deg", "fcs/stick-pusher", "fcs/stall-warning"]);
+    expect(batches[0]!.read).toHaveBeenCalledTimes(4);
+    // The sampler resolves the SDK's new nodes after its old batch was disposed.
+    batches[0]!.disposed = true;
+    values["aero/alpha-deg"] = 7.2;
+    handle.update(sdk);
+    expect(sdk.createPropertyBatch).toHaveBeenCalledTimes(2);
+    expect(handle.aoaDeg()).toBe(7.2);
+    // A new reader has only AoA: no missing warning paths are sampled.
+    const replacement = { ...sdk, queryPropertyCatalog: reader({ "aero/alpha-deg": 0 }).queryPropertyCatalog };
+    handle.update(replacement);
+    expect(batches[1]!.disposed).toBe(true);
+    expect(batches[2]!.paths).toEqual(["aero/alpha-deg"]);
+    handle.destroy();
+    expect(batches[2]!.disposed).toBe(true);
   });
 
   it("removes its markup on destroy", () => {

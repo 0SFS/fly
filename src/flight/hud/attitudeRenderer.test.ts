@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createAttitudeRenderer, describeAttitudeRendererStatus } from "./attitudeRenderer";
+import { ATTITUDE_HALF_SHARE, createAttitudeRenderer, describeAttitudeRendererStatus } from "./attitudeRenderer";
 import type { AttitudeState } from "./attitudeIndicator";
+import * as attitude from "./attitudeIndicator";
+import * as webGpu from "./attitudeWebGpu";
 
 const LEVEL: AttitudeState = {
   rollRad: 0, pitchRad: 0, headingRad: 0, northVelocityFps: 200, eastVelocityFps: 0, verticalSpeedFps: 0,
@@ -73,6 +75,44 @@ describe("attitude renderer", () => {
     renderer.destroy();
   });
 
+  it("keeps the scene for stick-only changes, and the exact grid while velocity markers move", async () => {
+    const t = stubCanvas();
+    const compute = attitude.computeAttitudeScene;
+    const sampled = vi.spyOn(attitude, "computeAttitudeScene");
+    const renderer = createAttitudeRenderer(t.host);
+    await renderer.ready;
+    const state = { ...LEVEL };
+    const stick = { ...CENTRED };
+    renderer.draw(state, stick);
+    const first = sampled.mock.results.at(-1)!.value;
+    stick.x = 0.2;
+    renderer.draw(state, stick);
+    expect(sampled).toHaveBeenCalledOnce();
+    expect(t.frames()).toBe(2);
+    const projection = attitude.createAttitudeProjection(220, 220 * ATTITUDE_HALF_SHARE);
+    for (const velocity of [0, -200, 3, 300]) {
+      state.northVelocityFps = velocity;
+      state.eastVelocityFps = velocity * 0.3;
+      renderer.draw(state, stick);
+      const scene = sampled.mock.results.at(-1)!.value;
+      expect(sampled.mock.calls.at(-1)![2]!.lines).toBe(false);
+      expect(scene.horizon).toBe(first.horizon);
+      expect(scene).toEqual(compute(state, projection));
+    }
+    // Rotations and resizes must not keep the old grid.
+    for (const axis of ["rollRad", "pitchRad", "headingRad"] as const) {
+      state[axis] = 0.3;
+      renderer.draw(state, stick);
+      expect(sampled.mock.calls.at(-1)![2]!.lines).toBe(true);
+      expect(sampled.mock.results.at(-1)!.value.horizon).not.toBe(first.horizon);
+      expect(sampled.mock.results.at(-1)!.value).toEqual(compute(state, projection));
+    }
+    vi.stubGlobal("devicePixelRatio", 2);
+    renderer.draw(state, stick);
+    expect(sampled.mock.calls.at(-1)![2]!.lines).toBe(true);
+    renderer.destroy();
+  });
+
   it("draws again when the camera it is drawn from turns, though the aircraft holds still", async () => {
     const t = stubCanvas();
     const renderer = createAttitudeRenderer(t.host);
@@ -88,6 +128,30 @@ describe("attitude renderer", () => {
     renderer.draw(LEVEL, CENTRED, null);
     expect(t.frames()).toBe(3);
     renderer.destroy();
+  });
+
+  it("redraws WebGPU and notifies the cockpit mirror even when it reuses a stick-only scene", async () => {
+    const gpu = { render: vi.fn<webGpu.WebGpuAttitude["render"]>(), destroy: vi.fn() };
+    vi.spyOn(webGpu, "createWebGpuAttitude").mockResolvedValue(gpu);
+    const t = stubCanvas();
+    const renderer = createAttitudeRenderer(t.host, { device: {} as GPUDevice });
+    await expect(renderer.ready).resolves.toBe("webgpu");
+    const copied = vi.fn();
+    t.canvas().addEventListener("foss-earth:canvas-drawn", copied);
+    renderer.draw(LEVEL, CENTRED);
+    const first = gpu.render.mock.calls[0]![0];
+    renderer.draw(LEVEL, { x: 0.2, y: 0, active: true });
+    expect(gpu.render).toHaveBeenCalledTimes(2);
+    expect(gpu.render.mock.calls[1]![0]).toBe(first);
+    expect(gpu.render.mock.calls[1]![1]).toEqual({ x: 0.2, y: 0, active: true });
+    renderer.draw({ ...LEVEL, eastVelocityFps: 150 }, CENTRED);
+    const next = gpu.render.mock.calls[2]![0];
+    expect(next).not.toBe(first);
+    expect(next.markers).not.toEqual(first.markers);
+    expect(next.horizon).toEqual([]);
+    expect(copied).toHaveBeenCalledTimes(3);
+    renderer.destroy();
+    expect(gpu.destroy).toHaveBeenCalledOnce();
   });
 
   it("falls back to Canvas 2D, and draws the frame it was holding, when WebGPU cannot build", async () => {

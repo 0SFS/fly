@@ -219,8 +219,10 @@ function createSkyField(doc: Document) {
   let down = new Float32Array(0);
   let image: ImageData | null = null;
   let pixels = new Uint32Array(0);
+  let paintedUp: Vec3 | null = null;
 
   const rebuild = (projection: AttitudeProjection): void => {
+    paintedUp = null;
     canvas.width = side;
     canvas.height = side;
     quarter = Math.ceil(side / 2);
@@ -256,6 +258,9 @@ function createSkyField(doc: Document) {
       rebuild(projection);
     }
     if (!image) return null;
+    // The markers, heading grid and stick can move while sky and ground stay
+    // fixed. Reuse only an image whose projection and up vector match exactly.
+    if (paintedUp && Object.is(paintedUp[0], up[0]) && Object.is(paintedUp[1], up[1]) && Object.is(paintedUp[2], up[2])) return canvas;
     const lookup = getColourmap();
     const [ux, uy, uz] = up;
     // Locals, not the closure's variables, so the loop reads registers.
@@ -274,6 +279,7 @@ function createSkyField(doc: Document) {
       }
     }
     ctx.putImageData(image, 0, 0);
+    paintedUp = [ux, uy, uz];
     return canvas;
   };
 }

@@ -7,6 +7,8 @@ export interface PropertySampler {
   dispose(): void;
 }
 
+export type PropertySamplerSdk = Pick<JSBSimSdk, "getPropertyValue"> & Partial<Pick<JSBSimSdk, "createPropertyBatch">>;
+
 /**
  * Reads a fixed list of properties through one native batch instead of one
  * scalar read each. Every slot holds what a scalar read of its path gives at
@@ -15,7 +17,7 @@ export interface PropertySampler {
  * batch when a model loads; the next read makes a batch for the new model.
  * Without the native batch, every slot is a scalar read.
  */
-export function createPropertySampler(sdk: JSBSimSdk, paths: readonly string[]): PropertySampler {
+export function createPropertySampler(sdk: PropertySamplerSdk, paths: readonly string[]): PropertySampler {
   const values = new Float64Array(paths.length);
   let batch: PropertyBatch | null = null;
   let scalarSlots: readonly number[] = [];

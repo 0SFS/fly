@@ -141,6 +141,49 @@ function* scenes(): Generator<AttitudeScene> {
 }
 
 describe("attitude painter on Canvas 2D", () => {
+  it("reuses only sky images with exactly the same projection and up vector while other artwork moves", () => {
+    const field = new RecordingContext();
+    const paint = createCanvasAttitudePainter(fakeDocument(field));
+    const scene = computeAttitudeScene(state(), createAttitudeProjection(101, 45.25));
+    let uploads = 0;
+    const check = (redraw: boolean) => {
+      const ctx = new RecordingContext();
+      paint(ctx as unknown as CanvasRenderingContext2D, scene, { x: 0.2, y: -0.1, active: true });
+      if (redraw) uploads++;
+      expect(field.images.length).toBe(uploads);
+      expect(field.images.at(-1)).toEqual(referenceSky(scene.projection, scene.up));
+      // Reusing the background still paints the labels at their new positions.
+      expect(ctx.texts[0]?.state.transform?.[4]).toBe(scene.labels[0]?.x);
+    };
+    check(true);
+    scene.labels[0]!.x += 1;
+    check(false);
+    // A fresh tuple with the same numbers reuses the image too.
+    scene.up = [...scene.up];
+    check(false);
+    // In-place edits must not change the cached stamp.
+    scene.up[0] = 0.3;
+    check(true);
+    scene.up[1] = Object.is(scene.up[1], -0) ? 0 : -0;
+    check(true);
+    scene.up[1] = Object.is(scene.up[1], -0) ? 0 : -0;
+    check(true);
+    scene.up[2] = -0.8;
+    check(true);
+    check(false);
+    // Projection coefficients can change without the image dimensions changing.
+    scene.projection = { ...scene.projection, a: scene.projection.a * 1.01 };
+    check(true);
+    scene.projection.b *= 0.9;
+    check(true);
+    scene.projection = createAttitudeProjection(160, 72);
+    check(true);
+    check(false);
+    scene.up[0] = NaN;
+    check(true);
+    check(false);
+  });
+
   it("shades every pixel of the sky and ground as shading each on its own did, at odd and even sizes", () => {
     const field = new RecordingContext();
     const paint = createCanvasAttitudePainter(fakeDocument(field));
