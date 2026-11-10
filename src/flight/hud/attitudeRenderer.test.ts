@@ -4,6 +4,7 @@ import { ATTITUDE_HALF_SHARE, createAttitudeRenderer, describeAttitudeRendererSt
 import type { AttitudeState } from "./attitudeIndicator";
 import * as attitude from "./attitudeIndicator";
 import * as webGpu from "./attitudeWebGpu";
+import * as webGl2 from "./attitudeWebGl2";
 
 const LEVEL: AttitudeState = {
   rollRad: 0, pitchRad: 0, headingRad: 0, northVelocityFps: 200, eastVelocityFps: 0, verticalSpeedFps: 0,
@@ -53,6 +54,87 @@ afterEach(() => {
 });
 
 describe("attitude renderer", () => {
+  it("uses WebGL2 only when asked, mirrors each draw, and falls back on a fresh canvas after context loss", async () => {
+    const gl = { render: vi.fn<webGl2.WebGl2Attitude["render"]>(), destroy: vi.fn() };
+    const create = vi.spyOn(webGl2, "createWebGl2Attitude").mockReturnValue(gl);
+    const t = stubCanvas();
+    const renderer = createAttitudeRenderer(t.host, { preference: "webgl2" });
+    await expect(renderer.ready).resolves.toBe("webgl2");
+    expect(t.canvas().dataset.attitudeBackend).toBe("webgl2");
+    const original = t.canvas(), copied = vi.fn();
+    original.addEventListener("foss-earth:canvas-drawn", copied);
+    renderer.draw(LEVEL, CENTRED);
+    renderer.draw(LEVEL, { x: 0.1, y: 0, active: true });
+    expect(gl.render).toHaveBeenCalledTimes(2);
+    expect(gl.render.mock.calls[0]![0].horizon).toEqual([]);
+    expect(copied).toHaveBeenCalledTimes(2);
+    create.mock.calls[0]![1]!.onContextLost!();
+    await expect(renderer.ready).resolves.toBe("canvas2d");
+    expect(t.canvas()).not.toBe(original);
+    expect(t.canvas().dataset.attitudeBackend).toBe("canvas2d");
+    expect(renderer.status.preference).toBe("webgl2");
+    expect(renderer.status.reason).toContain("lost");
+    expect(t.frames()).toBe(1);
+    expect(gl.destroy).toHaveBeenCalledOnce();
+    renderer.destroy();
+  });
+
+  it("replaces a WebGL2 canvas after setup or first-draw failure", async () => {
+    for (const setupFails of [true, false]) {
+      const gl = { render: vi.fn(() => { throw new Error("draw failed"); }), destroy: vi.fn() };
+      const create = vi.spyOn(webGl2, "createWebGl2Attitude").mockImplementation(() => {
+        if (setupFails) throw new Error("compile failed");
+        return gl;
+      });
+      const t = stubCanvas();
+      const renderer = createAttitudeRenderer(t.host, { preference: "webgl2" });
+      await renderer.ready;
+      renderer.draw(LEVEL, CENTRED);
+      await expect(renderer.ready).resolves.toBe("canvas2d");
+      expect(t.canvas()).not.toBe(create.mock.calls[0]![0]);
+      expect(t.host.querySelectorAll("canvas")).toHaveLength(1);
+      expect(renderer.status.reason).toContain(setupFails ? "compile failed" : "draw failed");
+      expect(t.frames()).toBe(1);
+      renderer.destroy();
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("settles on Canvas 2D when WebGL2, chosen in flight, cannot redraw the frame already shown", async () => {
+    const gl = { render: vi.fn(() => { throw new Error("draw failed"); }), destroy: vi.fn() };
+    vi.spyOn(webGl2, "createWebGl2Attitude").mockReturnValue(gl);
+    const t = stubCanvas();
+    const renderer = createAttitudeRenderer(t.host, { preference: "canvas2d" });
+    await renderer.ready;
+    renderer.draw(LEVEL, CENTRED);
+    renderer.setPreference("webgl2");
+    await expect(renderer.ready).resolves.toBe("canvas2d");
+    expect(renderer.status).toEqual({ preference: "webgl2", backend: "canvas2d", reason: expect.stringContaining("draw failed") });
+    expect(t.canvas().dataset.attitudeBackend).toBe("canvas2d");
+    expect(t.host.querySelectorAll("canvas")).toHaveLength(1);
+    expect(gl.render).toHaveBeenCalledOnce();
+    expect(gl.destroy).toHaveBeenCalledOnce();
+    expect(t.frames()).toBe(2);
+    renderer.destroy();
+  });
+
+  it("ignores a lost-context callback after switching away from WebGL2", async () => {
+    const gl = { render: vi.fn(), destroy: vi.fn() }, gpu = { render: vi.fn(), destroy: vi.fn() };
+    const create = vi.spyOn(webGl2, "createWebGl2Attitude").mockReturnValue(gl);
+    vi.spyOn(webGpu, "createWebGpuAttitude").mockResolvedValue(gpu);
+    const t = stubCanvas();
+    const renderer = createAttitudeRenderer(t.host, { preference: "webgl2", device: {} as GPUDevice });
+    await renderer.ready;
+    renderer.draw(LEVEL, CENTRED);
+    renderer.setPreference("webgpu");
+    await expect(renderer.ready).resolves.toBe("webgpu");
+    create.mock.calls[0]![1]!.onContextLost!();
+    expect(renderer.status.backend).toBe("webgpu");
+    expect(gl.destroy).toHaveBeenCalledOnce();
+    renderer.destroy();
+    expect(gpu.destroy).toHaveBeenCalledOnce();
+  });
+
   it("draws with Canvas 2D when the globe has no WebGPU device", async () => {
     const t = stubCanvas();
     const renderer = createAttitudeRenderer(t.host);

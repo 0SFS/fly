@@ -34,7 +34,7 @@ import {
 } from "foss-earth/diagnostics";
 import { createMeshInspector } from "foss-earth/diagnosticDrawing";
 import { createWasmSections, earthWasmCores, earthComputeScheduling } from "foss-earth/wasm";
-import { describeAttitudeRendererStatus } from "./hud/attitudeRenderer";
+import { ATTITUDE_BACKEND_LABELS, describeAttitudeRendererStatus, type AttitudeRendererStatus } from "./hud/attitudeRenderer";
 import { AIRCRAFT_FOCUS_POINT, registerFlightSettings } from "./settings/registerFlightSettings";
 import { flightParameterSpec, type FlightParameterStore } from "./settings/flightParameters";
 import { AIRCRAFT_START_PARAMETER_IDS, applyAircraftStartDefaults } from "./settings/aircraftStart";
@@ -1573,6 +1573,7 @@ async function createFlightSimSession(
   // The throttle lever starts and stops the engine, on this screen and the phone's.
   const engineControl = createEngineControl(jsbsim.sdk, getFdmProfile(initialAircraftId));
   let localStartHeld = false;
+  let attitudeRendererStatus: AttitudeRendererStatus | null = null;
   const flightHud: FlightHudHandle = createFlightHud(hudRoot, {
     drone: droneAircraft,
     capabilities: controlCapabilities,
@@ -1642,10 +1643,11 @@ async function createFlightSimSession(
     gpuDevice: runtime.renderer.mode === "webgpu" ? (runtime.renderer.engine as WebGPUEngine)._device : null,
     attitudeRenderer: parameters.get("osfs.renderer.attitudeIndicator"),
     onAttitudeStatus: status => {
+      attitudeRendererStatus = { ...status };
       // What actually draws, under the choice in Renderer → Instruments.
       settings.setNote("osfs.renderer.attitudeIndicator", describeAttitudeRendererStatus(status));
       if (!status.backend) return;
-      flightLog.info("hud", `Attitude indicator draws with ${status.backend === "webgpu" ? "WebGPU" : "Canvas 2D"}`,
+      flightLog.info("hud", `Attitude indicator draws with ${ATTITUDE_BACKEND_LABELS[status.backend]}`,
         { preference: status.preference, renderer: runtime.renderer.mode, ...(status.reason ? { reason: status.reason } : {}) });
     },
     profiler: frameProfiler,
@@ -3565,6 +3567,7 @@ async function createFlightSimSession(
       : status.mode === "google-tiles" ? "google" : null;
   let preparedGround = mapGround(runtime.status);
   stopWatching.push(runtime.subscribeStatus(status => {
+    mapPanel.update(status);
     const ground = mapGround(status);
     if (ground === null || ground === preparedGround) return;
     preparedGround = ground;
@@ -3669,6 +3672,14 @@ async function createFlightSimSession(
     downloads: browserReportDownloads(URL), secrets: () => reportSecrets(settings), providers: {
       diagnostics: diagnosticsSource.report,
       flight: () => createPanelSnapshot(),
+      instruments: () => {
+        const canvas = hudRoot.querySelector<HTMLCanvasElement>(".flight-hud__attitude canvas");
+        return {
+          attitude: attitudeRendererStatus ? { ...attitudeRendererStatus } : null,
+          canvas: canvas ? { width: canvas.width, height: canvas.height, devicePixelRatio: globalThis.devicePixelRatio || 1 } : null,
+          lastAttitudeCpuMs: frameProfiler.enabled ? frameProfiler.current("flight/hud/attitude") : null,
+        };
+      },
       ground: captureGroundDiagnostics,
       armament: armamentState,
       damage: () => damage.snapshot(),

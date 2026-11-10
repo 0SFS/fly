@@ -42,8 +42,9 @@ const RUNS = {
   "webgpu-webgpu": { globe: "webgpu", attitude: "webgpu" },
   "webgpu-canvas2d": { globe: "webgpu", attitude: "canvas2d" },
   "webgl2-canvas2d": { globe: "webgl2", attitude: "canvas2d" },
+  "webgl2-webgl2": { globe: "webgl2", attitude: "webgl2" },
 };
-const runNames = arg("runs", Object.keys(RUNS).join(",")).split(",");
+const runNames = arg("runs", "webgpu-webgpu,webgpu-canvas2d,webgl2-canvas2d").split(",");
 for (const name of runNames) if (!RUNS[name]) throw new Error(`Unknown run ${name}; choose from ${Object.keys(RUNS).join(", ")}`);
 if (new Set(runNames).size !== runNames.length) throw new Error("Run configurations must be unique.");
 const googleKey = route && !buildOnly ? await flightGoogleKey() : null;
@@ -108,6 +109,7 @@ const SUMMARY = `(() => {
     summary,
     instrument: { ias: text('[data-metric="ias"]'), alt: text('[data-metric="alt"]'), hdg: text('[data-metric="hdg"]'), vs: text('[data-metric="vs"]') },
     attitudeCanvas: Boolean(document.querySelector('.flight-hud__attitude canvas')),
+    attitudeBackend: document.querySelector('.flight-hud__attitude canvas')?.dataset.attitudeBackend ?? null,
     gpuTimed: window.osfsFrameProfile?.gpuTimed() ?? null,
     route: window.osfsFlightRoute?.snapshot() ?? null,
     flightPerformance: window.osfsFlightPerformance?.snapshot() ?? null,

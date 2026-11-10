@@ -14,6 +14,7 @@ import { uninstallCameraPreview } from "../drone/cameraPreviewRegistry";
 import { unregisterAircraftMod } from "@0sfs/aircraft/aircraftCatalog";
 import { unregisterFdmProfile } from "../jsbsim/fdmProfiles";
 import { BUNDLED_MODS, DEFAULT_MODPACK } from "./bundledMods";
+import { localCheckoutSource } from "./localCheckoutSource";
 import { removeSpaceManifest } from "../space/applySpaceManifest";
 
 const ADDED_KEY = "osfs.mods.added";
@@ -193,6 +194,28 @@ async function loadSource(source: string, fromUrl: boolean): Promise<void> {
   writeList(ADDED_KEY, added);
 }
 
+/**
+ * Loads a requested mod. On the dev server, an unpublished GitHub Pages
+ * manifest falls back to the checkout served at `/dev-mods/`.
+ */
+async function loadRequested(source: string, fromUrl: boolean): Promise<void> {
+  try {
+    await loadSource(source, fromUrl);
+  } catch (error) {
+    const local = import.meta.env.DEV ? localCheckoutSource(source, error) : null;
+    if (!local) throw error;
+    const saved = added;
+    added = added.filter(item => item !== source);
+    try {
+      await loadSource(local, fromUrl);
+    } catch {
+      added = saved;
+      throw error;
+    }
+    notice = `GitHub Pages has no manifest for ${source}. Loaded the checkout on this computer.`;
+  }
+}
+
 /** Installs the default modpack, then any mods saved on this browser or named in `?mods=`. */
 export function ensureModsSession(): Promise<readonly LoadedModRecord[]> {
   if (started) return started;
@@ -221,7 +244,7 @@ export function ensureModsSession(): Promise<readonly LoadedModRecord[]> {
     }
     for (const source of requested) {
       try {
-        await loadSource(source, true);
+        await loadRequested(source, true);
       } catch (error) {
         notice = error instanceof Error ? error.message : String(error);
       }
@@ -282,7 +305,7 @@ export async function addMod(source: string): Promise<void> {
   await ensureModsSession();
   notice = null;
   try {
-    await loadSource(source, false);
+    await loadRequested(source, false);
   } catch (error) {
     notice = error instanceof Error ? error.message : String(error);
   }
@@ -298,7 +321,7 @@ export async function confirmPendingMod(): Promise<void> {
   pendingSource = null;
   pendingWarning = null;
   try {
-    await loadSource(source, false);
+    await loadRequested(source, false);
   } catch (error) {
     notice = error instanceof Error ? error.message : String(error);
   }

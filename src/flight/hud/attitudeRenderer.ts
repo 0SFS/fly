@@ -11,14 +11,18 @@ import {
 } from "./attitudeIndicator";
 import { createCanvasAttitudePainter, type AttitudeStick } from "./attitudeCanvas";
 import { createWebGpuAttitude, type WebGpuAttitude } from "./attitudeWebGpu";
+import { createWebGl2Attitude, type WebGl2Attitude } from "./attitudeWebGl2";
 
 /** The instrument's half side as a share of its canvas's side; the rest is the gap to the levers beside it. */
 export const ATTITUDE_HALF_SHARE = INSTRUMENT_STICK_HALF_SHARE;
 
-export type AttitudeBackend = "webgpu" | "canvas2d";
+export type AttitudeBackend = "webgpu" | "webgl2" | "canvas2d";
+export const ATTITUDE_BACKEND_LABELS: Readonly<Record<AttitudeBackend, string>> = {
+  webgpu: "WebGPU", webgl2: "WebGL2", canvas2d: "Canvas 2D",
+};
 /** What the pilot asked for in Settings. Auto is WebGPU wherever the globe has it. */
 export type AttitudeRendererPreference = "auto" | AttitudeBackend;
-export const ATTITUDE_RENDERER_PREFERENCES: readonly AttitudeRendererPreference[] = ["auto", "webgpu", "canvas2d"];
+export const ATTITUDE_RENDERER_PREFERENCES: readonly AttitudeRendererPreference[] = ["auto", "webgpu", "webgl2", "canvas2d"];
 
 export function isAttitudeRendererPreference(value: unknown): value is AttitudeRendererPreference {
   return ATTITUDE_RENDERER_PREFERENCES.includes(value as AttitudeRendererPreference);
@@ -38,7 +42,8 @@ export interface AttitudeRendererStatus {
  */
 export function describeAttitudeRendererStatus(status: AttitudeRendererStatus): string | null {
   if (!status.backend) return null;
-  const drawing = status.backend === "webgpu" ? "WebGPU, on the globe's GPU device" : "Canvas 2D";
+  const drawing = status.backend === "webgpu" ? "WebGPU, on the globe's GPU device"
+    : status.backend === "webgl2" ? "WebGL2 (experimental), on the indicator's canvas" : "Canvas 2D";
   return status.reason ? `Drawing with ${drawing}. ${status.reason}` : `Drawing with ${drawing}.`;
 }
 
@@ -67,7 +72,7 @@ export interface AttitudeRendererOptions {
 const PROFILE_SECTION = "flight/hud/attitude";
 
 type Backend =
-  | { kind: "webgpu"; gpu: WebGpuAttitude }
+  | { kind: "webgpu" | "webgl2"; gpu: WebGpuAttitude | WebGl2Attitude }
   | { kind: "canvas2d"; ctx: CanvasRenderingContext2D; paint: ReturnType<typeof createCanvasAttitudePainter> };
 
 /**
@@ -181,8 +186,13 @@ export function createAttitudeRenderer(host: HTMLElement, options: AttitudeRende
         scene.ticks = previous.ticks;
       }
     }
-    if (backend.kind === "webgpu") {
-      backend.gpu.render(scene, stick, backing / cssSize);
+    if (backend.kind !== "canvas2d") {
+      try { backend.gpu.render(scene, stick, backing / cssSize); }
+      catch (error) {
+        if (backend.kind !== "webgl2") throw error;
+        ready = Promise.resolve(fallback(`WebGL2 could not draw here: ${error instanceof Error ? error.message : String(error)}`));
+        return;
+      }
       // Its picture lasts only this task: a copy of the page, such as the cockpit screen's, takes it now.
       noteCanvasDrawn(canvas);
     } else {
@@ -195,18 +205,41 @@ export function createAttitudeRenderer(host: HTMLElement, options: AttitudeRende
 
   const settle = (next: Backend, reason: string | null): AttitudeBackend => {
     backend = next;
+    if (canvas) canvas.dataset.attitudeBackend = next.kind;
     publish({ preference: status.preference, backend: next.kind, reason });
     if (last) draw(...last);
-    return next.kind;
+    // That first draw may already have replaced a WebGL2 backend that could not draw.
+    return backend?.kind ?? next.kind;
+  };
+
+  const fallback = (reason: string): AttitudeBackend => {
+    if (backend && backend.kind !== "canvas2d") backend.gpu.destroy();
+    backend = null;
+    return settle(startCanvas2d(freshCanvas()), reason);
   };
 
   const choose = (preference: AttitudeRendererPreference): Promise<AttitudeBackend> => {
     const mine = ++generation;
-    if (backend?.kind === "webgpu") backend.gpu.destroy();
+    if (backend && backend.kind !== "canvas2d") backend.gpu.destroy();
     backend = null;
     publish({ preference, backend: null, reason: null });
     const target = freshCanvas();
     if (preference === "canvas2d") return Promise.resolve(settle(startCanvas2d(target), null));
+    if (preference === "webgl2") {
+      try {
+        const gl = createWebGl2Attitude(target, {
+          profiler,
+          onContextLost() {
+            if (destroyed || mine !== generation || backend?.kind !== "webgl2") return;
+            ready = Promise.resolve(fallback("WebGL2 lost its drawing context."));
+          },
+        });
+        if (gl) return Promise.resolve(settle({ kind: "webgl2", gpu: gl }, null));
+      } catch (error) {
+        return Promise.resolve(fallback(`WebGL2 could not start here: ${error instanceof Error ? error.message : String(error)}`));
+      }
+      return Promise.resolve(fallback("WebGL2 is not available to the indicator."));
+    }
     if (!device) {
       const reason = preference === "webgpu" ? "The globe is running on WebGL, so WebGPU is not available to the instrument." : null;
       return Promise.resolve(settle(startCanvas2d(target), reason));
@@ -245,7 +278,7 @@ export function createAttitudeRenderer(host: HTMLElement, options: AttitudeRende
       destroyed = true;
       generation++;
       resizeObserver?.disconnect();
-      if (backend?.kind === "webgpu") backend.gpu.destroy();
+      if (backend && backend.kind !== "canvas2d") backend.gpu.destroy();
       backend = null;
       canvas?.remove();
       canvas = null;

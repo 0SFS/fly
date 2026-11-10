@@ -786,6 +786,7 @@ export const OSFS_PARAMETERS = [
     choices: [
       { id: "auto", label: "Auto", description: "The GPU when the globe runs on WebGPU, Canvas 2D otherwise." },
       { id: "webgpu", label: "WebGPU", description: "On the globe's GPU device." },
+      { id: "webgl2", label: "WebGL2", description: "Experimental shader rendering on the indicator's canvas. Antialiasing differs from Canvas 2D; Auto keeps its existing choice." },
       { id: "canvas2d", label: "Canvas 2D", description: "The browser rasterises its lines and text every frame, which costs more." },
     ],
     default: "auto",
