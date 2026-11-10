@@ -1,0 +1,1342 @@
+{
+  "date": "2026-11-09",
+  "report": "attitude-webgl2.md",
+  "commits": {
+    "baseline": "fly 016e191",
+    "change": "fly 8c053b8",
+    "validatedAt": "fly 11f1605"
+  },
+  "machine": {
+    "model": "Apple M5 MacBook Air (fanless)",
+    "os": "macOS 27.0 (26A428)",
+    "node": "v26.9.0",
+    "power": "AC, battery 69% charging",
+    "thermal": "pmset: no thermal or performance warning before or after"
+  },
+  "imageComparison": {
+    "browser": "Chrome/156.0.8078.80",
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)",
+    "cases": [
+      {
+        "cssPx": 101,
+        "dpr": 1,
+        "backingPx": 101,
+        "frames": 24,
+        "canvas2dVsWebgl2": {
+          "max": 255,
+          "mean": 4.962876392837304,
+          "over2Share": 0.29371201352808546
+        },
+        "webgl2VsWebgpu": {
+          "max": 50,
+          "over2Share": 0.007835220403228442
+        },
+        "webgpuBeforeVsAfterExtractionMax": 0
+      },
+      {
+        "cssPx": 160,
+        "dpr": 1,
+        "backingPx": 160,
+        "frames": 24,
+        "canvas2dVsWebgl2": {
+          "max": 255,
+          "mean": 3.321703287760417,
+          "over2Share": 0.20706461588541666
+        },
+        "webgl2VsWebgpu": {
+          "max": 1,
+          "over2Share": 0.0
+        },
+        "webgpuBeforeVsAfterExtractionMax": 0
+      },
+      {
+        "cssPx": 220,
+        "dpr": 1,
+        "backingPx": 220,
+        "frames": 24,
+        "canvas2dVsWebgl2": {
+          "max": 255,
+          "mean": 2.326489755509642,
+          "over2Share": 0.14509125344352616
+        },
+        "webgl2VsWebgpu": {
+          "max": 1,
+          "over2Share": 0.0
+        },
+        "webgpuBeforeVsAfterExtractionMax": 0
+      },
+      {
+        "cssPx": 300,
+        "dpr": 1,
+        "backingPx": 300,
+        "frames": 24,
+        "canvas2dVsWebgl2": {
+          "max": 230,
+          "mean": 1.880596875,
+          "over2Share": 0.12270659722222223
+        },
+        "webgl2VsWebgpu": {
+          "max": 1,
+          "over2Share": 0.0
+        },
+        "webgpuBeforeVsAfterExtractionMax": 0
+      },
+      {
+        "cssPx": 220,
+        "dpr": 2,
+        "backingPx": 440,
+        "frames": 24,
+        "canvas2dVsWebgl2": {
+          "max": 255,
+          "mean": 1.4434591834538566,
+          "over2Share": 0.08226987560261707
+        },
+        "webgl2VsWebgpu": {
+          "max": 2,
+          "over2Share": 0.0
+        },
+        "webgpuBeforeVsAfterExtractionMax": 0
+      },
+      {
+        "cssPx": 300,
+        "dpr": 2,
+        "backingPx": 600,
+        "frames": 24,
+        "canvas2dVsWebgl2": {
+          "max": 255,
+          "mean": 1.2537707175925925,
+          "over2Share": 0.0752599537037037
+        },
+        "webgl2VsWebgpu": {
+          "max": 2,
+          "over2Share": 0.0
+        },
+        "webgpuBeforeVsAfterExtractionMax": 0
+      },
+      {
+        "cssPx": 220,
+        "dpr": 3,
+        "backingPx": 660,
+        "frames": 24,
+        "canvas2dVsWebgl2": {
+          "max": 255,
+          "mean": 1.2178404069100093,
+          "over2Share": 0.06491917278849096
+        },
+        "webgl2VsWebgpu": {
+          "max": 2,
+          "over2Share": 0.0
+        },
+        "webgpuBeforeVsAfterExtractionMax": 0
+      },
+      {
+        "cssPx": 220.25,
+        "dpr": 1.25,
+        "backingPx": 275,
+        "frames": 24,
+        "canvas2dVsWebgl2": {
+          "max": 255,
+          "mean": 2.5514225895316804,
+          "over2Share": 0.14143636363636364
+        },
+        "webgl2VsWebgpu": {
+          "max": 37,
+          "over2Share": 0.0011925619834710743
+        },
+        "webgpuBeforeVsAfterExtractionMax": 0
+      }
+    ]
+  },
+  "sideBySide": {
+    "browser": "Chrome/157.0.8103.50",
+    "side": 440,
+    "stats": [
+      {
+        "case": "Level, heading 000",
+        "maxLevel": 255,
+        "pixelsOver2Pct": 10.746384297520661
+      },
+      {
+        "case": "Climbing right turn: roll 35, pitch 12, heading 210",
+        "maxLevel": 255,
+        "pixelsOver2Pct": 12.743285123966942
+      },
+      {
+        "case": "Inverted dive: roll -120, pitch -40, heading 075",
+        "maxLevel": 255,
+        "pixelsOver2Pct": 13.327479338842977
+      },
+      {
+        "case": "Camera looking back: roll 20, pitch 5, heading 300",
+        "maxLevel": 255,
+        "pixelsOver2Pct": 11.924586776859504
+      }
+    ]
+  },
+  "componentCpu": {
+    "browser": "Chrome/156.0.8078.80",
+    "note": "median over 8 rounds of the mean per draw across 120 changing attitudes; order reversed every round",
+    "rows": [
+      {
+        "cssPx": 160,
+        "dpr": 1,
+        "medianUs": {
+          "canvas2d": 139.1666665673256,
+          "webgl2": 22.499999900658924,
+          "webgpu": 25.833333532015484,
+          "AA-canvas2d": 140.00000009934107
+        }
+      },
+      {
+        "cssPx": 220,
+        "dpr": 1,
+        "medianUs": {
+          "canvas2d": 159.16666686534882,
+          "webgl2": 22.499999900658924,
+          "webgpu": 27.500000099341076,
+          "AA-canvas2d": 159.99999990065893
+        }
+      },
+      {
+        "cssPx": 300,
+        "dpr": 1,
+        "medianUs": {
+          "canvas2d": 195.83333333333334,
+          "webgl2": 22.5000003973643,
+          "webgpu": 28.333333134651184,
+          "AA-canvas2d": 196.66666686534882
+        }
+      },
+      {
+        "cssPx": 220,
+        "dpr": 2,
+        "medianUs": {
+          "canvas2d": 159.16666686534882,
+          "webgl2": 23.333333432674408,
+          "webgpu": 27.500000099341076,
+          "AA-canvas2d": 164.16666706403097
+        }
+      }
+    ]
+  },
+  "isolatedGpuTimer": {
+    "note": "EXT_disjoint_timer_query_webgl2 and WebGPU timestamps, 220 CSS px, DPR 1, no other GPU load",
+    "medianMs": {
+      "webgl2": 0.250875,
+      "webgpu": 0.14904
+    }
+  },
+  "inApp": {
+    "browser": "Chrome/157.0.8103.50",
+    "note": "scripts/profile-flight.mjs, WebGL2 globe, 1280x720 CSS at DPR 1, app defaults, headless",
+    "passes": {
+      "report-pass1": {
+        "generatedAt": "2026-11-10T01:54:44.247Z",
+        "order": [
+          "webgl2-canvas2d",
+          "webgl2-webgl2"
+        ],
+        "seconds": 10,
+        "settleSeconds": 5,
+        "headed": false,
+        "runs": {
+          "webgl2-canvas2d": {
+            "attitudeBackend": "canvas2d",
+            "frames": 599,
+            "frame": {
+              "meanMs": 16.665943238731217,
+              "p50Ms": 16.69999999999891,
+              "p95Ms": 16.799999999999272,
+              "p99Ms": 16.80000000000109,
+              "maxMs": 16.80000000000109
+            },
+            "measuredMeanMs": 5.062270450970167,
+            "slowFrames": {
+              "over25Ms": 2,
+              "over50Ms": 0,
+              "over100Ms": 0
+            },
+            "instrument": {
+              "ias": "049",
+              "alt": null,
+              "hdg": "255",
+              "vs": "-1662"
+            },
+            "render": {
+              "widthCss": 1280,
+              "heightCss": 720,
+              "devicePixelRatio": 1,
+              "widthPixels": 1280,
+              "heightPixels": 720
+            },
+            "gpuAdapter": {
+              "vendor": "apple",
+              "architecture": "metal-3",
+              "description": "Apple M5",
+              "fallback": false
+            },
+            "exceptions": [],
+            "sections": {
+              "gpu": {
+                "meanMs": 2.72450951585977,
+                "p50Ms": 2.446583,
+                "p95Ms": 5.029166,
+                "p99Ms": 5.776499,
+                "maxMs": 6.073249,
+                "activeFrames": 599
+              },
+              "gpu/globe": {
+                "meanMs": 2.72450951585977,
+                "p50Ms": 2.446583,
+                "p95Ms": 5.029166,
+                "p99Ms": 5.776499,
+                "maxMs": 6.073249,
+                "activeFrames": 599
+              },
+              "render": {
+                "meanMs": 1.9891485822618704,
+                "p50Ms": 2,
+                "p95Ms": 2.300000011920929,
+                "p99Ms": 2.5,
+                "maxMs": 2.799999952316284,
+                "activeFrames": 599
+              },
+              "flight": {
+                "meanMs": 1.8484140238499203,
+                "p50Ms": 1.199999988079071,
+                "p95Ms": 4.899999976158142,
+                "p99Ms": 6.699999988079071,
+                "maxMs": 8.900000035762787,
+                "activeFrames": 599
+              },
+              "flight/view": {
+                "meanMs": 0.849415693239298,
+                "p50Ms": 0.19999998807907104,
+                "p95Ms": 3.699999988079071,
+                "p99Ms": 5.5,
+                "maxMs": 7.5,
+                "activeFrames": 571
+              },
+              "flight/hud": {
+                "meanMs": 0.5218697836084637,
+                "p50Ms": 0.5,
+                "p95Ms": 0.6000000238418579,
+                "p99Ms": 0.7000000476837158,
+                "maxMs": 0.800000011920929,
+                "activeFrames": 599
+              },
+              "flight/hud/attitude": {
+                "meanMs": 0.41919866358497504,
+                "p50Ms": 0.40000003576278687,
+                "p95Ms": 0.5,
+                "p99Ms": 0.5999999642372131,
+                "maxMs": 0.6000000238418579,
+                "activeFrames": 599
+              },
+              "map": {
+                "meanMs": 1.1535893143317935,
+                "p50Ms": 0.5,
+                "p95Ms": 4.299999952316284,
+                "p99Ms": 6.599999964237213,
+                "maxMs": 9.100000023841858,
+                "activeFrames": 565
+              }
+            }
+          },
+          "webgl2-webgl2": {
+            "attitudeBackend": "webgl2",
+            "frames": 599,
+            "frame": {
+              "meanMs": 16.6661101836394,
+              "p50Ms": 16.69999999999891,
+              "p95Ms": 16.700000000000728,
+              "p99Ms": 16.80000000000109,
+              "maxMs": 16.80000000000109
+            },
+            "measuredMeanMs": 4.7126878107927475,
+            "slowFrames": {
+              "over25Ms": 2,
+              "over50Ms": 0,
+              "over100Ms": 0
+            },
+            "instrument": {
+              "ias": "047",
+              "alt": null,
+              "hdg": "258",
+              "vs": "-1472"
+            },
+            "render": {
+              "widthCss": 1280,
+              "heightCss": 720,
+              "devicePixelRatio": 1,
+              "widthPixels": 1280,
+              "heightPixels": 720
+            },
+            "gpuAdapter": {
+              "vendor": "apple",
+              "architecture": "metal-3",
+              "description": "Apple M5",
+              "fallback": false
+            },
+            "exceptions": [],
+            "sections": {
+              "gpu": {
+                "meanMs": 3.06917387479132,
+                "p50Ms": 2.792291,
+                "p95Ms": 5.706124,
+                "p99Ms": 6.575832,
+                "maxMs": 9.521541000000001,
+                "activeFrames": 599
+              },
+              "gpu/globe": {
+                "meanMs": 1.9749156744574312,
+                "p50Ms": 1.726833,
+                "p95Ms": 3.296208,
+                "p99Ms": 5.051666,
+                "maxMs": 5.737999,
+                "activeFrames": 599
+              },
+              "gpu/attitude indicator": {
+                "meanMs": 1.0942582003338897,
+                "p50Ms": 0.795541,
+                "p95Ms": 3.119416,
+                "p99Ms": 4.359333,
+                "maxMs": 7.311333,
+                "activeFrames": 598
+              },
+              "render": {
+                "meanMs": 1.9358931557961019,
+                "p50Ms": 1.9000000357627869,
+                "p95Ms": 2.300000011920929,
+                "p99Ms": 2.5,
+                "maxMs": 2.900000035762787,
+                "activeFrames": 599
+              },
+              "flight": {
+                "meanMs": 1.599499166409838,
+                "p50Ms": 0.8999999761581421,
+                "p95Ms": 4.5,
+                "p99Ms": 6.100000023841858,
+                "maxMs": 7.100000023841858,
+                "activeFrames": 599
+              },
+              "flight/view": {
+                "meanMs": 0.8953255418943046,
+                "p50Ms": 0.19999998807907104,
+                "p95Ms": 3.700000047683716,
+                "p99Ms": 5.300000011920929,
+                "maxMs": 6.300000011920929,
+                "activeFrames": 562
+              },
+              "flight/hud": {
+                "meanMs": 0.21585976629702994,
+                "p50Ms": 0.19999998807907104,
+                "p95Ms": 0.30000001192092896,
+                "p99Ms": 0.3999999761581421,
+                "maxMs": 0.5,
+                "activeFrames": 597
+              },
+              "flight/hud/attitude": {
+                "meanMs": 0.10984974920451143,
+                "p50Ms": 0.10000002384185791,
+                "p95Ms": 0.20000004768371582,
+                "p99Ms": 0.20000004768371582,
+                "maxMs": 0.30000001192092896,
+                "activeFrames": 526
+              },
+              "map": {
+                "meanMs": 1.0976627690963237,
+                "p50Ms": 0.5000000596046448,
+                "p95Ms": 3.800000011920929,
+                "p99Ms": 5.900000035762787,
+                "maxMs": 9.800000011920929,
+                "activeFrames": 560
+              }
+            }
+          }
+        }
+      },
+      "report-pass2": {
+        "generatedAt": "2026-11-10T01:58:47.574Z",
+        "order": [
+          "webgl2-webgl2",
+          "webgl2-canvas2d"
+        ],
+        "seconds": 10,
+        "settleSeconds": 5,
+        "headed": false,
+        "runs": {
+          "webgl2-webgl2": {
+            "attitudeBackend": "webgl2",
+            "frames": 599,
+            "frame": {
+              "meanMs": 16.665943238731217,
+              "p50Ms": 16.69999999999891,
+              "p95Ms": 16.700000000000728,
+              "p99Ms": 16.80000000000109,
+              "maxMs": 16.80000000000109
+            },
+            "measuredMeanMs": 4.665776290459704,
+            "slowFrames": {
+              "over25Ms": 2,
+              "over50Ms": 1,
+              "over100Ms": 0
+            },
+            "instrument": {
+              "ias": "049",
+              "alt": null,
+              "hdg": "255",
+              "vs": "-1721"
+            },
+            "render": {
+              "widthCss": 1280,
+              "heightCss": 720,
+              "devicePixelRatio": 1,
+              "widthPixels": 1280,
+              "heightPixels": 720
+            },
+            "gpuAdapter": {
+              "vendor": "apple",
+              "architecture": "metal-3",
+              "description": "Apple M5",
+              "fallback": false
+            },
+            "exceptions": [],
+            "sections": {
+              "gpu": {
+                "meanMs": 3.4202727228714545,
+                "p50Ms": 3.2038320000000002,
+                "p95Ms": 5.802374,
+                "p99Ms": 7.228874,
+                "maxMs": 10.015749,
+                "activeFrames": 599
+              },
+              "gpu/globe": {
+                "meanMs": 2.1952197278798002,
+                "p50Ms": 2.032999,
+                "p95Ms": 3.481499,
+                "p99Ms": 4.038874,
+                "maxMs": 4.267208,
+                "activeFrames": 599
+              },
+              "gpu/attitude indicator": {
+                "meanMs": 1.2250529949916524,
+                "p50Ms": 1.007041,
+                "p95Ms": 2.654583,
+                "p99Ms": 4.409499,
+                "maxMs": 6.637791,
+                "activeFrames": 597
+              },
+              "render": {
+                "meanMs": 1.8821368943868775,
+                "p50Ms": 1.899999976158142,
+                "p95Ms": 2.300000011920929,
+                "p99Ms": 2.699999988079071,
+                "maxMs": 2.800000011920929,
+                "activeFrames": 599
+              },
+              "flight": {
+                "meanMs": 1.5535893174563107,
+                "p50Ms": 0.8999999761581421,
+                "p95Ms": 4.199999988079071,
+                "p99Ms": 6.299999952316284,
+                "maxMs": 9.199999988079071,
+                "activeFrames": 599
+              },
+              "flight/view": {
+                "meanMs": 0.8479131889064643,
+                "p50Ms": 0.19999998807907104,
+                "p95Ms": 3.399999976158142,
+                "p99Ms": 5.5,
+                "maxMs": 8.300000011920929,
+                "activeFrames": 553
+              },
+              "flight/hud": {
+                "meanMs": 0.21886477565924592,
+                "p50Ms": 0.19999998807907104,
+                "p95Ms": 0.30000001192092896,
+                "p99Ms": 0.3999999761581421,
+                "maxMs": 0.5,
+                "activeFrames": 598
+              },
+              "flight/hud/attitude": {
+                "meanMs": 0.1170283800771519,
+                "p50Ms": 0.10000002384185791,
+                "p95Ms": 0.20000004768371582,
+                "p99Ms": 0.20000004768371582,
+                "maxMs": 0.30000001192092896,
+                "activeFrames": 530
+              },
+              "map": {
+                "meanMs": 1.1616026680537177,
+                "p50Ms": 0.5,
+                "p95Ms": 4.100000023841858,
+                "p99Ms": 6.099999964237213,
+                "maxMs": 9.899999976158142,
+                "activeFrames": 571
+              }
+            }
+          },
+          "webgl2-canvas2d": {
+            "attitudeBackend": "canvas2d",
+            "frames": 599,
+            "frame": {
+              "meanMs": 16.665776293823036,
+              "p50Ms": 16.69999999999891,
+              "p95Ms": 16.700000000000728,
+              "p99Ms": 16.80000000000109,
+              "maxMs": 16.80000000000109
+            },
+            "measuredMeanMs": 5.237061769018985,
+            "slowFrames": {
+              "over25Ms": 3,
+              "over50Ms": 1,
+              "over100Ms": 0
+            },
+            "instrument": {
+              "ias": "048",
+              "alt": null,
+              "hdg": "257",
+              "vs": "-1497"
+            },
+            "render": {
+              "widthCss": 1280,
+              "heightCss": 720,
+              "devicePixelRatio": 1,
+              "widthPixels": 1280,
+              "heightPixels": 720
+            },
+            "gpuAdapter": {
+              "vendor": "apple",
+              "architecture": "metal-3",
+              "description": "Apple M5",
+              "fallback": false
+            },
+            "exceptions": [],
+            "sections": {
+              "render": {
+                "meanMs": 2.096494156749101,
+                "p50Ms": 2.099999964237213,
+                "p95Ms": 2.5,
+                "p99Ms": 2.899999976158142,
+                "maxMs": 3,
+                "activeFrames": 599
+              },
+              "gpu": {
+                "meanMs": 1.924357103505843,
+                "p50Ms": 1.743291,
+                "p95Ms": 3.029374,
+                "p99Ms": 5.201999,
+                "maxMs": 6.623041,
+                "activeFrames": 599
+              },
+              "gpu/globe": {
+                "meanMs": 1.924357103505843,
+                "p50Ms": 1.743291,
+                "p95Ms": 3.029374,
+                "p99Ms": 5.201999,
+                "maxMs": 6.623041,
+                "activeFrames": 599
+              },
+              "flight": {
+                "meanMs": 1.88848080221122,
+                "p50Ms": 1.199999988079071,
+                "p95Ms": 4.800000011920929,
+                "p99Ms": 6.900000035762787,
+                "maxMs": 11,
+                "activeFrames": 599
+              },
+              "flight/view": {
+                "meanMs": 0.8562604354100554,
+                "p50Ms": 0.19999998807907104,
+                "p95Ms": 3.700000047683716,
+                "p99Ms": 5.800000011920929,
+                "maxMs": 9.699999988079071,
+                "activeFrames": 568
+              },
+              "flight/hud": {
+                "meanMs": 0.5263772968059788,
+                "p50Ms": 0.5,
+                "p95Ms": 0.6000000238418579,
+                "p99Ms": 0.7000000476837158,
+                "maxMs": 0.800000011920929,
+                "activeFrames": 599
+              },
+              "flight/hud/attitude": {
+                "meanMs": 0.4240400643897972,
+                "p50Ms": 0.40000003576278687,
+                "p95Ms": 0.5,
+                "p99Ms": 0.6000000238418579,
+                "maxMs": 0.699999988079071,
+                "activeFrames": 599
+              },
+              "map": {
+                "meanMs": 1.1712854757332842,
+                "p50Ms": 0.5999999642372131,
+                "p95Ms": 4.099999964237213,
+                "p99Ms": 5.900000035762787,
+                "maxMs": 7.800000011920929,
+                "activeFrames": 575
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "gpuCost": {
+    "browser": "Chrome/157.0.8103.50",
+    "setup": {
+      "backends": [
+        "canvas2d",
+        "webgl2"
+      ],
+      "dpr": 2,
+      "loadPixels": [
+        2560,
+        1440
+      ],
+      "timer": true,
+      "indicatorPixels": [
+        [
+          220,
+          220
+        ],
+        [
+          220,
+          220
+        ]
+      ],
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)"
+    },
+    "iters": {
+      "heavy": 349,
+      "globeSized": 16
+    },
+    "featureStatus": {
+      "2d_canvas": "enabled",
+      "gpu_compositing": "enabled",
+      "rasterization": "enabled",
+      "skia_graphite": "enabled_on",
+      "webgl": "enabled"
+    },
+    "calibration": [
+      {
+        "iters": 256,
+        "intervalMs": 20.667999999999996,
+        "loadGpuMedianMs": 39.746374
+      },
+      {
+        "iters": 167,
+        "intervalMs": 17,
+        "loadGpuMedianMs": 23.748375
+      },
+      {
+        "iters": 183,
+        "intervalMs": 16.665999999999993,
+        "loadGpuMedianMs": 13.616249
+      },
+      {
+        "iters": 349,
+        "intervalMs": 28.333999999999996,
+        "loadGpuMedianMs": 54.645374
+      }
+    ],
+    "phases": {
+      "alone": {
+        "iters": 0,
+        "reps": 4,
+        "framesPerBlock": 90,
+        "summary": {
+          "none": {
+            "intervalMs": 16.66624999999999,
+            "deltaVsNoneMs": 0,
+            "deltaRangeMs": [
+              0,
+              0
+            ],
+            "cpuMs": 0.002499999850988388,
+            "loadGpuMs": 0.377041,
+            "indicatorGpuMs": null
+          },
+          "canvas2d": {
+            "intervalMs": 16.66624999999999,
+            "deltaVsNoneMs": 2.1316282072803006e-14,
+            "deltaRangeMs": [
+              -0.0012500000000272848,
+              0.0012499999999810996
+            ],
+            "cpuMs": 0.4375,
+            "loadGpuMs": 0.426875,
+            "indicatorGpuMs": null
+          },
+          "webgl2": {
+            "intervalMs": 16.66624999999999,
+            "deltaVsNoneMs": 0,
+            "deltaRangeMs": [
+              -0.0012500000000272848,
+              2.1316282072803006e-14
+            ],
+            "cpuMs": 0.23499999418854714,
+            "loadGpuMs": 0.374624,
+            "indicatorGpuMs": 0.481333
+          }
+        }
+      },
+      "globe": {
+        "iters": 16,
+        "reps": 4,
+        "framesPerBlock": 90,
+        "summary": {
+          "none": {
+            "intervalMs": 16.666250000000037,
+            "deltaVsNoneMs": 0,
+            "deltaRangeMs": [
+              0,
+              0
+            ],
+            "cpuMs": 0.001250000298023224,
+            "loadGpuMs": 3.743125,
+            "indicatorGpuMs": null
+          },
+          "canvas2d": {
+            "intervalMs": 16.666249999999945,
+            "deltaVsNoneMs": -9.237055564881302e-14,
+            "deltaRangeMs": [
+              -0.0025000000000083844,
+              0.0012500000000734701
+            ],
+            "cpuMs": 0.41874999552965164,
+            "loadGpuMs": 2.089624,
+            "indicatorGpuMs": null
+          },
+          "webgl2": {
+            "intervalMs": 16.66500000000001,
+            "deltaVsNoneMs": -0.0012499999999810996,
+            "deltaRangeMs": [
+              -0.0025000000000545697,
+              0.0025000000000545697
+            ],
+            "cpuMs": 0.21499999687075616,
+            "loadGpuMs": 3.744458,
+            "indicatorGpuMs": 3.838958
+          }
+        }
+      },
+      "gpu-bound": {
+        "iters": 349,
+        "reps": 6,
+        "framesPerBlock": 150,
+        "summary": {
+          "none": {
+            "intervalMs": 28.45142857142855,
+            "deltaVsNoneMs": 0,
+            "deltaRangeMs": [
+              0,
+              0
+            ],
+            "cpuMs": 0.001428571343421936,
+            "loadGpuMs": 54.780124,
+            "indicatorGpuMs": null
+          },
+          "canvas2d": {
+            "intervalMs": 29.402857142857204,
+            "deltaVsNoneMs": 1.071428571428573,
+            "deltaRangeMs": [
+              0.7135714285714378,
+              1.3092857142856325
+            ],
+            "cpuMs": 0.8264285734721593,
+            "loadGpuMs": 55.364375,
+            "indicatorGpuMs": null
+          },
+          "webgl2": {
+            "intervalMs": 28.689285714285713,
+            "deltaVsNoneMs": 0.23785714285716253,
+            "deltaRangeMs": [
+              -0.23785714285716253,
+              0.594285714285693
+            ],
+            "cpuMs": 0.22785714140960148,
+            "loadGpuMs": 53.55375,
+            "indicatorGpuMs": 27.891708
+          },
+          "extra": {
+            "intervalMs": 29.28500000000001,
+            "deltaVsNoneMs": 0.8335714285714069,
+            "deltaRangeMs": [
+              0.7135714285713881,
+              1.0721428571430032
+            ],
+            "cpuMs": 0.002857142686843872,
+            "loadGpuMs": 56.533708,
+            "indicatorGpuMs": null
+          }
+        },
+        "blocks": [
+          {
+            "rep": 0,
+            "condition": "none",
+            "iters": 349,
+            "frames": 140,
+            "intervalMs": 28.451428571428604,
+            "cpuMeanMs": 0.001428571343421936,
+            "loadGpuMedianMs": 54.255541,
+            "indicatorGpuMedianMs": null
+          },
+          {
+            "rep": 0,
+            "condition": "canvas2d",
+            "iters": 349,
+            "frames": 140,
+            "intervalMs": 29.165000000000042,
+            "cpuMeanMs": 0.8578571434531893,
+            "loadGpuMedianMs": 55.175958,
+            "indicatorGpuMedianMs": null
+          },
+          {
+            "rep": 0,
+            "condition": "webgl2",
+            "iters": 349,
+            "frames": 140,
+            "intervalMs": 29.045714285714297,
+            "cpuMeanMs": 0.22785714140960148,
+            "loadGpuMedianMs": 53.55375,
+            "indicatorGpuMedianMs": 29.473625
+          },
+          {
+            "rep": 0,
+            "condition": "extra",
+            "iters": 359,
+            "frames": 140,
+            "intervalMs": 29.28500000000001,
+            "cpuMeanMs": 0,
+            "loadGpuMedianMs": 55.980833,
+            "indicatorGpuMedianMs": null
+          },
+          {
+            "rep": 1,
+            "condition": "extra",
+            "iters": 359,
+            "frames": 140,
+            "intervalMs": 29.5221428571429,
+            "cpuMeanMs": 0,
+            "loadGpuMedianMs": 56.653666,
+            "indicatorGpuMedianMs": null
+          },
+          {
+            "rep": 1,
+            "condition": "webgl2",
+            "iters": 349,
+            "frames": 140,
+            "intervalMs": 28.689285714285713,
+            "cpuMeanMs": 0.21071428656578065,
+            "loadGpuMedianMs": 52.680374,
+            "indicatorGpuMedianMs": 29.182499
+          },
+          {
+            "rep": 1,
+            "condition": "canvas2d",
+            "iters": 349,
+            "frames": 140,
+            "intervalMs": 29.402857142857204,
+            "cpuMeanMs": 0.8450000047683716,
+            "loadGpuMedianMs": 55.363958,
+            "indicatorGpuMedianMs": null
+          },
+          {
+            "rep": 1,
+            "condition": "none",
+            "iters": 349,
+            "frames": 140,
+            "intervalMs": 28.45142857142855,
+            "cpuMeanMs": 0.001428571343421936,
+            "loadGpuMedianMs": 54.532875,
+            "indicatorGpuMedianMs": null
+          },
+          {
+            "rep": 2,
+            "condition": "none",
+            "iters": 349,
+            "frames": 140,
+            "intervalMs": 28.450714285714326,
+            "cpuMeanMs": 0,
+            "loadGpuMedianMs": 54.764416,
+            "indicatorGpuMedianMs": null
+          },
+          {
+            "rep": 2,
+            "condition": "canvas2d",
+            "iters": 349,
+            "frames": 140,
+            "intervalMs": 29.64142857142859,
+            "cpuMeanMs": 0.6764285743236542,
+            "loadGpuMedianMs": 57.416999,
+            "indicatorGpuMedianMs": null
+          },
+          {
+            "rep": 2,
+            "condition": "webgl2",
+            "iters": 349,
+            "frames": 140,
+            "intervalMs": 28.212857142857164,
+            "cpuMeanMs": 0.2192857129233224,
+            "loadGpuMedianMs": 53.32125,
+            "indicatorGpuMedianMs": 27.666874
+          },
+          {
+            "rep": 2,
+            "condition": "extra",
+            "iters": 359,
+            "frames": 140,
+            "intervalMs": 29.28428571428563,
+            "cpuMeanMs": 0.0007142854588372367,
+            "loadGpuMedianMs": 56.588708,
+            "indicatorGpuMedianMs": null
+          },
+          {
+            "rep": 3,
+            "condition": "extra",
+            "iters": 359,
+            "frames": 140,
+            "intervalMs": 29.165714285714266,
+            "cpuMeanMs": 0.002857142686843872,
+            "loadGpuMedianMs": 56.533708,
+            "indicatorGpuMedianMs": null
+          },
+          {
+            "rep": 3,
+            "condition": "webgl2",
+            "iters": 349,
+            "frames": 140,
+            "intervalMs": 28.57000000000002,
+            "cpuMeanMs": 0.22785714268684387,
+            "loadGpuMedianMs": 53.929208,
+            "indicatorGpuMedianMs": 27.470833
+          },
+          {
+            "rep": 3,
+            "condition": "canvas2d",
+            "iters": 349,
+            "frames": 140,
+            "intervalMs": 29.28428571428563,
+            "cpuMeanMs": 0.8171428569725582,
+            "loadGpuMedianMs": 55.312208,
+            "indicatorGpuMedianMs": null
+          },
+          {
+            "rep": 3,
+            "condition": "none",
+            "iters": 349,
+            "frames": 140,
+            "intervalMs": 28.45142857142855,
+            "cpuMeanMs": 0.0021428572280066355,
+            "loadGpuMedianMs": 54.780124,
+            "indicatorGpuMedianMs": null
+          },
+          {
+            "rep": 4,
+            "condition": "none",
+            "iters": 349,
+            "frames": 140,
+            "intervalMs": 28.33142857142853,
+            "cpuMeanMs": 0,
+            "loadGpuMedianMs": 55.104958,
+            "indicatorGpuMedianMs": null
+          },
+          {
+            "rep": 4,
+            "condition": "canvas2d",
+            "iters": 349,
+            "frames": 140,
+            "intervalMs": 29.4028571428571,
+            "cpuMeanMs": 0.7578571460076741,
+            "loadGpuMedianMs": 55.794416,
+            "indicatorGpuMedianMs": null
+          },
+          {
+            "rep": 4,
+            "condition": "webgl2",
+            "iters": 349,
+            "frames": 140,
+            "intervalMs": 28.807857142857184,
+            "cpuMeanMs": 0.21214285833495003,
+            "loadGpuMedianMs": 53.901916,
+            "indicatorGpuMedianMs": 27.891708
+          },
+          {
+            "rep": 4,
+            "condition": "extra",
+            "iters": 359,
+            "frames": 140,
+            "intervalMs": 29.40357142857153,
+            "cpuMeanMs": 0.003571428997176034,
+            "loadGpuMedianMs": 56.388875,
+            "indicatorGpuMedianMs": null
+          },
+          {
+            "rep": 5,
+            "condition": "extra",
+            "iters": 359,
+            "frames": 140,
+            "intervalMs": 29.165000000000042,
+            "cpuMeanMs": 0.0035714294229234967,
+            "loadGpuMedianMs": 56.02175,
+            "indicatorGpuMedianMs": null
+          },
+          {
+            "rep": 5,
+            "condition": "webgl2",
+            "iters": 349,
+            "frames": 140,
+            "intervalMs": 28.450714285714326,
+            "cpuMeanMs": 0.23142857210976736,
+            "loadGpuMedianMs": 53.530999,
+            "indicatorGpuMedianMs": 27.191083
+          },
+          {
+            "rep": 5,
+            "condition": "canvas2d",
+            "iters": 349,
+            "frames": 140,
+            "intervalMs": 29.760714285714286,
+            "cpuMeanMs": 0.8264285734721593,
+            "loadGpuMedianMs": 55.364375,
+            "indicatorGpuMedianMs": null
+          },
+          {
+            "rep": 5,
+            "condition": "none",
+            "iters": 349,
+            "frames": 140,
+            "intervalMs": 28.451428571428654,
+            "cpuMeanMs": 0,
+            "loadGpuMedianMs": 54.913958,
+            "indicatorGpuMedianMs": null
+          }
+        ]
+      }
+    },
+    "startedAt": "2026-11-10T02:04:39.640Z",
+    "finishedAt": "2026-11-10T02:07:11.739Z"
+  },
+  "realApp": {
+    "steps": [
+      {
+        "name": "test link",
+        "href": "/fly/?renderer=webgl2&set.osfs.start.resume=false&set.osfs.start.paused=true&test=attitude-webgl2",
+        "panel": {
+          "title": "Try the WebGL2 attitude indicator",
+          "status": "Press Start, follow the steps, then finish and download your feedback."
+        }
+      },
+      {
+        "name": "initial",
+        "backend": "canvas2d",
+        "glRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)"
+      },
+      {
+        "name": "opened Renderer tab",
+        "opened": "WebGL2",
+        "tabs": [
+          "test-feedback"
+        ]
+      },
+      {
+        "name": "chose canvas2d",
+        "value": "canvas2d",
+        "backend": "canvas2d",
+        "note": "Drawing with Canvas 2D.",
+        "mirrorEvents": 0,
+        "canvases": 1,
+        "size": [
+          220,
+          220,
+          220,
+          2
+        ]
+      },
+      {
+        "name": "chose webgl2",
+        "value": "webgl2",
+        "backend": "webgl2",
+        "note": "Drawing with WebGL2 (experimental), on the indicator's canvas.",
+        "mirrorEvents": 15,
+        "canvases": 1,
+        "size": [
+          352,
+          352,
+          220,
+          2
+        ]
+      },
+      {
+        "name": "context lost",
+        "backend": "canvas2d",
+        "note": "Drawing with Canvas 2D. WebGL2 lost its drawing context.",
+        "canvases": 1
+      },
+      {
+        "name": "chose canvas2d",
+        "value": "canvas2d",
+        "backend": "canvas2d",
+        "note": "Drawing with Canvas 2D.",
+        "mirrorEvents": 0,
+        "canvases": 1,
+        "size": [
+          352,
+          352,
+          220,
+          2
+        ]
+      },
+      {
+        "name": "chose webgl2",
+        "value": "webgl2",
+        "backend": "webgl2",
+        "note": "Drawing with WebGL2 (experimental), on the indicator's canvas.",
+        "mirrorEvents": 27,
+        "canvases": 1,
+        "size": [
+          352,
+          352,
+          220,
+          2
+        ]
+      },
+      {
+        "name": "chose auto",
+        "value": "auto",
+        "backend": "canvas2d",
+        "note": "Drawing with Canvas 2D.",
+        "mirrorEvents": 0,
+        "canvases": 1,
+        "size": [
+          352,
+          352,
+          220,
+          2
+        ]
+      }
+    ],
+    "feedbackInstrumentsSamples": 2,
+    "consoleWarnings": [
+      "warning: [runtime] No Google Maps API key found. Starting without Google 3D tiles.",
+      "warning: BJS - [19:53:07]: Node __root__ has a parent that is not in the container.",
+      "warning: BJS - [19:53:07]: SceneSerializer.addAllToScene: The Asset Container hierarchy is not valid."
+    ]
+  },
+  "archive": {
+    "file": "attitude-webgl2-evidence.tar.gz",
+    "sha256": "2e79a512ccc75ae7c487fa48feb33c4e8d59b8fd38a85a9900ee9c597f7fa1be",
+    "bytes": 45517,
+    "note": "Member paths are relative to the organization root (~/gh/0sfs). Excludes Chrome profiles, builds, map tiles and images; the scripts regenerate the images.",
+    "files": [
+      {
+        "path": "fly/build/perf-20261109-webgl/check.mjs",
+        "bytes": 2689,
+        "sha256": "018a0962e2943666978cd334fc89754ea1edcb0d4d55dba291245c99acb60f37"
+      },
+      {
+        "path": "fly/build/perf-20261109-webgl/check-entry.ts",
+        "bytes": 3814,
+        "sha256": "40affa04eb81210a3c9a08aa32a9939026547bd9467b5773a79c931524077c4e"
+      },
+      {
+        "path": "fly/build/perf-20261109-webgl/check-report.json",
+        "bytes": 80201,
+        "sha256": "0bc8a763695604ce1573bcb3eaf829442b6ba058d20073b25fa32d0eb8055223"
+      },
+      {
+        "path": "fly/build/perf-20261109-webgl/bench.mjs",
+        "bytes": 2466,
+        "sha256": "0516edb02b16918f081cbef4745e46a5b8da92b60bf6a134277c8c37a582dcb5"
+      },
+      {
+        "path": "fly/build/perf-20261109-webgl/bench-entry.ts",
+        "bytes": 2648,
+        "sha256": "a0a4f3aa0690098f5ab034dad93c13327ee163211634bdbcef3be94caddb5b5c"
+      },
+      {
+        "path": "fly/build/perf-20261109-webgl/bench-report.json",
+        "bytes": 10360,
+        "sha256": "e36c578e0c8e62e0059376ba8ca8ca3eb5462c11fd39136e29a87455edac4a7f"
+      },
+      {
+        "path": "fly/build/perf-20261109-webgl/old/attitudeWebGpu.ts",
+        "bytes": 20994,
+        "sha256": "62d117d3279a81ab5450bdc134724430f3a4fc23a34dd587cc102c415819fe14"
+      },
+      {
+        "path": "fly/build/perf-20261109-webgl2-resume/ui-probe.mjs",
+        "bytes": 8532,
+        "sha256": "fbe41011e0bb7dd9a151d937be187a038536d592f5cfbac33887d5f47ffdf4bb"
+      },
+      {
+        "path": "fly/build/perf-20261109-webgl2-resume/ui-probe.json",
+        "bytes": 2620,
+        "sha256": "0006fa6dd9e685893afad7c8a0c9fad5fe345db1208874ee673abea4417198f8"
+      },
+      {
+        "path": "fly/build/perf-20261109-webgl2-resume/report-pass1.json",
+        "bytes": 27175,
+        "sha256": "8ff5d67543d8524e484bb69545ff94349168ba94c9389b30df191a4c523186b1"
+      },
+      {
+        "path": "fly/build/perf-20261109-webgl2-resume/report-pass2.json",
+        "bytes": 27138,
+        "sha256": "2dc1517a06fefbd347c8472139244bd508af10b97d59abf54a9b9ef953a53b6d"
+      },
+      {
+        "path": "fly/build/perf-20261109-webgl2-resume/renderer-fixed.log",
+        "bytes": 394,
+        "sha256": "d2c4c30ba7f3c4afd6d4abe051552e1c1e87c70ad9bf872d05e79db6909c8de0"
+      },
+      {
+        "path": "fly/build/perf-20261109-webgl2-resume/renderer-mutant.log",
+        "bytes": 1409,
+        "sha256": "9a2933b360155e412568f869296b98bc160e94402926e7eaafab532604bcbc65"
+      },
+      {
+        "path": "fly/build/perf-20261109-webgl2-resume/gpu-cost/entry.ts",
+        "bytes": 6455,
+        "sha256": "61f27995e7afba20e705e07d4dded39f978442b75db9cfbf957187573c9bbd84"
+      },
+      {
+        "path": "fly/build/perf-20261109-webgl2-resume/gpu-cost/run.mjs",
+        "bytes": 5606,
+        "sha256": "749cdaa77ad294746cafe4acb63a77631b33c7951d17363d654a82ce5c538af7"
+      },
+      {
+        "path": "fly/build/perf-20261109-webgl2-resume/gpu-cost/report.json",
+        "bytes": 27646,
+        "sha256": "912883a32c601d039d7f7e413ab96fd65a3592f71dc544c2c336c9bf2caa7356"
+      },
+      {
+        "path": "fly/build/perf-20261109-webgl2-resume/gpu-cost/run.log",
+        "bytes": 1608,
+        "sha256": "766a8e34cd2b34a3fecaddd9572f9ea02db6078008f73d860499e3f6c5ddff1b"
+      },
+      {
+        "path": "fly/build/perf-20261109-webgl2-resume/side-by-side/entry.ts",
+        "bytes": 5768,
+        "sha256": "0ad564b52917743e7d1e1e244182676d3b2f92872ffd8da21aae358e9fb25185"
+      },
+      {
+        "path": "fly/build/perf-20261109-webgl2-resume/side-by-side/run.mjs",
+        "bytes": 2538,
+        "sha256": "8c700e834813573cbc4a7ffc111c4657a996462582aafdaa92c139dae198d116"
+      },
+      {
+        "path": "fly/build/perf-20261109-webgl2-resume/side-by-side/stats.json",
+        "bytes": 626,
+        "sha256": "221f512f945d844fb92c8d1a409a95fe1d0c1aadd96a989e7b427ecf7fe350d8"
+      },
+      {
+        "path": "fly/build/perf-20261109-webgl2-resume/make-evidence.py",
+        "bytes": 6565,
+        "sha256": "35625a582ce518b9b645c3fd1535d10c62ed366c73fb32e645b6155d00150496"
+      }
+    ]
+  }
+}

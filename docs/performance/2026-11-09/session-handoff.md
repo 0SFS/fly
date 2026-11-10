@@ -110,3 +110,21 @@ view, resizing, and changing aircraft. In F-35B flight, compare dry and
 reacting exhaust and switch the instrument backend while paused. The output
 should look and behave as before. This pass does not need a new UI decision
 or change any visual-quality option.
+
+## Continuation: the WebGL2 attitude indicator
+
+[attitude-webgl2.md](attitude-webgl2.md) covers prompt 03's step 2, shipped
+in fly `8c053b8`. *WebGL2* is a new, opt-in choice for the attitude
+indicator, and Auto is unchanged.
+
+On this machine, the WebGL2 indicator takes 0.31 ms a frame off the main
+thread in the app. When the GPU is the bottleneck, it adds 0.24 ms to the
+frame where Canvas 2D adds 1.07 ms.
+
+The frame budget's WebGL2 GPU timers measure spans that include other
+contexts' work. Read `gpu/attitude indicator`, and possibly `gpu/globe`, on
+WebGL2 with that in mind.
+
+The user still has to decide two things: the image tolerance, and whether
+Auto should choose WebGL2 on WebGL2 globes. Step 3 (skipping sub-pixel
+redraws, behind a setting) has not been started.
