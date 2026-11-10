@@ -15,7 +15,9 @@ the main-thread cost without adding GPU cost.
 - **New choice.** The *Attitude indicator* setting
   (`osfs.renderer.attitudeIndicator`) has a new choice, **WebGL2**, which is
   opt-in and labelled experimental. **Auto is unchanged:** it uses Canvas 2D
-  on WebGL2 globes and WebGPU on WebGPU globes.
+  on WebGL2 globes and WebGPU on WebGPU globes. (Later the same day, Auto was
+  switched to WebGL2 on WebGL2 globes; see
+  [Decided: Auto uses WebGL2](#decided-auto-uses-webgl2-on-webgl2-globes).)
 - **The WebGL2 renderer.** `attitudeWebGl2.ts` and `attitudeWebGl2Shader.ts`
   port the WebGPU renderer to GLSL ES 3.00.
   - It draws in its own WebGL2 context, on the indicator's own canvas.
@@ -242,6 +244,10 @@ The load's figure comes from the blocks without an indicator.
 
 ## Decisions for the user
 
+Decisions 1 and 2 were settled later on 9 November; see
+[Decided: Auto uses WebGL2](#decided-auto-uses-webgl2-on-webgl2-globes).
+Decision 3 is still open.
+
 1. **The tolerance.** Proposed:
    - WebGL2 matches WebGPU within 2 levels at even backing sizes. At odd
      sizes, line edges may differ on under 1% of values.
@@ -261,6 +267,96 @@ The load's figure comes from the blocks without an indicator.
 3. **The frame budget's WebGL2 indicator timer.** Remove it, or keep it
    with a label saying it is a span? As it stands, it overstates the
    indicator and double-counts in the `gpu` total.
+
+## Decided: Auto uses WebGL2 on WebGL2 globes
+
+On 9 November the user looked at the
+[side-by-side images](#exactness-and-image-comparison) and accepted the
+look of all three renderers: "webgl2 looks great, they all do". That settles
+the tolerance and the Auto question above. The change is in the fly commit
+that adds this section.
+
+- **Auto.** On a globe without WebGPU, Auto now starts WebGL2 on the
+  indicator's own canvas.
+  - If WebGL2 is unavailable, fails to start or draw, or loses its context,
+    Canvas 2D takes over on a fresh canvas. The note says why, and Auto
+    stays selected.
+  - WebGPU globes are unchanged. If WebGPU cannot build its pipelines, Auto
+    still falls back to Canvas 2D, without trying WebGL2 beside the globe's
+    device.
+  - Choosing WebGPU explicitly on a WebGL2 globe still gives Canvas 2D, with
+    the same reason as before.
+- **Wording.** The WebGL2 choice is no longer called experimental. The note
+  reads "Drawing with WebGL2, on the indicator's canvas." The setting's Auto
+  description and default reason now say what Auto does.
+- **Not changed:**
+  - A saved explicit choice, such as Canvas 2D, is kept.
+  - The phone's pitch/roll pad still draws with Canvas 2D. A phone has not
+    been measured.
+  - `scripts/profile-flight.mjs` still runs `webgl2-canvas2d` by default,
+    not the new default `webgl2-webgl2`. Pass
+    `--runs=webgpu-webgpu,webgpu-canvas2d,webgl2-webgl2` to profile the
+    defaults on both globes.
+- **Decision 3 matters more now.** With the frame budget on, a WebGL2
+  globe under Auto now reports the indicator's span timer as
+  `gpu/attitude indicator`, and counts it twice in `gpu`.
+
+### Checks
+
+- **Tests.** In `attitudeRenderer.test.ts`:
+  - New tests check that Auto without a device draws with WebGL2 and falls
+    back after context loss.
+  - They check that Auto falls back to Canvas 2D, with the exact reason,
+    when WebGL2 is unavailable, throws at setup, or throws on its first draw.
+  - The WebGPU fallback test now also checks that WebGL2 was not tried.
+  - The Canvas 2D tests choose Canvas 2D explicitly instead of relying on
+    Auto.
+  - The status-note test covers the new note.
+  - The HUD and settings tests pass: 29 files, 226 tests. `npm run lint`
+    and `npm run typecheck` pass.
+- **Mutants.** Each was caught by the renderer tests, and the file was
+  restored byte for byte:
+
+  | Mutant | Failed tests |
+  |---|---|
+  | Auto on a WebGL2 globe goes back to Canvas 2D | the two new Auto tests |
+  | Auto tries WebGL2 even with a WebGPU device | the WebGPU redraw test and the WebGPU fallback test |
+  | The note still says "experimental" | the status-note test |
+
+- **Real app.** `npm run llm-dev`, Chrome 157.0.8103.50 headless, DPR 2, a
+  fresh profile, run twice with no problems reported:
+  - **The test link on a WebGL2 globe.** Auto was selected by default and
+    drew with WebGL2. There was one canvas, and the note read "Drawing with
+    WebGL2, on the indicator's canvas."
+  - **Switching.** Canvas 2D drew with no mirror events, as before. Returning
+    to Auto drew with WebGL2 again, with 11 and 20 mirror events in the two
+    runs.
+  - **Losing the context under Auto** gave one fresh Canvas 2D canvas. Auto
+    stayed selected, and the note read "Drawing with Canvas 2D. WebGL2 lost
+    its drawing context."
+  - **Recovery.** Choosing WebGL2 and then Auto again drew with WebGL2.
+  - **Feedback file.** Its start and finish `instruments` samples both read
+    `{ preference: "auto", backend: "webgl2", reason: null }`.
+  - **WebGPU globe.** Auto drew with WebGPU, and the note read "Drawing with
+    WebGPU, on the globe's GPU device."
+  - **Console.** No exceptions, and no warning about too many WebGL contexts.
+    Each page load gave the same three unrelated warnings as before.
+  - **Screenshots.** Taken in flight, they show the complete indicator under
+    Auto with WebGL2. They are in ignored
+    `fly/build/perf-20261109-webgl2-resume/auto/`.
+- **Retained evidence.**
+  [attitude-webgl2-auto-evidence.tar.gz](attitude-webgl2-auto-evidence.tar.gz)
+  is 5,155 bytes, with SHA-256
+  `8215df7a2c67b6dd084ddabae3cb033d9d6e92a21a363d42fe1b8d6de855596c`.
+  - It holds the probe script, the second run's JSON, both runs' logs and the
+    mutant runner.
+  - The first run used the same script without its two in-flight
+    screenshots.
+  - To reproduce, start `npm run llm-dev` and run
+    `node build/perf-20261109-webgl2-resume/auto/ui-probe-auto.mjs` from
+    `fly`. It takes about a minute. `python3
+    build/perf-20261109-webgl2-resume/auto/mutants.py` takes about
+    10 seconds.
 
 ## Validation
 

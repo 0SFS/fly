@@ -54,7 +54,7 @@ afterEach(() => {
 });
 
 describe("attitude renderer", () => {
-  it("uses WebGL2 only when asked, mirrors each draw, and falls back on a fresh canvas after context loss", async () => {
+  it("draws with WebGL2 when asked, mirrors each draw, and falls back on a fresh canvas after context loss", async () => {
     const gl = { render: vi.fn<webGl2.WebGl2Attitude["render"]>(), destroy: vi.fn() };
     const create = vi.spyOn(webGl2, "createWebGl2Attitude").mockReturnValue(gl);
     const t = stubCanvas();
@@ -135,18 +135,55 @@ describe("attitude renderer", () => {
     expect(gpu.destroy).toHaveBeenCalledOnce();
   });
 
-  it("draws with Canvas 2D when the globe has no WebGPU device", async () => {
+  it("draws with WebGL2 under Auto when the globe has no WebGPU device", async () => {
+    const gl = { render: vi.fn<webGl2.WebGl2Attitude["render"]>(), destroy: vi.fn() };
+    const create = vi.spyOn(webGl2, "createWebGl2Attitude").mockReturnValue(gl);
     const t = stubCanvas();
     const renderer = createAttitudeRenderer(t.host);
-    await expect(renderer.ready).resolves.toBe("canvas2d");
+    await expect(renderer.ready).resolves.toBe("webgl2");
+    expect(renderer.status).toEqual({ preference: "auto", backend: "webgl2", reason: null });
+    expect(create.mock.calls[0]![0]).toBe(t.canvas());
     renderer.draw(LEVEL, CENTRED);
+    expect(gl.render).toHaveBeenCalledOnce();
+    expect(t.frames()).toBe(0);
+    // A lost context hands the instrument to Canvas 2D, and Auto stays the choice.
+    create.mock.calls[0]![1]!.onContextLost!();
+    await expect(renderer.ready).resolves.toBe("canvas2d");
+    expect(renderer.status).toEqual({ preference: "auto", backend: "canvas2d", reason: "WebGL2 lost its drawing context." });
     expect(t.frames()).toBe(1);
+    expect(gl.destroy).toHaveBeenCalledOnce();
     renderer.destroy();
+  });
+
+  it("draws with Canvas 2D under Auto, saying why, when WebGL2 cannot start or draw", async () => {
+    const cases: { create?: () => webGl2.WebGl2Attitude | null; reason: string }[] = [
+      // The stubbed canvas, like a browser without WebGL2, has no such context to give.
+      { reason: "WebGL2 is not available to the indicator." },
+      { create: () => { throw new Error("compile failed"); }, reason: "WebGL2 could not start here: compile failed" },
+      {
+        create: () => ({ render: () => { throw new Error("draw failed"); }, destroy: vi.fn() }),
+        reason: "WebGL2 could not draw here: draw failed",
+      },
+    ];
+    for (const { create, reason } of cases) {
+      if (create) vi.spyOn(webGl2, "createWebGl2Attitude").mockImplementation(create);
+      const t = stubCanvas();
+      const renderer = createAttitudeRenderer(t.host);
+      await renderer.ready;
+      renderer.draw(LEVEL, CENTRED);
+      await expect(renderer.ready).resolves.toBe("canvas2d");
+      expect(renderer.status).toEqual({ preference: "auto", backend: "canvas2d", reason });
+      expect(t.canvas().dataset.attitudeBackend).toBe("canvas2d");
+      expect(t.host.querySelectorAll("canvas")).toHaveLength(1);
+      expect(t.frames()).toBe(1);
+      renderer.destroy();
+      vi.restoreAllMocks();
+    }
   });
 
   it("skips a frame that would draw the same picture", async () => {
     const t = stubCanvas();
-    const renderer = createAttitudeRenderer(t.host);
+    const renderer = createAttitudeRenderer(t.host, { preference: "canvas2d" });
     await renderer.ready;
     renderer.draw(LEVEL, CENTRED);
     renderer.draw({ ...LEVEL }, { ...CENTRED });
@@ -161,7 +198,7 @@ describe("attitude renderer", () => {
     const t = stubCanvas();
     const compute = attitude.computeAttitudeScene;
     const sampled = vi.spyOn(attitude, "computeAttitudeScene");
-    const renderer = createAttitudeRenderer(t.host);
+    const renderer = createAttitudeRenderer(t.host, { preference: "canvas2d" });
     await renderer.ready;
     const state = { ...LEVEL };
     const stick = { ...CENTRED };
@@ -197,7 +234,7 @@ describe("attitude renderer", () => {
 
   it("draws again when the camera it is drawn from turns, though the aircraft holds still", async () => {
     const t = stubCanvas();
-    const renderer = createAttitudeRenderer(t.host);
+    const renderer = createAttitudeRenderer(t.host, { preference: "canvas2d" });
     await renderer.ready;
     const ahead = [1, 0, 0, 0, 1, 0, 0, 0, 1];
     const east = [0, -1, 0, 1, 0, 0, 0, 0, 1];
@@ -245,15 +282,16 @@ describe("attitude renderer", () => {
     expect(t.frames()).toBe(0);
     await expect(renderer.ready).resolves.toBe("canvas2d");
     expect(t.frames()).toBe(1);
-    // The canvas was never claimed for WebGPU, or 2D could not have it.
+    // The canvas was never claimed for WebGPU, or 2D could not have it. Auto does not try WebGL2 beside the globe's WebGPU.
     expect(t.getContext.mock.calls.map(([kind]) => kind)).not.toContain("webgpu");
+    expect(t.getContext.mock.calls.map(([kind]) => kind)).not.toContain("webgl2");
     renderer.destroy();
   });
 
   it("sizes the backing store to the screen's pixel density", async () => {
     vi.stubGlobal("devicePixelRatio", 2);
     const t = stubCanvas();
-    const renderer = createAttitudeRenderer(t.host);
+    const renderer = createAttitudeRenderer(t.host, { preference: "canvas2d" });
     await renderer.ready;
     renderer.draw(LEVEL, CENTRED);
     expect([t.canvas().width, t.canvas().height]).toEqual([440, 440]);
@@ -262,7 +300,7 @@ describe("attitude renderer", () => {
 
   it("draws into a canvas of its own, which the host keeps the pointer for", async () => {
     const t = stubCanvas();
-    const renderer = createAttitudeRenderer(t.host);
+    const renderer = createAttitudeRenderer(t.host, { preference: "canvas2d" });
     await renderer.ready;
     expect(t.host.children).toHaveLength(1);
     expect(t.canvas().style.pointerEvents).toBe("none");
@@ -301,7 +339,7 @@ describe("attitude renderer", () => {
 
   it("draws nothing once destroyed", async () => {
     const t = stubCanvas();
-    const renderer = createAttitudeRenderer(t.host);
+    const renderer = createAttitudeRenderer(t.host, { preference: "canvas2d" });
     await renderer.ready;
     renderer.destroy();
     renderer.draw(LEVEL, CENTRED);
@@ -314,6 +352,10 @@ describe("attitude renderer status note", () => {
     expect(describeAttitudeRendererStatus({ preference: "auto", backend: null, reason: null })).toBeNull();
     expect(describeAttitudeRendererStatus({ preference: "auto", backend: "webgpu", reason: null }))
       .toBe("Drawing with WebGPU, on the globe's GPU device.");
+    expect(describeAttitudeRendererStatus({ preference: "auto", backend: "webgl2", reason: null }))
+      .toBe("Drawing with WebGL2, on the indicator's canvas.");
+    expect(describeAttitudeRendererStatus({ preference: "auto", backend: "canvas2d", reason: "WebGL2 is not available to the indicator." }))
+      .toBe("Drawing with Canvas 2D. WebGL2 is not available to the indicator.");
     expect(describeAttitudeRendererStatus({ preference: "webgpu", backend: "canvas2d", reason: "WebGPU is unavailable." }))
       .toBe("Drawing with Canvas 2D. WebGPU is unavailable.");
   });

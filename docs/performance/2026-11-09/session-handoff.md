@@ -125,6 +125,12 @@ The frame budget's WebGL2 GPU timers measure spans that include other
 contexts' work. Read `gpu/attitude indicator`, and possibly `gpu/globe`, on
 WebGL2 with that in mind.
 
-The user still has to decide two things: the image tolerance, and whether
-Auto should choose WebGL2 on WebGL2 globes. Step 3 (skipping sub-pixel
-redraws, behind a setting) has not been started.
+Later that day the user accepted the look of all three renderers, so Auto
+now chooses WebGL2 on WebGL2 globes, with Canvas 2D as the fallback. WebGPU
+globes are unchanged. See
+[Decided: Auto uses WebGL2](attitude-webgl2.md#decided-auto-uses-webgl2-on-webgl2-globes).
+
+Still open: whether to remove the WebGL2 indicator's GPU timer or relabel it
+as a span. Under Auto it now appears by default on WebGL2 globes whenever the
+frame budget is on. Step 3 (skipping sub-pixel redraws, behind a setting) has
+not been started.
