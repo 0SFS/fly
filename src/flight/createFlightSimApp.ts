@@ -3873,6 +3873,7 @@ async function createFlightSimSession(
         case "enable": flightAudio.setEnabled(action.enabled); break;
         case "quality": flightAudio.setQuality(action.quality); break;
         case "settings": flightAudio.patchSettings(action.patch); break;
+        case "electricTuning": flightAudio.patchElectricTuning(action.patch); break;
         case "retest": flightAudio.retest(); break;
       }
       controlPanel?.update(createPanelSnapshot(physicsLoop.getLatestState() ?? initialState));
